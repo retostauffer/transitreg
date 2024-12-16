@@ -44,10 +44,10 @@ tm(formula, data, subset, na.action,
 \details{
   The function transforms the input data using \code{\link{tm_data}} to a format 
   compatible with transition models. Estimation relies on binary GLM-type techniques 
-  to model conditional transition probabilities. The \code{theta} variable, representing 
-  the current transition level, is automatically included in the model. Additional 
-  transition-specific covariates, such as those addressing excess zeros, can be 
-  included by adding \code{theta0}, \code{theta1}, etc., to the formula.
+  to model conditional transition probabilities. Note that the \code{theta} variable, representing 
+  the current transition level, must be included in the model by the user, please
+  see the examples. Additional transition-specific covariates, such as those addressing excess
+  zeros, can be included by adding \code{theta0}, \code{theta1}, etc., to the formula.
 
   For continuous responses, the \code{breaks} argument specifies the intervals for 
   discretizing the response, enabling the application of count-based transition models.
@@ -74,7 +74,7 @@ x <- runif(n, -3, 3)
 y <- rpois(n, exp(2 + sin(x)))
 
 ## Fit transition count response model.
-b <- tm(y ~ s(x))
+b <- tm(y ~ s(theta) + s(x))
 
 ## GAM summary.
 summary(b)
@@ -106,7 +106,7 @@ x <- runif(n, -3, 3)
 y <- sin(x) + rnorm(n, sd = exp(-1 + cos(x)))
 
 ## Fit model with continuous response.
-b <- tm(y ~ s(x) + te(x, theta), breaks = 200)
+b <- tm(y ~ s(theta) + s(x) + te(x, theta), breaks = 200)
 
 ## Predictions and plotting
 nd <- data.frame(x = seq(-3, 3, length = 100))
@@ -118,6 +118,30 @@ fit <- cbind(
 )
 
 ## Plot data and fitted curves.
+plot(y ~ x, pch = 16, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
+matplot(nd$x, fit, type = "l", lty = 1, lwd = 2,
+  col = c(2, 4, 4, 4), add = TRUE)
+
+## Example 3: Count response with neural network.
+set.seed(123)
+n <- 1000
+x <- runif(n, -3, 3)
+y <- rpois(n, exp(2 + sin(x)))
+
+## Fit NN transition count response model.
+b <- tm(y ~ theta + x, scale.x = TRUE, engine = "nnet",
+  size = 5, maxit = 1000, decay = 0.001)
+
+## Predictions and plotting.
+nd <- data.frame(x = seq(-3, 3, length = 100))
+fit <- cbind(
+  predict(b, nd, type = "pmax"),
+  predict(b, nd, type = "quantile", p = 0.05/2),
+  predict(b, nd, type = "quantile", p = 0.5),
+  predict(b, nd, type = "quantile", p = 1 - 0.05/2)
+)
+
+## Plot data and fitted counts.
 plot(y ~ x, pch = 16, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
 matplot(nd$x, fit, type = "l", lty = 1, lwd = 2,
   col = c(2, 4, 4, 4), add = TRUE)

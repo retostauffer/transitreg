@@ -179,7 +179,7 @@ tm_dist <- function(y, data = NULL, ...)
     is_f <- TRUE
   } else {
     yn <- deparse(substitute(y), backtick = TRUE, width.cutoff = 500)
-    f <- y ~ 1
+    f <- y ~ s(theta)
     environment(f) <- environment(y)
     data <- list()
     data[["y"]] <- y
@@ -340,7 +340,7 @@ tm <- function(formula, data, subset, na.action,
       rval$new_formula <- update(formula, Y ~ .)
     }
   } else {
-    rval$new_formula <- update(formula, as.factor(Y) ~ . + theta)
+    rval$new_formula <- update(formula, as.factor(Y) ~ .)
   }
 
   ## Estimate model.

@@ -62,7 +62,7 @@ tm_dist(y)
 y <- c(y, rep(0, 500))
 
 ## Include a zero-inflation term.
-tm_dist(y ~ theta0)
+tm_dist(y ~ s(theta) + theta0)
 
 ## Example 3: Continuous data.
 set.seed(123)

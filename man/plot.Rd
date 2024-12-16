@@ -62,7 +62,7 @@ set.seed(123)
 n <- 500
 x <- runif(n, -3, 3)
 y <- rpois(n, exp(2 + sin(x)))
-b <- tm(y ~ s(x))
+b <- tm(y ~ s(theta) + s(x))
 
 ## Plot effects.
 plot(b, which = "effects")
