@@ -1,0 +1,72 @@
+---
+title: "Transition Models"
+format: 
+  html:
+    html-math-method: mathjax
+    toc: true
+    number-sections: true
+bibliography: tm.bib
+nocite: |
+  @Berger:2021
+vignette: >
+  %\VignetteIndexEntry{Transition Models}
+  %\VignetteEngine{quarto::html}
+  %\VignetteDepends{TransitionModels}
+  %\VignetteKeywords{transition models, first steps}
+  %\VignettePackage{tm}
+---
+
+```{r preliminaries, echo=FALSE, message=FALSE, results="hide"}
+library("TransitionModels")
+```
+Transition models provide a flexible and powerful framework for modeling response variables that transition between discrete or continuous states. Unlike traditional models that rely on fixed distributional assumptions (e.g., Poisson or Gaussian), transition models focus on the conditional probabilities of transitioning between successive response levels. This makes them particularly useful for data where the underlying distribution is complex, overdispersed, zero-inflated, or exhibits heteroskedasticity.
+
+The central idea of transition models is to decompose the response variable into a series of binary transitions, which can then be modeled using generalized linear or additive models. For example, given a count response, the model predicts the probability of transitioning from one count to the next higher count, conditional on covariates.
+
+Transition models are particularly advantageous in situations where:
+- **Flexibility is required**: They do not impose rigid distributional assumptions, allowing the data to define the response distribution.
+- **Heteroskedasticity is present**: The variance of the response may vary with covariates, and transition models can naturally accommodate this.
+- **Overdispersion or zero-inflation**: Transition models can better handle excess variability or an overrepresentation of zeros compared to traditional count models.
+
+## Key Features of Transition Models
+
+Transition models offer several unique features:
+
+1. **Modeling framework**: By focusing on transitions, the models allow for a probabilistic representation of the response that adapts to the data.
+2. **Flexibility in response type**: Transition models can be applied to both count and continuous data. For continuous responses, a slicing mechanism is used to discretize the response into bins, enabling the application of transition probabilities.
+3. **Covariate effects**: Transition models allow for rich interaction terms and smooth effects of covariates using frameworks such as generalized additive models (GAMs).
+4. **Applications**: These models are widely applicable across domains, including epidemiology, environmental sciences, and social sciences.
+
+## Structure of the Transition Model
+
+Transition models describe the conditional probability of a response transitioning from one state to a higher state, given the covariates and the previous state. The general form of the model is:
+
+$$
+P(Y_i > r \mid Y_i \geq r, \mathbf{x}_i) = F(\theta_r + \mathbf{x}_i^\top\boldsymbol{\beta}),
+$$
+
+where:
+
+- $P(Y_i > r \mid Y_i \geq r, \mathbf{x}_i)$ is the conditional probability of the response $Y_i$ exceeding the threshold $r$, given that $Y_i$ is at least $r$.
+- $F(\cdot)$ is a cumulative distribution function (CDF) that links the linear predictor to the probability space (e.g., logistic or probit function).
+- $\theta_r$ represents the transition-specific threshold parameter for the $r$-th transition.
+- $\mathbf{x}_i$ is the vector of covariates for observation $i$.
+- $\boldsymbol{\beta}$ is the vector of regression coefficients describing the effect of covariates.
+
+This structure allows for the modeling of probabilities across discrete transitions, such as moving from one count level to the next.
+
+For continuous responses, the transition model incorporates a discretization step:
+
+- The range of the continuous response variable is divided into a finite set of intervals (bins).
+- Each interval corresponds to a transition level, and the conditional probability of transitioning from one interval to the next is modeled similarly to transitions between count levels.
+
+This discretization enables the application of transition probabilities to continuous data while retaining the flexibility to model complex covariate effects. The result is a highly adaptable framework that works seamlessly for both discrete and continuous responses.
+
+
+## Advantages of Transition Models
+
+- **Nonparametric nature**: Transition models adapt to the data, avoiding potential biases from incorrect parametric assumptions.
+- **Dynamic distributions**: By modeling conditional transitions, the response distribution is not fixed but depends on covariates, allowing for greater flexibility.
+- **Integration with GAMs**: Transition models are often implemented within GAM frameworks, leveraging smooth terms and complex interactions to improve predictive performance and interpretability.
+
+In this vignette, we will demonstrate the implementation and application of transition models using the `TransitionModels` package. The following sections provide practical examples and insights into their flexibility and versatility.

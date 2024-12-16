@@ -1,0 +1,27 @@
+Package: TransitionModels
+Title: Flexible Transition Models for Probabilistic Learning
+Version: 0.1-0
+Date: 2024-12-11
+Authors@R: c(person(
+               given = "Nikolaus", 
+               family = "Umlauf", 
+               role = c("aut", "cre"),
+               email = "Nikolaus.Umlauf@uibk.ac.at",
+               comment = c(ORCID = "0000-0003-2160-9803")
+             ),
+             person(
+               given = "Reto", 
+               family = "Stauffer", 
+               role = "aut",
+               email = "Reto.Stauffer@uibk.ac.at",
+               comment = c(ORCID = "0000-0002-3798-5507")
+             ))
+Description: Provides infrastructure for estimating flexible transition models, 
+  supporting both count and continuous responses. For continuous responses, a 
+  slicing trick is applied to estimate fully probabilistic models. 
+License: GPL-2 | GPL-3
+Depends: R (>= 4.1.0), mgcv, topmodels
+Imports: Formula
+Suggests: colorspace, distributions3, nnet, quarto
+VignetteBuilder: quarto
+

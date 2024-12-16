@@ -1,0 +1,21 @@
+<!-- README.md is generated from README.qmd via: quarto render README.qmd --to gfm -->
+
+# TransitionModels: Flexible Estimation and Visualization of Transition Models
+
+## Installation
+
+The development version of *gamlss2* can be installed via
+
+```{r installation, eval = FALSE}
+install.packages("TransitionModels",
+  repos = c("https://gamlss-dev.R-universe.dev", "https://cloud.R-project.org"))
+```
+
+## Examples
+
+For examples, please visit the manual pages.
+
+```{r help, eval = FALSE}
+help(package = "TransitionModels")
+```
+
