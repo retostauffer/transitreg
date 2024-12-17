@@ -72,7 +72,7 @@ dgp_ZINBI <- function(n = 1000, probs = c(0.01, 0.1, 0.5, 0.9, 0.99), ...)
 
   ## Parameters.
   mu <- exp(1 + 2 * sin(x))
-  sigma <- exp(-0.5*x)
+  sigma <- exp(-x)
   sigmoid <- function(x) 1 / (1 + exp(-x))
   nu <- sigmoid(-4 + cos(x))
 
@@ -94,16 +94,16 @@ dgp_ZINBI <- function(n = 1000, probs = c(0.01, 0.1, 0.5, 0.9, 0.99), ...)
 }
 
 sim_NO <- function(n = 1000, breaks = NULL, counts = FALSE, family = NO, seed = 111,
-  xlim = NULL, ylim = NULL, engine = "bam", pos = "topleft", ...)
+  xlim = NULL, ylim = NULL, engine = "bam", pos = "topleft", probs = 0.5, ...)
 {
   if(!is.null(seed))
     set.seed(seed)
 
   ## Simulate data.
-  d <- dgp_NO(n, ...)
+  d <- dgp_NO(n, probs = probs)
 
   ## Simulate new data.
-  nd <- dgp_NO(1000, ...)
+  nd <- dgp_NO(1000, probs = probs)
 
   if(counts) {
     d$num <- d$counts
@@ -118,9 +118,9 @@ sim_NO <- function(n = 1000, breaks = NULL, counts = FALSE, family = NO, seed = 
 
   ## Estimate transition model.
   if(engine != "nnet") {
-    f <- num ~ s(x) + te(x,theta)
+    f <- num ~ s(theta) + s(x) + te(theta,x)
   } else {
-    f <- num ~ x
+    f <- num ~ theta + x
   }
   b <- tm(f, data = d, breaks = breaks, engine = engine,
     scale.x = TRUE, size = 40, maxit = 1000, decay = 0.01)
@@ -134,9 +134,9 @@ sim_NO <- function(n = 1000, breaks = NULL, counts = FALSE, family = NO, seed = 
 
   ## Quantile regression.
   if(counts) {
-    g <- mqgam(log(num + 1) ~ s(x), data = d, qu = qu)
+    g <- mqgam(log(num + 1) ~ s(x,k=20), data = d, qu = qu)
   } else {
-    g <- mqgam(num ~ s(x), data = d, qu = qu)
+    g <- mqgam(num ~ s(x,k=20), data = d, qu = qu)
   }
 
   ## Predict quantiles.
@@ -208,7 +208,7 @@ sim_ZINBI <- function(n = 1000, seed = 111, breaks = NULL,
   qu <- as.numeric(gsub("%", "", qu, fixed = TRUE))/100
 
   ## Estimate transition model.
-  f <- y ~ ti(theta) + ti(x) + ti(theta,x)
+  f <- y ~ ti(theta) + ti(x) + ti(theta,x,k=10)
   b <- tm(f, data = d, breaks = breaks)
 
   ## Corresponding GAMLSS.
@@ -251,7 +251,7 @@ sim_ZINBI <- function(n = 1000, seed = 111, breaks = NULL,
 
   plot(y ~ x, data = d, xlim = xlim, ylim = ylim,
     col = rgb(0.1, 0.1, 0.1, alpha = 0.2), pch = 16,
-    main = "", xlab = "x", ylab = "y")
+    main = "", xlab = "", ylab = "", ...)
 
   i <- order(nd$x)
 
@@ -278,35 +278,36 @@ x11(width = 10, height = 6)
 
 par(mfrow = c(2, 3), mar = rep(0, 4), oma = c(4, 4, 3, 3))
 
+seed <- 111
 
 sim_NO(n = 1000, counts = TRUE, breaks = NULL, probs = 0.5,
-  family = NBI, ylim = c(2, 20), axes = FALSE)
+  family = NBI, ylim = c(2, 20), axes = FALSE, seed = seed)
 box()
 axis(2)
 mtext("Median", side = 3, line = 1, font = 2)
 
 sim_NO(n = 1000, counts = TRUE, breaks = NULL, probs = c(0.1, 0.9),
-  family = NBI, ylim = c(2, 20), axes = FALSE)
+  family = NBI, ylim = c(2, 20), axes = FALSE, seed = seed)
 box()
 mtext("10% and 90% Quantile", side = 3, line = 1, font = 2)
 
 sim_NO(n = 1000, counts = TRUE, breaks = NULL, probs = c(0.01, 0.99),
-  family = NBI, ylim = c(2, 20), axes = FALSE)
+  family = NBI, ylim = c(2, 20), axes = FALSE, seed = seed)
 box()
 mtext("1% and 99% Quantile", side = 3, line = 1, font = 2)
 
 
 sim_NO(n = 1000, counts = TRUE, breaks = 200, probs = 0.5,
-  family = NO, ylim = c(2, 20), axes = FALSE)
+  family = NO, ylim = c(2, 20), axes = FALSE, seed = seed)
 box()
 
 sim_NO(n = 1000, counts = TRUE, breaks = 200, probs = c(0.1, 0.9),
-  family = NO, ylim = c(2, 20), axes = FALSE) 
+  family = NO, ylim = c(2, 20), axes = FALSE, seed = seed) 
 box()
 axis(1)
 
 sim_NO(n = 1000, counts = TRUE, breaks = 200, probs = c(0.01, 0.99),
-  family = NO, ylim = c(2, 20), axes = FALSE)
+  family = NO, ylim = c(2, 20), axes = FALSE, seed = seed)
 box()
 axis(4)
 
@@ -316,13 +317,13 @@ mtext("y", side = 2 , line = 2.5, outer = TRUE)
 
 
 ## (2)
-if(TRUE) {
+if(FALSE) {
 x11(width = 10, height = 6)
 
 par(mfrow = c(2, 3), mar = rep(0, 4), oma = c(4, 4, 3, 3))
 
 ylim <- c(-2.7, 3.5)
-seed <- 3
+seed <- 111
 
 sim_NO(n = 1000, counts = FALSE, breaks = 30, probs = 0.5,
   family = NO, ylim = ylim, axes = FALSE, seed = seed)
@@ -360,13 +361,31 @@ mtext("y", side = 2 , line = 2.5, outer = TRUE)
 }
 
 
-if(FALSE) {
+if(TRUE) {
 x11(width = 10, height = 4)
 
-par(mfrow = c(1, 3), mar = c(4, 4, 2, 1))
+par(mfrow = c(1, 3), mar = rep(0, 4), oma = c(4, 4, 3, 3))
 
-sim_ZINBI(1000, probs = 0.5)
-sim_ZINBI(1000, probs = c(0.1, 0.9))
-sim_ZINBI(1000, probs = c(0.01, 0.99))
+seed <- 111
+## seed <- 123
+
+ylim <- c(0, 65)
+
+sim_ZINBI(1000, probs = 0.5, seed = seed, axes = FALSE, ylim = ylim)
+box()
+axis(2)
+mtext("Median", side = 3, line = 1, font = 2)
+
+sim_ZINBI(1000, probs = c(0.1, 0.9), seed = seed, axes = FALSE, ylim = ylim)
+box()
+axis(1)
+mtext("10% and 90% Quantile", side = 3, line = 1, font = 2)
+
+sim_ZINBI(1000, probs = c(0.01, 0.99), seed = seed, axes = FALSE, ylim = ylim)
+box()
+mtext("1% and 99% Quantile", side = 3, line = 1, font = 2)
+
+mtext("x", side = 1, line = 2.5, outer = TRUE)
+mtext("y", side = 2 , line = 2.5, outer = TRUE)
 }
 
