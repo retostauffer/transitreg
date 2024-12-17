@@ -3,7 +3,7 @@ library("gamlss2")
 
 ## Load the 'storms' dataset from the 'WeatherGermany' package and fit a transition model.
 data("storms", package = "WeatherGermany")
-f <- counts ~ ti(alt) + ti(year) + ti(lon, lat) + ti(alt, year)
+f <- counts ~ s(theta) + ti(alt) + ti(year) + ti(lon, lat) + ti(alt, year)
 b <- tm(f, data = storms)
 
 ## Generate random count data and visualize its probability density function (PDF).
@@ -17,7 +17,7 @@ set.seed(123)
 n <- 500
 x <- runif(n, -3, 3)
 y <- rpois(n, exp(2 + sin(x)))
-b <- tm(y ~ s(x))
+b <- tm(y ~ s(theta) + s(x))
 
 nd <- data.frame("x" = seq(-3, 3, length = 100))
 fit <- cbind(

@@ -415,7 +415,7 @@ tm <- function(formula, data, subset, na.action,
 }
 
 ## Plotting method.
-plot.tm <- function(x, which = "effects", spar = TRUE, ...)
+plot.tm <- function(x, which = "effects", spar = TRUE, k = 5, ...)
 {
   ## What should be plotted?
   which.match <- c("effects", "hist-resid", "qq-resid", "wp-resid")
@@ -437,7 +437,10 @@ plot.tm <- function(x, which = "effects", spar = TRUE, ...)
     }
   }
 
-  resids <- residuals(x, newdata = list(...)$newdata)
+  resids <- NULL
+  for(j in 1:k)
+    resids <- cbind(resids, residuals(x, newdata = list(...)$newdata))
+  resids <- apply(resids, 1, median)
 
   ## Number of plots.
   if(spar) {
@@ -551,11 +554,38 @@ logLik.tm <- function(object, newdata = NULL, ...)
 }
 
 ## Residuals method.
-residuals.tm <- function(object, ...)
+residuals.tm <- function(object, newdata = NULL, y = NULL, ...)
 {
-  p <- predict(object, ..., type = "cdf")
+  if(is.null(newdata)) {
+    if(is.null(object$model.frame))
+      stop("cannot compute residuals, no model.frame including the response!")
+    newdata <- object$model.frame
+  }
+
+  if(is.null(y)) {
+    y <- newdata[[object$response]]
+  }
+
+  if(is.null(y)) {
+    stop("cannot compute residuals, response is missing!")
+  }
+
+  i <- y > 0
+  p <- numeric(length(y))
+
+  pL <- predict(object, newdata = newdata[i, , drop = FALSE], y = y[i] - 1L, type = "cdf")
+  pU <- predict(object, newdata = newdata[i, , drop = FALSE], y = y[i], type = "cdf")
+
+  p[i] <- runif(sum(i), pL, pU)
+
+  if(any(!i)) {
+    pU <- predict(object, newdata = newdata[!i, , drop = FALSE], y = y[!i], type = "cdf")
+    p[!i] <- runif(sum(!i), 0, pU)
+  }
+
   p[p < 1e-15] <- 1e-15
   p[p > 0.999999] <- 0.999999
+
   return(qnorm(p))
 }
 
