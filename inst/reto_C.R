@@ -1,3 +1,5 @@
+#!/usr/bin/env Rscript
+
 library("TransitionModels")
 library("gamlss2")
 
@@ -47,10 +49,9 @@ devtools::load_all("../")
 #dead_p <- predict(b, newdata = x, type = "pdf", useC = FALSE)
 #dead_p <- predict(b, newdata = x, type = "pdf", useC = TRUE)
 
-dead_p <- predict(b, newdata = x, type = "cdf", useC = FALSE)
-dead_p <- predict(b, newdata = x, type = "cdf", useC = TRUE)
+#dead_p <- predict(b, newdata = x, type = "cdf", useC = FALSE)
+#dead_p <- predict(b, newdata = x, type = "cdf", useC = TRUE)
 
-#system.time(dead_p <- predict(b, newdata = x, type = "pdf"))
-#system.time(dead_p <- predict(b, newdata = x, type = "quantile"))
-#system.time(dead_p <- predict(b, newdata = x, type = "cdf"))
-
+devtools::load_all("../")
+dead_p <- predict(b, newdata = x, type = "pmax", useC = FALSE)
+dead_p <- predict(b, newdata = x, type = "pmax", useC = TRUE)

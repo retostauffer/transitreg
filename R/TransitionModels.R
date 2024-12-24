@@ -121,11 +121,11 @@ tm_predict <- function(object, newdata,
     message("Calling C version")
     t1 <- Sys.time()
     if (type == "pdf") {
-      probs <- .Call("c_predict_pdf_cdf", ui, nd$index, p, type_pdf = TRUE);
+      probs <- .Call("c_tm_predict", ui, nd$index, p, type = type);
     } else if (type == "cdf") {
-      probs <- .Call("c_predict_pdf_cdf", ui, nd$index, p, type_pdf = FALSE);
+      probs <- .Call("c_tm_predict", ui, nd$index, p, type = type);
     } else {
-        stop(type, " in C not yet implemented")
+      probs <- .Call("c_tm_predict", ui, nd$index, p, type = type);
     }
     t2 <- Sys.time()
   }
@@ -172,6 +172,7 @@ tm_predict <- function(object, newdata,
       }
 
       if(type == "pmax") {
+        # That is my count
         cj <- numeric(k)
         cj[1] <- 1 - pj[1]
         if(length(pj) > 1) {
@@ -184,6 +185,7 @@ tm_predict <- function(object, newdata,
     t2 <- Sys.time()
   } ## end !useC
 
+  print(head(probs))
   message(sprintf(" Time taken: %12.8f secs", as.numeric(t2 - t1, unit = "secs")))
   message("    Method: ", ifelse(useC, "C", "R"), " implementation")
   message("    Sum result:  ", sum(probs), "\n")
