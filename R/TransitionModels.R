@@ -73,7 +73,7 @@ tm_predict <- function(object, newdata,
   type = c("pdf", "cdf", "quantile", "pmax"), 
   response = NULL, y = NULL, prob = 0.5, maxcounts = 1e+03,
   verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
-  factor = FALSE)
+  factor = FALSE, useC = FALSE)
 {
   if(is.null(response))
     response <- names(newdata)[1L]
@@ -117,52 +117,76 @@ tm_predict <- function(object, newdata,
 
   probs <- numeric(length(ui))
 
-  for(j in ui) {
-    pj <- p[nd$index == j]
-    k <- length(pj)
-
-    if(type == "pdf") {
-      probs[j] <- (1 - pj[k]) * prod(pj[-k])
+  if (useC) {
+    message("Calling C version")
+    t1 <- Sys.time()
+    if (type == "pdf") {
+      probs <- .Call("c_predict_pdf_cdf", ui, nd$index, p, type_pdf = TRUE);
+    } else if (type == "cdf") {
+      probs <- .Call("c_predict_pdf_cdf", ui, nd$index, p, type_pdf = FALSE);
+    } else {
+        stop(type, " in C not yet implemented")
     }
+    t2 <- Sys.time()
+  }
 
-    if(type == "cdf") {
-      cj <- 1 - pj[1]
-      if(length(pj) > 1) {
-        for(jj in 2:length(pj))
-          cj <- cj + (1 - pj[jj]) * prod(pj[1:(jj - 1)])
+  # -------------------
+  if (!useC) {
+    message("Calling R loop")
+    t1 <- Sys.time()
+    for(j in ui) {
+
+      pj <- p[nd$index == j]
+      k <- length(pj)
+
+      if(type == "pdf") {
+        probs[j] <- (1 - pj[k]) * prod(pj[-k])
       }
-      probs[j] <- cj
-    }
 
-    if(type == "quantile") {
-      cj <- 1 - pj[1]
-      if(cj >= prob[j]) {
-        probs[j] <- 0L
-      } else {
+      if(type == "cdf") {
+        cj <- 1 - pj[1]
         if(length(pj) > 1) {
-          for(jj in 2:length(pj)) {
+          for(jj in 2:length(pj))
             cj <- cj + (1 - pj[jj]) * prod(pj[1:(jj - 1)])
-            if(cj >= prob[j]) {
-              probs[j] <- jj - 1L
-              break
-            }
-          }
-        } else {
+        }
+        probs[j] <- cj
+      }
+
+      if(type == "quantile") {
+        cj <- 1 - pj[1]
+        if(cj >= prob[j]) {
           probs[j] <- 0L
+        } else {
+          if(length(pj) > 1) {
+            for(jj in 2:length(pj)) {
+              cj <- cj + (1 - pj[jj]) * prod(pj[1:(jj - 1)])
+              if(cj >= prob[j]) {
+                probs[j] <- jj - 1L
+                break
+              }
+            }
+          } else {
+            probs[j] <- 0L
+          }
         }
       }
-    }
 
-    if(type == "pmax") {
-      cj <- numeric(k)
-      cj[1] <- 1 - pj[1]
-      if(length(pj) > 1) {
-        for(jj in 2:length(pj))
-          cj[jj] <- (1 - pj[jj]) * prod(pj[1:(jj - 1)])
+      if(type == "pmax") {
+        cj <- numeric(k)
+        cj[1] <- 1 - pj[1]
+        if(length(pj) > 1) {
+          for(jj in 2:length(pj))
+            cj[jj] <- (1 - pj[jj]) * prod(pj[1:(jj - 1)])
+        }
+        probs[j] <- which.max(cj) - 1L
       }
-      probs[j] <- which.max(cj) - 1L
     }
-  }
+    t2 <- Sys.time()
+  } ## end !useC
+
+  message(sprintf(" Time taken: %12.8f secs", as.numeric(t2 - t1, unit = "secs")))
+  message("    Method: ", ifelse(useC, "C", "R"), " implementation")
+  message("    Sum result:  ", sum(probs), "\n")
 
   return(probs)
 }

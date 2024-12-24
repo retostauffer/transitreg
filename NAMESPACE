@@ -26,3 +26,4 @@ S3method(summary, tm)
 S3method(print, tm)
 S3method(rootogram, tm)
 
+useDynLib(TransitionModels, .registration = TRUE)
