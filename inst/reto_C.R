@@ -46,12 +46,11 @@ if (!file.exists("__tmp.rda")) {
 
 #devtools::load_all("../"); dead_p <- predict(b, newdata = x, type = "quantile", prob = .5)
 devtools::load_all("../")
-#dead_p <- predict(b, newdata = x, type = "pdf", useC = FALSE)
-#dead_p <- predict(b, newdata = x, type = "pdf", useC = TRUE)
+dead_p <- predict(b, newdata = x, type = "pdf", useC = FALSE)
+dead_p <- predict(b, newdata = x, type = "pdf", useC = TRUE)
 
-#dead_p <- predict(b, newdata = x, type = "cdf", useC = FALSE)
-#dead_p <- predict(b, newdata = x, type = "cdf", useC = TRUE)
+dead_p <- predict(b, newdata = x, type = "cdf", useC = FALSE)
+dead_p <- predict(b, newdata = x, type = "cdf", useC = TRUE)
 
-devtools::load_all("../")
 dead_p <- predict(b, newdata = x, type = "pmax", useC = FALSE)
 dead_p <- predict(b, newdata = x, type = "pmax", useC = TRUE)
