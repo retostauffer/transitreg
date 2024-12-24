@@ -185,7 +185,6 @@ tm_predict <- function(object, newdata,
     t2 <- Sys.time()
   } ## end !useC
 
-  print(head(probs))
   message(sprintf(" Time taken: %12.8f secs", as.numeric(t2 - t1, unit = "secs")))
   message("    Method: ", ifelse(useC, "C", "R"), " implementation")
   message("    Sum result:  ", sum(probs), "\n")
