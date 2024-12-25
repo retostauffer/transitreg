@@ -76,6 +76,7 @@ sim_NO <- function(d, nd, breaks, counts = FALSE, family = NO, engine = "bam", u
 # Sim
 n <- 50000
 #n <- 10000
+#n <- 2000
 ##n <- 3
 probs <- 0.5
 set.seed(111)
@@ -83,12 +84,21 @@ d  <- dgp_NO(n, probs = probs)
 nd <- dgp_NO(1000, probs = probs)
 
 devtools::load_all("../")
+set.seed(111)
 system.time(
-    mod <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE)
+    mod1 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE)
 )
+set.seed(111)
 system.time(
-    mod <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = TRUE)
+    mod2 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = TRUE)
 )
+
+# Comparing model estimates
+table(coef_comparison = coef(mod1$model) == coef(mod2$model))
+table(abs(mod1$probs$pdf - mod2$probs$pdf) < sqrt(.Machine$double.eps))
+print(sqrt(mean((predict(mod1) - predict(mod2))^2)))
+
+sapply(list(mod1 = mod1, mod2 = mod2), logLik)
 
 
 

@@ -34,42 +34,72 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
   if (any(is.na(response_values)))
     stop("NA values in response data!")
 
-  # The resulting data.frame has the length
-  #    sum(response_values) + length(response_values)
-  # ... "count" plus 0 for each observation. Thus, we could
-  # try to create the list and fill it with C.
+  ## TODO(R) Original implementation is used when useC == FALSE,
+  ##         though the new implementation has nothing to do with C.
+  if (!useC) {
 
-  ## Process each row.
-  for(i in seq_len(n)) {
-    k <- response_values[i] # Count or pseudocount
-    Y <- c(rep(1, k), 0)
-    row_data <- data[i, , drop = FALSE]
+    ## Process each row.
+    for(i in seq_len(n)) {
+      k <- response_values[i] # Count or pseudocount
+      Y <- c(rep(1, k), 0)
+      row_data <- data[i, , drop = FALSE]
 
-    ## Create expanded data frame for the current row.
-    di <- data.frame(
-      "index" = i,
-      Y = Y,
-      theta = c(0:k),
-      row_data[rep(1, length(Y)), ]
-    )
+      ## Create expanded data frame for the current row.
+      di <- data.frame(
+        "index" = i,
+        Y = Y,
+        theta = c(0:k),
+        row_data[rep(1, length(Y)), ]
+      )
 
-    ## Add to list.
-    df_list[[i]] <- di
+      ## Add to list.
+      df_list[[i]] <- di
 
-    ## Update progress bar.
-    if(verbose && (i %% step == 0)) {
-      utils::setTxtProgressBar(pb, i)
+      ## Update progress bar.
+      if(verbose && (i %% step == 0)) {
+        utils::setTxtProgressBar(pb, i)
+      }
     }
-  }
-  timer("[tm_data] loop over n - R")
+    timer("[tm_data] loop over n - R")
 
-  if(verbose) {
-    close(pb)
-  }
+    if(verbose) {
+      close(pb)
+    }
 
-  ## Combine all rows into a single data frame.
-  result <- do.call("rbind", df_list)
-  timer("[tm_data] results combined")
+
+    ## Combine all rows into a single data frame.
+    result <- do.call("rbind", df_list)
+    timer("[tm_data] results combined - loop")
+
+  } else {
+    ## TODO(R): This is the 'faster version' of the
+    ##          original loop. Has nothing to do with C, but for
+    ##          testing I let it run when useC = TRUE.
+
+    ## Length of vectors in list; names of list elements.
+    nout <- sum(response_values) + length(response_values)
+    names_out <- c("index", "Y", "theta", names(data))
+
+    ## Building index vector; each observation 1:n gets its
+    ## unique index (ID).
+    result <- list()
+    result$index <- rep(seq_len(n), response_values + 1L)
+
+    ## Creating Y; always 1 except for the last entry per index.
+    result$Y     <- rep(1L, nout)
+    result$Y[cumsum(response_values + 1)] <- 0L
+
+    ## Creating theta; a sequence from zero to the
+    ## response_value for each index. The following
+    ## Two lines create this sequence of sequences.
+    reset_to_zero <- c(0, which(diff(result$index) > 0))
+    result$theta <- seq_len(nout) - rep(reset_to_zero, response_values + 1) - 1
+
+    ## Appending the remaining data from 'data'
+    for (n in names(data)) result[[n]] <- rep(data[[n]], response_values + 1)
+
+    timer("[tm_data] faster vectorized version")
+  }
 
   ## Attach the response column as an attribute.
   attr(result, "response") <- response
@@ -446,6 +476,7 @@ timer(NULL)
   ##          replacing it with the corresponding C call if useC = TRUE.
   ##          Roughly 3-4 times faster.
   if (useC) {
+    probs  <- .Call("c_tm_predict", ui, tmf$index, p, type = "pdf");
     cprobs <- .Call("c_tm_predict", ui, tmf$index, p, type = "cdf");
     timer("calculating CDF - C")
   } else {
