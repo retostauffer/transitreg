@@ -136,3 +136,64 @@ SEXP c_tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type) {
 }
 
 
+/* Calculating elementwise pdf and cdf (both at the same time)
+ *
+ * @param uidx integer vector with unique indices in data.
+ * @param idx integer with indices, length of idx is sample size times breaks.
+ * @param p probabilities, same length as idx vector.
+ * @param type character, either 'pdf', 'cdf', or 'pmax'.
+ *
+ * @details Does the same as c_tm_predict but calculates both PDF and
+ * CDF simultanously, returning a named list. This is used in the
+ * main `tm()` function, calculating both at the same time should
+ * help to speed up the calculations.
+ * 
+ * @return Returns SEXP double vector of length (length(uidx)).
+ */
+SEXP c_tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p) {
+
+    double *pptr    = REAL(p);
+    int    *uidxptr = INTEGER(uidx);  // Unique indices in the dtaa
+    int    *idxptr  = INTEGER(idx);   // Index vector
+    int    n = LENGTH(idx);
+    int    un = LENGTH(uidx);
+    int    i, count;
+
+    // Initialize results vector
+    int nProtected = 0;
+
+    SEXP pdf; PROTECT(pdf = allocVector(REALSXP, un)); ++nProtected;
+    double *pdfptr = REAL(pdf);
+    SEXP cdf; PROTECT(cdf = allocVector(REALSXP, un)); ++nProtected;
+    double *cdfptr = REAL(cdf);
+
+    for (i = 0; i < un; i++) {
+        int* positions = find_positions(uidxptr[i], idxptr, n, &count);
+        pdfptr[i] = c_calc_pdf(positions, count, pptr);
+        cdfptr[i] = c_calc_cdf(positions, count, pptr);
+        free(positions); // Free allocated memory
+    }
+
+    /* ----------------------------------- */
+    /* Generating list */
+    SEXP rval;
+    PROTECT(rval = allocVector(VECSXP, 2)); ++nProtected;
+
+    /* Adding data to list */
+    SET_VECTOR_ELT(rval, 0, pdf);
+    SET_VECTOR_ELT(rval, 1, cdf);
+
+    SEXP names_rval;
+    PROTECT(names_rval = allocVector(STRSXP, 2)); ++nProtected;
+
+    SET_STRING_ELT(names_rval, 0, mkChar("pdf"));
+    SET_STRING_ELT(names_rval, 1, mkChar("cdf"));
+
+    setAttrib(rval, R_NamesSymbol, names_rval);
+
+    UNPROTECT(nProtected);
+    return rval;
+
+}
+
+

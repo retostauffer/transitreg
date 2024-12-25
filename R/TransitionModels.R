@@ -160,13 +160,7 @@ tm_predict <- function(object, newdata,
   if (useC) {
     message("Calling C version")
     t1 <- Sys.time()
-    if (type == "pdf") {
-      probs <- .Call("c_tm_predict", ui, nd$index, p, type = type);
-    } else if (type == "cdf") {
-      probs <- .Call("c_tm_predict", ui, nd$index, p, type = type);
-    } else {
-      probs <- .Call("c_tm_predict", ui, nd$index, p, type = type);
-    }
+    probs <- .Call("c_tm_predict", ui, nd$index, p, type = type);
     t2 <- Sys.time()
   }
 
@@ -472,12 +466,13 @@ timer(NULL)
   ui <- unique(tmf$index)
   probs <- cprobs <- numeric(length(ui))
 
-  ## TODO(R): 'cprobs' is nothing else than the CDF, thus
-  ##          replacing it with the corresponding C call if useC = TRUE.
-  ##          Roughly 3-4 times faster.
   if (useC) {
-    probs  <- .Call("c_tm_predict", ui, tmf$index, p, type = "pdf");
-    cprobs <- .Call("c_tm_predict", ui, tmf$index, p, type = "cdf");
+    ## c_tm_predict_pdfcdf returns a list with PDF and CDF, calculating
+    ## both simultanously in C to improve speed.
+    tmp    <- .Call("c_tm_predict_pdfcdf", ui, tmf$index, p)
+    probs  <- tmp$pdf
+    cprobs <- tmp$cdf
+    rm(tmp)
     timer("calculating CDF - C")
   } else {
     for(j in ui) {

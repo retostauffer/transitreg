@@ -54,3 +54,4 @@ dead_p <- predict(b, newdata = x, type = "cdf", useC = TRUE)
 
 dead_p <- predict(b, newdata = x, type = "pmax", useC = FALSE)
 dead_p <- predict(b, newdata = x, type = "pmax", useC = TRUE)
+

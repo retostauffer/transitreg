@@ -85,13 +85,17 @@ nd <- dgp_NO(1000, probs = probs)
 
 devtools::load_all("../")
 set.seed(111)
-system.time(
+t1 <- system.time(
     mod1 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE)
 )
 set.seed(111)
-system.time(
+t2 <- system.time(
     mod2 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = TRUE)
 )
+message("Speed improvement factor:     x ",  
+        round(t1["elapsed"] / t2["elapsed"] ,2),
+        "   with n = ", n)
+
 
 # Comparing model estimates
 table(coef_comparison = coef(mod1$model) == coef(mod2$model))
