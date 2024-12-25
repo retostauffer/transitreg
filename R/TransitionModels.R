@@ -1,7 +1,7 @@
 ## Main paper: https://link.springer.com/article/10.1007/s10260-021-00558-6
 
 ## Function to set up expanded data set.
-tm_data <- function(data, response = NULL, verbose = TRUE) {
+tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
   ## Ensure data is a data frame.
   if(!is.data.frame(data)) {
     data <- as.data.frame(data)
@@ -28,14 +28,21 @@ tm_data <- function(data, response = NULL, verbose = TRUE) {
     step <- 1
   response_values <- data[[response]]
   df_list <- vector("list", n)
+  timer("[tm_data] extracted response, allocated list")
+
+  ## If any missing value in response: stop
+  if (any(is.na(response_values)))
+    stop("NA values in response data!")
+
+  # The resulting data.frame has the length
+  #    sum(response_values) + length(response_values)
+  # ... "count" plus 0 for each observation. Thus, we could
+  # try to create the list and fill it with C.
 
   ## Process each row.
   for(i in seq_len(n)) {
-    k <- response_values[i]
-    if(is.na(k))
-      stop("NA values in response data!")
+    k <- response_values[i] # Count or pseudocount
     Y <- c(rep(1, k), 0)
-    theta <- seq_len(k) - 1
     row_data <- data[i, , drop = FALSE]
 
     ## Create expanded data frame for the current row.
@@ -54,6 +61,7 @@ tm_data <- function(data, response = NULL, verbose = TRUE) {
       utils::setTxtProgressBar(pb, i)
     }
   }
+  timer("[tm_data] loop over n - R")
 
   if(verbose) {
     close(pb)
@@ -61,6 +69,7 @@ tm_data <- function(data, response = NULL, verbose = TRUE) {
 
   ## Combine all rows into a single data frame.
   result <- do.call("rbind", df_list)
+  timer("[tm_data] results combined")
 
   ## Attach the response column as an attribute.
   attr(result, "response") <- response
@@ -69,11 +78,12 @@ tm_data <- function(data, response = NULL, verbose = TRUE) {
 }
 
 ## Predict function.
+# TODO(R): Adding useC option for testing; must be removed in the future.
 tm_predict <- function(object, newdata,
   type = c("pdf", "cdf", "quantile", "pmax"), 
   response = NULL, y = NULL, prob = 0.5, maxcounts = 1e+03,
   verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
-  factor = FALSE, useC = FALSE)
+  factor = FALSE, useC = TRUE)
 {
   if(is.null(response))
     response <- names(newdata)[1L]
@@ -262,12 +272,27 @@ tm_dist <- function(y, data = NULL, ...)
   return(invisible(b))
 }
 
+timer <- function(msg = NULL) {
+    if (is.null(msg)) ttotal <<- Sys.time()
+    if (!is.null(msg) && "treto" %in% ls(envir = .GlobalEnv)) {
+        t <- as.numeric(Sys.time() - treto, units = "secs")
+        tt <- as.numeric(Sys.time() - ttotal, units = "secs")
+        message(sprintf("[timing] Elapsed  %8.1f ms  - %8.1f total     (%s)",
+                        t * 1000, tt * 1000, msg))
+    }
+    treto <<- Sys.time()
+}
+timer(NULL)
+
 ## Wrapper function to estimate CTMs.
+# TODO(R): Adding useC option for testing; must be removed in the future.
 tm <- function(formula, data, subset, na.action,
   engine = "bam", scale.x = FALSE, breaks = NULL,
-  model = TRUE, verbose = FALSE, ...)
+  model = TRUE, verbose = FALSE, useC = FALSE, ...)
 {
+timer(NULL)
   cl <- match.call()
+
 
   ## Evaluate the model frame
   mf <- match.call(expand.dots = FALSE)
@@ -289,6 +314,8 @@ tm <- function(formula, data, subset, na.action,
   mf[["formula"]] <- ff2
   mf[[1L]] <- quote(stats::model.frame)
   mf <- eval(mf, parent.frame())
+
+  timer("building model frame")
 
   ## Response name.
   rn <- response_name(formula)
@@ -320,6 +347,7 @@ tm <- function(formula, data, subset, na.action,
 
     mf[[rn]] <- yc
   }
+  timer("discretize response")
 
   ## Scaling data.
   scaler <- NULL
@@ -332,17 +360,21 @@ tm <- function(formula, data, subset, na.action,
       }
     }
   }
+  timer("data scaling")
 
   ## Max. counts.
   ymax <- max(mf[[rn]], na.rm = TRUE)
   k <- min(c(ymax - 1L, 20L))
+  timer("find min/max")
 
   ## Transform data.
-  tmf <- tm_data(mf, response = rn, verbose = verbose)
+  tmf <- tm_data(mf, response = rn, useC = useC, verbose = verbose)
+  timer("transforming data (tm_df)")
 
   if(!is.null(scaler)) {
     scaler$theta <- list("mean" = mean(tmf$theta), "sd" = sd(tmf$theta))
     tmf$theta <- (tmf$theta - scaler$theta$mean) / scaler$theta$sd
+    timer("scaling theta")
   }
 
   if(length(tv)) {
@@ -350,6 +382,7 @@ tm <- function(formula, data, subset, na.action,
       i <- as.integer(gsub("theta", "", j))
       tmf[[j]] <- as.integer(tmf$theta == i)
     }
+    timer(paste("loop over tv (length ", length(tv), ")"))
   }
 
   ## Setup return value.
@@ -367,6 +400,7 @@ tm <- function(formula, data, subset, na.action,
   } else {
     rval$new_formula <- update(formula, as.factor(Y) ~ .)
   }
+  timer("updated formula")
 
   ## Estimate model.
   warn <- getOption("warn")
@@ -380,6 +414,7 @@ tm <- function(formula, data, subset, na.action,
   if(engine == "nnet") {
     rval$model <- nnet::nnet(rval$new_formula, data = tmf, ...)
   }
+  timer("estimation")
   options("warn" = warn)
 
   ## Additional info.
@@ -390,11 +425,14 @@ tm <- function(formula, data, subset, na.action,
   rval$theta_vars <- tv
   rval$factor <- isTRUE(list(...)$factor)
 
+  timer("preparing RVAL")
+
   if(inherits(rval$model, "nnet")) {
-    p <- predict(rval$model, type = "raw")
+    p <- predict(rval$model, type = "raw", useC = useC)
   } else {
-    p <- predict(rval$model, type = "response")
+    p <- predict(rval$model, type = "response", useC = useC)
   }
+  timer("prediction")
 
   ## Remove model frame.
   if(!model)
@@ -404,18 +442,27 @@ tm <- function(formula, data, subset, na.action,
   ui <- unique(tmf$index)
   probs <- cprobs <- numeric(length(ui))
 
-  for(j in ui) {
-    pj <- p[tmf$index == j]
-    k <- length(pj)
-    probs[j] <- (1 - pj[k]) * prod(pj[-k])
+  ## TODO(R): 'cprobs' is nothing else than the CDF, thus
+  ##          replacing it with the corresponding C call if useC = TRUE.
+  ##          Roughly 3-4 times faster.
+  if (useC) {
+    cprobs <- .Call("c_tm_predict", ui, tmf$index, p, type = "cdf");
+    timer("calculating CDF - C")
+  } else {
+    for(j in ui) {
+      pj <- p[tmf$index == j]
+      k <- length(pj)
+      probs[j] <- (1 - pj[k]) * prod(pj[-k])
 
-    cj <- numeric(k)
-    cj[1] <- 1 - pj[1]
-    if(length(pj) > 1) {
-      for(jj in 2:length(pj))
-        cj[jj] <- (1 - pj[jj]) * prod(pj[1:(jj - 1)])
+      cj <- numeric(k)
+      cj[1] <- 1 - pj[1]
+      if(length(pj) > 1) {
+        for(jj in 2:length(pj))
+          cj[jj] <- (1 - pj[jj]) * prod(pj[1:(jj - 1)])
+      }
+      cprobs[j] <- sum(cj)
     }
-    cprobs[j] <- sum(cj)
+    timer("calculating CDF - R")
   }
 
   probs[probs < 1e-15] <- 1e-15
@@ -424,6 +471,7 @@ tm <- function(formula, data, subset, na.action,
   cprobs[cprobs > 0.999999] <- 0.999999
 
   rval$probs <- data.frame("pdf" = probs, "cdf" = cprobs)
+  timer("building rval")
 
   ## If binning.
   if(bin.y) {
@@ -431,6 +479,7 @@ tm <- function(formula, data, subset, na.action,
     rval$ym <- ym
     rval$yc_tab <- table(yc)
     rval$breaks <- breaks
+    timer("ended if bin.y")
   }
 
   ## Assign class.
