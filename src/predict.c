@@ -145,7 +145,6 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP ncores) {
 
 
     #if OPENMP_ON
-    printf(" [tm_predict] ------------------------ %d\n", nthreads);
     #pragma omp parallel for num_threads(nthreads) private(which)
     #endif
     for (i = 0; i < un; i++) {
@@ -203,7 +202,6 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores) {
 
 
     /* Warning for future me: Do not use Rprintf inside omp -> segfault */
-    printf(" [tm_predict_pdfcdf] ------------------------ %d\n", nthreads);
     #if OPENMP_ON
     #pragma omp parallel for num_threads(nthreads) private(which)
     #endif

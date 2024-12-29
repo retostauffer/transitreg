@@ -12,6 +12,19 @@ tm_detect_cores <- function(verbose = TRUE) {
     return(ncores)
 }
 
+
+tm_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
+  ## Number of cores to be used for OpenMP. If
+  ## - NULL: Guess cores (max cores - 2L)
+  ## - Smaller or equal to 0: Set to 1L (single-core processing)
+  ## - Else: Take user input; limited to maximum number of detected cores.
+  ncores <- if (!is.null(ncores)) as.integer(ncores)[1L] else tm_detect_cores(verbose = FALSE) - 2L
+  ncores <- if (ncores < 1L) 1L else pmin(ncores, tm_detect_cores(verbose = FALSE))
+  if (verbose) message("Number of cores set to: ", ncores)
+  return(ncores)
+}
+
+
 ## Function to set up expanded data set.
 tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
   ## Ensure data is a data frame.
@@ -121,11 +134,11 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
 
 ## Predict function.
 # TODO(R): Adding useC option for testing; must be removed in the future.
-tm_predict <- function(object, newdata, ncores,
+tm_predict <- function(object, newdata,
   type = c("pdf", "cdf", "quantile", "pmax"),
   response = NULL, y = NULL, prob = 0.5, maxcounts = 1e+03,
   verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
-  factor = FALSE, useC = TRUE)
+  factor = FALSE, ncores = NULL, useC = TRUE)
 {
   if(is.null(response))
     response <- names(newdata)[1L]
@@ -324,15 +337,7 @@ tm <- function(formula, data, subset, na.action,
     "'ncores' must be NULL or numeric" = is.null(ncores) || is.numeric(ncores),
     "'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose)
   )
-
-  ## Number of cores to be used for OpenMP. If
-  ## - NULL: Guess cores (max cores - 2L)
-  ## - Smaller or equal to 0: Set to 1L (single-core processing)
-  ## - Else: Take user input; limited to maximum number of detected cores.
-  ncores <- if (!is.null(ncores)) as.integer(ncores)[1L] else tm_detect_cores(verbose = FALSE) - 2L
-  ncores <- if (ncores < 1L) 1L else pmin(ncores, tm_detect_cores(verbose = FALSE))
-  if (verbose) message("Number of cores set to: ", ncores)
-
+  ncores <- tm_get_number_of_cores(ncores, verbose = verbose)
 
 timer(NULL)
   cl <- match.call()
@@ -602,10 +607,13 @@ print.tm <- function(x, ...)
 ## Predict method.
 predict.tm <- function(object, newdata = NULL,
   y = NULL, prob = NULL,
-  type = c("pdf", "cdf", "pmax", "quantile"), ...)
+  type = c("pdf", "cdf", "pmax", "quantile"), ncores = NULL, ...)
 {
   type <- tolower(type)
   type <- match.arg(type)
+
+  ## Get number of cores for OpenMP parallelization
+  ncores <- tm_get_number_of_cores(ncores, FALSE)
 
   if(!is.null(prob))
     type <- "quantile"

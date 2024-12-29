@@ -68,7 +68,7 @@ sim_NO <- function(d, nd, breaks, ncores, counts = FALSE, family = NO, engine = 
   ## Predict quantiles.
   p <- do.call("cbind",
     lapply(qu, function(j) {
-      predict(b, newdata = nd, prob = j, useC = useC)
+      predict(b, newdata = nd, prob = j, ncores = ncores, useC = useC)
   }))
 
   return(b)
@@ -90,12 +90,12 @@ message("       Using N = ", n)
 #message("       Calling devtools load_all")
 devtools::load_all("../")
 message("    -------------------------------")
-ncores <- 1
+ncores <- -1
 #t1 <- system.time(
-#    mod1 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE, ncores = ncores)
+#    mod1 <- sim_NO(d, nd, ncores, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE, ncores = ncores)
 #)
 t2 <- system.time(
-    mod2 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = TRUE, ncores = ncores)
+    mod2 <- sim_NO(d, nd, ncores, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = TRUE)
 )
 #print(t1)
 print(t2)
@@ -106,11 +106,11 @@ tm_detect_cores()
 #devtools::load_all("../")
 #set.seed(111)
 #t1 <- system.time(
-#    mod1 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE)
+#    mod1 <- sim_NO(d, nd, ncores, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE)
 #)
 #set.seed(111)
 #t2 <- system.time(
-#    mod2 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = TRUE)
+#    mod2 <- sim_NO(d, nd, ncores, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = TRUE)
 #)
 #message("Speed improvement factor:     x ",  
 #        round(t1["elapsed"] / t2["elapsed"] ,2),
