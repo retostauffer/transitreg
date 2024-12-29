@@ -6,10 +6,10 @@
  * defining multiple versions OPENMP_ON1, OPENMP_ON2...)
  */
 #ifdef _OPENMP
-#pragma message(" [dev] Defining OPENMP_ON 1")
+//#pragma message(" [dev] Defining OPENMP_ON 1")
 #define OPENMP_ON 1
 #else
-#pragma message(" [dev] Defining OPENMP_ON 0")
+//#pragma message(" [dev] Defining OPENMP_ON 0")
 #define OPENMP_ON 0
 #endif
 
@@ -48,10 +48,18 @@
 typedef struct {
     int* index;
     int length;
-} PositionResult;
+} tmWhich;
+
+/* The custom struct is used by find_position.
+ * Searches for 'x' (int) in integer vector 'y' with a max length of 'n'.
+ *
+ * Returns struct object with:
+ *   -   .index:   integer vector. position of 'x' in 'y'.
+ *   -   .length:  length of .index, or number of 'x' in 'y'.
+ */
+tmWhich find_positions(int x, int* y, int n);
 
 void fun(double *y, double *H);
-PositionResult find_positions(int x, int* y, int n);
 double tm_calc_pdf(int* positions, int count, double* pptr);
 double tm_calc_cdf(int* positions, int count, double* pptr);
 double tm_calc_pmax(int* positions, int count, double* pptr);

@@ -89,16 +89,16 @@ message("       Using N = ", n)
 #message("       Calling devtools load_all")
 #devtools::load_all("../")
 message("    -------------------------------")
-#t1 <- system.time(
-#    mod1 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE)
-#)
+t1 <- system.time(
+    mod1 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE)
+)
 t2 <- system.time(
     mod2 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = TRUE)
 )
-#print(t1)
+print(t1)
 print(t2)
-#print(c("R version" = logLik(mod1), "C version" = logLik(mod2)))
-print(c("C version" = logLik(mod2)))
+print(c("R version" = logLik(mod1), "C version" = logLik(mod2)))
+#print(c("C version" = logLik(mod2)))
 TransitionModels:::tm_check_omp();
 
 #devtools::load_all("../")
