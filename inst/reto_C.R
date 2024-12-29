@@ -49,6 +49,11 @@ devtools::load_all("../")
 dead_p <- predict(b, newdata = x, type = "pdf", useC = FALSE)
 dead_p <- predict(b, newdata = x, type = "pdf", useC = TRUE)
 
+library("microbenchmark")
+devtools::load_all("../"); microbenchmark(logLik(b, newdata = x, useC = FALSE),
+                                          logLik(b, newdata = x, useC = TRUE),
+                                          times = 1)
+
 dead_p <- predict(b, newdata = x, type = "cdf", useC = FALSE)
 dead_p <- predict(b, newdata = x, type = "cdf", useC = TRUE)
 

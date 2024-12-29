@@ -644,7 +644,7 @@ logLik.tm <- function(object, newdata = NULL, ...)
   if(is.null(newdata)) {
     p <- object$probs$pdf
   } else {
-    p <- predict(object, newdata = newdata, type = "pdf")
+    p <- predict(object, newdata = newdata, type = "pdf", ...)
   }
   ll <- sum(log(p))
   attr(ll, "nobs") <- nrow(object$model.frame)
