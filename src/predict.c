@@ -6,15 +6,22 @@
  * Authors: Nikolaus Umlauf, Reto Stauffer
  * -------------------------------------------------------------
  */
+
+#ifdef _OPENMP // needs to precede R.h
+#include <omp.h>
+#endif
+
 #include <R.h>
 #include <Rdefines.h>
 #include <Rinternals.h>
 #include <stdbool.h>
 
 #include <stdlib.h>
+#include "tm.h" // Include header, required to have the OPENMP_ON macro available.
 
 /* Helper function to find position of x in y
  *
+ * TODO(R): Must update the docstring
  * @param x single integer (the 'needle').
  * @param y integer vector (the 'haystack').
  * @param n length of y.
@@ -23,16 +30,22 @@
  * @return returns an integer vector (must be freed outside function)
  * with the index position of x in y.
  */
-int* find_positions(int x, int* y, int n, int* count) {
-    int* positions = (int*)malloc(n * sizeof(int)); // Allocate max possible size
-    *count = 0;
+PositionResult find_positions(int x, int* y, int n) {
+    PositionResult res;
+    res.index = (int*)malloc(n * sizeof(int));  // Allocate max possible size
+
+    if (res.index == NULL) {
+        error("Memory allocation failed for result.positions\n");
+    }
+
+    res.length = 0;
     for (int i = 0; i < n; i++) {
         if (y[i] == x) {
-            positions[*count] = i; // Store the index
-            (*count)++;
+            res.index[res.length] = i; // Store the index
+            res.length++;
         }
     }
-    return positions; // Caller must free this memory
+    return res; // Return the struct with index position and length
 }
 
 /* Helper function for type = "pdf".
@@ -115,6 +128,8 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type) {
     int    un = LENGTH(uidx);
     int    i, count;
 
+    PositionResult positions;
+
     // Evaluate 'type' to define what to do
     const char* thetype = CHAR(STRING_ELT(type, 0));
     bool do_pdf = strcmp(thetype, "pdf") == 0;
@@ -126,16 +141,25 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type) {
     double *probsptr = REAL(probs);
 
 
+    /////#if OPENMP_ON
+    /////#pragma omp parallel for num_threads(5) private(positions)
+    /////#endif
+    /////for (i = 0; i < un; i++) {
+    /////    pos = find_positions(uidxptr[i], idxptr, n);
+    /////    pdfptr[i] = tm_calc_pdf(pos.positions, pos.count, pptr);
+    /////    cdfptr[i] = tm_calc_cdf(pos.positions, pos.count, pptr);
+    /////    free(pos.positions); // Free allocated memory
+    /////}
     for (i = 0; i < un; i++) {
-        int* positions = find_positions(uidxptr[i], idxptr, n, &count);
+        positions = find_positions(uidxptr[i], idxptr, n);
         if (do_pdf) {
-            probsptr[i] = tm_calc_pdf(positions, count, pptr);
+            probsptr[i] = tm_calc_pdf(positions.index, positions.length, pptr);
         } else if (do_cdf) {
-            probsptr[i] = tm_calc_cdf(positions, count, pptr);
+            probsptr[i] = tm_calc_cdf(positions.index, positions.length, pptr);
         } else {
-            probsptr[i] = tm_calc_pmax(positions, count, pptr);
+            probsptr[i] = tm_calc_pmax(positions.index, positions.length, pptr);
         }
-        free(positions); // Free allocated memory
+        free(positions.index); // Free allocated memory
     }
 
     UNPROTECT(1); // Releasing protected objects
@@ -164,7 +188,10 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p) {
     int    *idxptr  = INTEGER(idx);   // Index vector
     int    n = LENGTH(idx);
     int    un = LENGTH(uidx);
-    int    i, count;
+    int    i;
+    int k;
+    int cores = 2;
+    PositionResult positions;
 
     // Initialize results vector
     int nProtected = 0;
@@ -174,11 +201,16 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p) {
     SEXP cdf; PROTECT(cdf = allocVector(REALSXP, un)); ++nProtected;
     double *cdfptr = REAL(cdf);
 
+
+    /* Warning for future me: Do not use Rprintf inside omp -> segfault */
+    #if OPENMP_ON
+    #pragma omp parallel for num_threads(5) private(positions)
+    #endif
     for (i = 0; i < un; i++) {
-        int* positions = find_positions(uidxptr[i], idxptr, n, &count);
-        pdfptr[i] = tm_calc_pdf(positions, count, pptr);
-        cdfptr[i] = tm_calc_cdf(positions, count, pptr);
-        free(positions); // Free allocated memory
+        positions = find_positions(uidxptr[i], idxptr, n);
+        pdfptr[i] = tm_calc_pdf(positions.index, positions.length, pptr);
+        cdfptr[i] = tm_calc_cdf(positions.index, positions.length, pptr);
+        free(positions.index); // Free allocated memory
     }
 
     /* ----------------------------------- */

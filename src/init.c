@@ -16,6 +16,7 @@
 static const R_CallMethodDef callMethods[] = {
   {"tm_predict",             (DL_FUNC) &tm_predict,           4},
   {"tm_predict_pdfcdf",      (DL_FUNC) &tm_predict_pdfcdf,    3},
+  {"tm_check_omp",           (DL_FUNC) &tm_check_omp,         0},
   {NULL, NULL, 0} // Termination entry
 };
 

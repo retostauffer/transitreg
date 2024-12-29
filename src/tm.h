@@ -1,13 +1,18 @@
 
 /* Strongly inspired by the great mgcv package! */
 
-/* Most compilers with openMP support supply. a pre-defined compiler macro
- * _OPENMP. Following. facilitates selective turning off (by testing value or
+/* Most compilers with openMP support supply a pre-defined compiler macro
+ * _OPENMP. Following facilitates selective turning off (by testing value or
  * defining multiple versions OPENMP_ON1, OPENMP_ON2...)
  */
-#if defined _OPENMP
+#ifdef _OPENMP
+#pragma message(" [dev] Defining OPENMP_ON 1")
 #define OPENMP_ON 1
+#else
+#pragma message(" [dev] Defining OPENMP_ON 0")
+#define OPENMP_ON 0
 #endif
+
 
 /* ... note also that there is no actual *need* to protect #pragmas with #ifdef
  * OPENMP_ON, since C ignores undefined pragmas, but failing to do so may
@@ -37,13 +42,22 @@
 
 /* ------------------------------------------------------------------------ */
 
+/* Custom type; structured object with   
+ * an integer vector with index and length of the resulting index vector.
+ * NOTE: .index must be freed by the user! */
+typedef struct {
+    int* index;
+    int length;
+} PositionResult;
+
 void fun(double *y, double *H);
-int* find_position(int x, int* y, int n, int* count);
+PositionResult find_positions(int x, int* y, int n);
 double tm_calc_pdf(int* positions, int count, double* pptr);
 double tm_calc_cdf(int* positions, int count, double* pptr);
 double tm_calc_pmax(int* positions, int count, double* pptr);
 
 SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type);
 SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p);
+SEXP tm_check_omp();
 
 

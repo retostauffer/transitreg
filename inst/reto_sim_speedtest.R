@@ -1,7 +1,6 @@
 #!/usr/bin/env Rscript
 library("TransitionModels")
 library("gamlss2")
-library("qgam")
 
 
 ## Data generating processes.
@@ -56,7 +55,9 @@ sim_NO <- function(d, nd, breaks, counts = FALSE, family = NO, engine = "bam", u
   qu <- as.numeric(gsub("%", "", qu, fixed = TRUE))/100
 
   ## Estimate transition model.
-  f <- num ~ s(theta) + s(x) + te(theta,x)
+  warning("Using num ~ theta for testing")
+  f <- num ~ theta
+  #f <- num ~ s(theta) + s(x) + te(theta,x)
   message("\n\n ====== running model estimation with useC = ", useC, " ===== \n")
   b <- tm(f, data = d, breaks = breaks, engine = engine,
     scale.x = TRUE, size = 40, maxit = 1000, decay = 0.01, useC = useC)
@@ -74,9 +75,9 @@ sim_NO <- function(d, nd, breaks, counts = FALSE, family = NO, engine = "bam", u
 
 
 # Sim
-#n <- 50000
+n <- 50000
 #n <- 10000
-n <- 2000
+#n <- 2000
 ##n <- 3
 probs <- 0.5
 set.seed(111)
@@ -85,29 +86,41 @@ nd <- dgp_NO(1000, probs = probs)
 
 message("    -------------------------------")
 message("       Using N = ", n)
-message("       Calling devtools load_all")
+#message("       Calling devtools load_all")
+#devtools::load_all("../")
 message("    -------------------------------")
-
-devtools::load_all("../")
-set.seed(111)
-t1 <- system.time(
-    mod1 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE)
-)
-set.seed(111)
+#t1 <- system.time(
+#    mod1 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE)
+#)
 t2 <- system.time(
     mod2 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = TRUE)
 )
-message("Speed improvement factor:     x ",  
-        round(t1["elapsed"] / t2["elapsed"] ,2),
-        "   with n = ", n)
+#print(t1)
+print(t2)
+#print(c("R version" = logLik(mod1), "C version" = logLik(mod2)))
+print(c("C version" = logLik(mod2)))
+TransitionModels:::tm_check_omp();
 
-
-# Comparing model estimates
-table(coef_comparison = coef(mod1$model) == coef(mod2$model))
-table(abs(mod1$probs$pdf - mod2$probs$pdf) < sqrt(.Machine$double.eps))
-print(sqrt(mean((predict(mod1) - predict(mod2))^2)))
-
-sapply(list(mod1 = mod1, mod2 = mod2), logLik)
+#devtools::load_all("../")
+#set.seed(111)
+#t1 <- system.time(
+#    mod1 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE)
+#)
+#set.seed(111)
+#t2 <- system.time(
+#    mod2 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = TRUE)
+#)
+#message("Speed improvement factor:     x ",  
+#        round(t1["elapsed"] / t2["elapsed"] ,2),
+#        "   with n = ", n)
+#
+#
+## Comparing model estimates
+#table(coef_comparison = coef(mod1$model) == coef(mod2$model))
+#table(abs(mod1$probs$pdf - mod2$probs$pdf) < sqrt(.Machine$double.eps))
+#print(sqrt(mean((predict(mod1) - predict(mod2))^2)))
+#
+#sapply(list(mod1 = mod1, mod2 = mod2), logLik)
 
 
 

@@ -9,6 +9,7 @@ install:
 	(cd ../ && \
 		R CMD build --no-build-vignettes TransitionModels && \
 		R CMD INSTALL TransitionModels_$(VERSION).tar.gz)
+####R CMD INSTALL TransitionModels_$(VERSION).tar.gz --configure-args="--enable-verbose")
 
 .PHONY: check
 check:

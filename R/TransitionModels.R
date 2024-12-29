@@ -1,5 +1,17 @@
 ## Main paper: https://link.springer.com/article/10.1007/s10260-021-00558-6
 
+
+tm_check_omp <- function(verbose = TRUE) {
+    stopifnot(isTRUE(verbose) || isFALSE(verbose))
+    check <- .Call(C_tm_check_omp)
+    if (verbose && check) {
+        message("OMP available")
+    } else if (verbose) {
+        message("OMP not available (not compiled with omp)")
+    }
+    invisible(check)
+}
+
 ## Function to set up expanded data set.
 tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
   ## Ensure data is a data frame.
@@ -439,8 +451,6 @@ timer(NULL)
   rval$maxcounts <- max(mf[[rn]])
   rval$theta_vars <- tv
   rval$factor <- isTRUE(list(...)$factor)
-
-  timer("preparing RVAL")
 
   if(inherits(rval$model, "nnet")) {
     p <- predict(rval$model, type = "raw", useC = useC)

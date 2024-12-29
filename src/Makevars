@@ -1,0 +1,4 @@
+
+## Adding OMP support
+PKG_LIBS   = -fopenmp $(SHLIB_OPENMP_CFLAGS)
+PKG_CFLAGS = -fopenmp $(SHLIB_OPENMP_CFLAGS)
