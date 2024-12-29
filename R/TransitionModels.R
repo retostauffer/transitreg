@@ -158,16 +158,12 @@ tm_predict <- function(object, newdata,
   probs <- numeric(length(ui))
 
   if (useC) {
-    message("Calling C version")
-    t1 <- Sys.time()
-    probs <- .Call("c_tm_predict", ui, nd$index, p, type = type);
-    t2 <- Sys.time()
+    probs <- .Call(C_tm_predict, ui, nd$index, p, type = type);
   }
 
   # -------------------
+  # Original R version, TODO(R): May be removed in the future
   if (!useC) {
-    message("Calling R loop")
-    t1 <- Sys.time()
     for(j in ui) {
 
       pj <- p[nd$index == j]
@@ -216,12 +212,7 @@ tm_predict <- function(object, newdata,
         probs[j] <- which.max(cj) - 1L
       }
     }
-    t2 <- Sys.time()
-  } ## end !useC
-
-  message(sprintf(" Time taken: %12.8f secs", as.numeric(t2 - t1, unit = "secs")))
-  message("    Method: ", ifelse(useC, "C", "R"), " implementation")
-  message("    Sum result:  ", sum(probs), "\n")
+  } ## end !useC (R version)
 
   return(probs)
 }
@@ -297,7 +288,7 @@ tm_dist <- function(y, data = NULL, ...)
 }
 
 timer <- function(msg = NULL) {
-    if (is.null(msg)) ttotal <<- Sys.time()
+    if (is.null(msg) || !exists("ttotal")) ttotal <<- Sys.time()
     if (!is.null(msg) && "treto" %in% ls(envir = .GlobalEnv)) {
         t <- as.numeric(Sys.time() - treto, units = "secs")
         tt <- as.numeric(Sys.time() - ttotal, units = "secs")
@@ -469,7 +460,7 @@ timer(NULL)
   if (useC) {
     ## c_tm_predict_pdfcdf returns a list with PDF and CDF, calculating
     ## both simultanously in C to improve speed.
-    tmp    <- .Call("c_tm_predict_pdfcdf", ui, tmf$index, p)
+    tmp    <- .Call(C_tm_predict_pdfcdf, ui, tmf$index, p)
     probs  <- tmp$pdf
     cprobs <- tmp$cdf
     rm(tmp)

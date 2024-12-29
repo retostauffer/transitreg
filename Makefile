@@ -5,7 +5,14 @@ VERSION := $(shell grep '^Version:' DESCRIPTION | awk '{print $$2}')
 
 .PHONY: install
 install:
-	@echo Current version $(VERSION)
+	@echo Installing current version: $(VERSION)
 	(cd ../ && \
 		R CMD build --no-build-vignettes TransitionModels && \
 		R CMD INSTALL TransitionModels_$(VERSION).tar.gz)
+
+.PHONY: check
+check:
+	@echo Checking current version: $(VERSION)
+	(cd ../ && \
+		R CMD build --no-build-vignettes TransitionModels && \
+		R CMD check --as-cran TransitionModels_$(VERSION).tar.gz)

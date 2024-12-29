@@ -1,3 +1,5 @@
+useDynLib(TransitionModels, .registration = TRUE, .fixes = "C_")
+
 import("Formula")
 import("mgcv")
 import("topmodels")
@@ -7,7 +9,8 @@ importFrom("grDevices", "rgb")
 importFrom("graphics", "barplot", "grid", "hist", "lines", "par",
   "points", "rug")
 
-importFrom("stats", "as.formula", "binomial", "density", "dnorm",
+importFrom("stats", "median", "runif",
+  "as.formula", "binomial", "density", "dnorm",
   "fitted", "lm", "model.frame", "model.response", "na.omit",
   "pnorm", "ppoints", "predict", "qnorm", "qqnorm",
   "quantile", "residuals", "sd", "terms", "update")
@@ -26,4 +29,3 @@ S3method(summary, tm)
 S3method(print, tm)
 S3method(rootogram, tm)
 
-useDynLib(TransitionModels, .registration = TRUE)

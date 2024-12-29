@@ -2,4 +2,4 @@ inst
 README.qmd
 .gitignore
 CHANGELOG.md
-
+Makefile

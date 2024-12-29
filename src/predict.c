@@ -1,4 +1,11 @@
-
+/* ------------- C routines for transition models --------------
+ *
+ * Functions called `C_*` are the ones called from R,
+ * all other functions are only used internally (in C).
+ *
+ * Authors: Nikolaus Umlauf, Reto Stauffer
+ * -------------------------------------------------------------
+ */
 #include <R.h>
 #include <Rdefines.h>
 #include <Rinternals.h>
@@ -32,7 +39,7 @@ int* find_positions(int x, int* y, int n, int* count) {
  *
  * Calculates (1 - p[count]) * prod(p[-count]) with p = pptr[positions]
  */
-double c_calc_pdf(int* positions, int count, double* pptr) {
+double tm_calc_pdf(int* positions, int count, double* pptr) {
     double res = 1.0; // Initialize with 1.0 for product
     for (int i = 0; i < (count - 1); i++) {
         // Calculates product over the first (count - 1) elements
@@ -46,7 +53,7 @@ double c_calc_pdf(int* positions, int count, double* pptr) {
 /* Helper function for type = "cdf".
  *
  */
-double c_calc_cdf(int* positions, int count, double* pptr) {
+double tm_calc_cdf(int* positions, int count, double* pptr) {
     // Initialize with (1 - p[0])
     double res = 1.0 - pptr[positions[0]];
     if (count > 0) {
@@ -63,13 +70,13 @@ double c_calc_cdf(int* positions, int count, double* pptr) {
 /* Helper function for type = "pmax"
  *
  */
-double c_calc_pmax(int* positions, int count, double* pptr) {
+double tm_calc_pmax(int* positions, int count, double* pptr) {
     // Initialize with (1 - p[0])
     double res = 1.0 - pptr[positions[0]];
     double max_res = res; // Current maximum
     int    pmax = 0;      // Position of highest value (max cdf)
 
-    // Does the same as c_calc_cdf except summing up, and only
+    // Does the same as tm_calc_cdf except summing up, and only
     // keeps the index of the highest value.
     if (count > 0) {
         double pprod = 1.0; // Initialize with 1.0 for product
@@ -99,7 +106,7 @@ double c_calc_pmax(int* positions, int count, double* pptr) {
  * 
  * @return Returns SEXP double vector of length (length(uidx)).
  */
-SEXP c_tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type) {
+SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type) {
 
     double *pptr    = REAL(p);
     int    *uidxptr = INTEGER(uidx);  // Unique indices in the dtaa
@@ -122,11 +129,11 @@ SEXP c_tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type) {
     for (i = 0; i < un; i++) {
         int* positions = find_positions(uidxptr[i], idxptr, n, &count);
         if (do_pdf) {
-            probsptr[i] = c_calc_pdf(positions, count, pptr);
+            probsptr[i] = tm_calc_pdf(positions, count, pptr);
         } else if (do_cdf) {
-            probsptr[i] = c_calc_cdf(positions, count, pptr);
+            probsptr[i] = tm_calc_cdf(positions, count, pptr);
         } else {
-            probsptr[i] = c_calc_pmax(positions, count, pptr);
+            probsptr[i] = tm_calc_pmax(positions, count, pptr);
         }
         free(positions); // Free allocated memory
     }
@@ -150,7 +157,7 @@ SEXP c_tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type) {
  * 
  * @return Returns SEXP double vector of length (length(uidx)).
  */
-SEXP c_tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p) {
+SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p) {
 
     double *pptr    = REAL(p);
     int    *uidxptr = INTEGER(uidx);  // Unique indices in the dtaa
@@ -169,8 +176,8 @@ SEXP c_tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p) {
 
     for (i = 0; i < un; i++) {
         int* positions = find_positions(uidxptr[i], idxptr, n, &count);
-        pdfptr[i] = c_calc_pdf(positions, count, pptr);
-        cdfptr[i] = c_calc_cdf(positions, count, pptr);
+        pdfptr[i] = tm_calc_pdf(positions, count, pptr);
+        cdfptr[i] = tm_calc_cdf(positions, count, pptr);
         free(positions); // Free allocated memory
     }
 
