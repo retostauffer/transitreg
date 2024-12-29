@@ -74,14 +74,19 @@ sim_NO <- function(d, nd, breaks, counts = FALSE, family = NO, engine = "bam", u
 
 
 # Sim
-n <- 50000
+#n <- 50000
 #n <- 10000
-#n <- 2000
+n <- 2000
 ##n <- 3
 probs <- 0.5
 set.seed(111)
 d  <- dgp_NO(n, probs = probs)
 nd <- dgp_NO(1000, probs = probs)
+
+message("    -------------------------------")
+message("       Using N = ", n)
+message("       Calling devtools load_all")
+message("    -------------------------------")
 
 devtools::load_all("../")
 set.seed(111)
