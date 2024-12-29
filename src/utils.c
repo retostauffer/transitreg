@@ -18,12 +18,13 @@
 /* Helper function to check if OMP is ON (i.e.,
  * parallelization enabled
  *
- * @return Returns TRUE if OMP enabled, else FALSE.
+ * @return Returns an integer, 0 if OMP is not available,
+ * else the number of available cores (procs).
  * */
-SEXP tm_check_omp() {
+SEXP tm_detect_cores() {
+    int ncores = 0;
     #ifdef OPENMP_ON
-      return Rf_ScalarLogical(1);
-    #else
-      return Rf_ScalarLogical(0);
+        ncores = omp_get_num_procs();
     #endif
+    return ScalarInteger(ncores);
 }

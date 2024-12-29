@@ -18,7 +18,8 @@ importFrom("stats", "median", "runif",
 export(
   "tm",
   "tm_data",
-  "tm_dist"
+  "tm_dist",
+  "tm_detect_cores"
 )
 
 S3method(plot, tm)

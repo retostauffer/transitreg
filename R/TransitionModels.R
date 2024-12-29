@@ -1,15 +1,15 @@
 ## Main paper: https://link.springer.com/article/10.1007/s10260-021-00558-6
 
 
-tm_check_omp <- function(verbose = TRUE) {
-    stopifnot(isTRUE(verbose) || isFALSE(verbose))
-    check <- .Call(C_tm_check_omp)
-    if (verbose && check) {
-        message("OMP available")
+tm_detect_cores <- function(verbose = TRUE) {
+    stopifnot("'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose))
+    ncores <- .Call(C_tm_detect_cores)
+    if (verbose && ncores) {
+        message("OMP available, number of cores detected: ", ncores)
     } else if (verbose) {
         message("OMP not available (not compiled with omp)")
     }
-    invisible(check)
+    return(ncores)
 }
 
 ## Function to set up expanded data set.
@@ -121,8 +121,8 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
 
 ## Predict function.
 # TODO(R): Adding useC option for testing; must be removed in the future.
-tm_predict <- function(object, newdata,
-  type = c("pdf", "cdf", "quantile", "pmax"), 
+tm_predict <- function(object, newdata, ncores,
+  type = c("pdf", "cdf", "quantile", "pmax"),
   response = NULL, y = NULL, prob = 0.5, maxcounts = 1e+03,
   verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
   factor = FALSE, useC = TRUE)
@@ -170,7 +170,7 @@ tm_predict <- function(object, newdata,
   probs <- numeric(length(ui))
 
   if (useC) {
-    probs <- .Call(C_tm_predict, ui, nd$index, p, type = type);
+    probs <- .Call(C_tm_predict, ui, nd$index, p, type = type, ncores = ncores);
   }
 
   # -------------------
@@ -315,8 +315,25 @@ timer(NULL)
 # TODO(R): Adding useC option for testing; must be removed in the future.
 tm <- function(formula, data, subset, na.action,
   engine = "bam", scale.x = FALSE, breaks = NULL,
-  model = TRUE, verbose = FALSE, useC = FALSE, ...)
+  model = TRUE, ncores = NULL, verbose = FALSE, useC = FALSE, ...)
 {
+  if (!is.null(breaks)) breaks <- as.numeric(breaks)
+
+  ## Staying sane
+  stopifnot(
+    "'ncores' must be NULL or numeric" = is.null(ncores) || is.numeric(ncores),
+    "'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose)
+  )
+
+  ## Number of cores to be used for OpenMP. If
+  ## - NULL: Guess cores (max cores - 2L)
+  ## - Smaller or equal to 0: Set to 1L (single-core processing)
+  ## - Else: Take user input; limited to maximum number of detected cores.
+  ncores <- if (!is.null(ncores)) as.integer(ncores)[1L] else tm_detect_cores(verbose = FALSE) - 2L
+  ncores <- if (ncores < 1L) 1L else pmin(ncores, tm_detect_cores(verbose = FALSE))
+  if (verbose) message("Number of cores set to: ", ncores)
+
+
 timer(NULL)
   cl <- match.call()
 
@@ -470,7 +487,7 @@ timer(NULL)
   if (useC) {
     ## c_tm_predict_pdfcdf returns a list with PDF and CDF, calculating
     ## both simultanously in C to improve speed.
-    tmp    <- .Call(C_tm_predict_pdfcdf, ui, tmf$index, p)
+    tmp    <- .Call(C_tm_predict_pdfcdf, uidx = ui, idx = tmf$index, p = p, ncores = ncores)
     probs  <- tmp$pdf
     cprobs <- tmp$cdf
     rm(tmp)
@@ -618,7 +635,7 @@ predict.tm <- function(object, newdata = NULL,
     }
   }
 
-  pred <- tm_predict(object$model, newdata = newdata, 
+  pred <- tm_predict(object$model, newdata = newdata, ncores = ncores,
     response = object$response, type = type,
     maxcounts = object$maxcounts, prob = prob,
     theta_scaler = object$scaler$theta,

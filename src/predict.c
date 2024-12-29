@@ -111,6 +111,7 @@ double tm_calc_pmax(int* positions, int count, double* pptr) {
  * @param idx integer with indices, length of idx is sample size times breaks.
  * @param p probabilities, same length as idx vector.
  * @param type character, either 'pdf', 'cdf', or 'pmax'.
+ * @param ncores integer, number of cores to be used (ignored if OMP not available).
  *
  * @details Internally loops over all unique indices in `uidx`.
  * For each index (belonging to one observation) we check the position
@@ -119,13 +120,14 @@ double tm_calc_pmax(int* positions, int count, double* pptr) {
  * 
  * @return Returns SEXP double vector of length (length(uidx)).
  */
-SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type) {
+SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP ncores) {
 
     double *pptr    = REAL(p);
-    int    *uidxptr = INTEGER(uidx);  // Unique indices in the dtaa
-    int    *idxptr  = INTEGER(idx);   // Index vector
-    int    n = LENGTH(idx);
-    int    un = LENGTH(uidx);
+    int    *uidxptr = INTEGER(uidx);     // Unique indices in the dtaa
+    int    *idxptr  = INTEGER(idx);      // Index vector
+    int    nthreads = asInteger(ncores); // Number of threads for OMP
+    int    n        = LENGTH(idx);
+    int    un       = LENGTH(uidx);
     int    i;
 
     // Evaluate 'type' to define what to do
@@ -143,7 +145,8 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type) {
 
 
     #if OPENMP_ON
-    #pragma omp parallel for num_threads(5) private(which)
+    printf(" [tm_predict] ------------------------ %d\n", nthreads);
+    #pragma omp parallel for num_threads(nthreads) private(which)
     #endif
     for (i = 0; i < un; i++) {
         which = find_positions(uidxptr[i], idxptr, n);
@@ -168,6 +171,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type) {
  * @param idx integer with indices, length of idx is sample size times breaks.
  * @param p probabilities, same length as idx vector.
  * @param type character, either 'pdf', 'cdf', or 'pmax'.
+ * @param ncores integer, number of cores to be used (ignored if OMP not available).
  *
  * @details Does the same as c_tm_predict but calculates both PDF and
  * CDF simultanously, returning a named list. This is used in the
@@ -176,13 +180,14 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type) {
  * 
  * @return Returns SEXP double vector of length (length(uidx)).
  */
-SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p) {
+SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores) {
 
     double *pptr    = REAL(p);
     int    *uidxptr = INTEGER(uidx);  // Unique indices in the dtaa
     int    *idxptr  = INTEGER(idx);   // Index vector
-    int    n = LENGTH(idx);
-    int    un = LENGTH(uidx);
+    int    nthreads = asInteger(ncores); // Number of threads for OMP
+    int    n        = LENGTH(idx);
+    int    un       = LENGTH(uidx);
     int    i;
 
     // Custom struct object to mimik "which()"
@@ -198,8 +203,9 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p) {
 
 
     /* Warning for future me: Do not use Rprintf inside omp -> segfault */
+    printf(" [tm_predict_pdfcdf] ------------------------ %d\n", nthreads);
     #if OPENMP_ON
-    #pragma omp parallel for num_threads(5) private(which)
+    #pragma omp parallel for num_threads(nthreads) private(which)
     #endif
     for (i = 0; i < un; i++) {
         which = find_positions(uidxptr[i], idxptr, n);

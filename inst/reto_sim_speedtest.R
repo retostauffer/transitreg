@@ -39,7 +39,7 @@ dgp_NO <- function(n = 1000, probs = c(0.01, 0.1, 0.5, 0.9, 0.99), breaks = 20, 
 }
 
 
-sim_NO <- function(d, nd, breaks, counts = FALSE, family = NO, engine = "bam", useC = FALSE, ...)
+sim_NO <- function(d, nd, breaks, ncores, counts = FALSE, family = NO, engine = "bam", useC = FALSE, ...)
 {
   breaks <- as.integer(breaks)[1L]
   stopifnot(is.integer(breaks), length(breaks) == 1L, breaks > 0)
@@ -59,8 +59,9 @@ sim_NO <- function(d, nd, breaks, counts = FALSE, family = NO, engine = "bam", u
   f <- num ~ theta
   #f <- num ~ s(theta) + s(x) + te(theta,x)
   message("\n\n ====== running model estimation with useC = ", useC, " ===== \n")
-  b <- tm(f, data = d, breaks = breaks, engine = engine,
-    scale.x = TRUE, size = 40, maxit = 1000, decay = 0.01, useC = useC)
+  b <- tm(f, data = d, ncores = ncores, breaks = breaks, engine = engine,
+    scale.x = TRUE, size = 40, maxit = 1000, decay = 0.01, useC = useC,
+    verbose = TRUE)
 
   message("\n\n ====== end of model estimation =========\n\n")
 
@@ -75,8 +76,8 @@ sim_NO <- function(d, nd, breaks, counts = FALSE, family = NO, engine = "bam", u
 
 
 # Sim
-n <- 50000
-#n <- 10000
+#n <- 50000
+n <- 10000
 #n <- 2000
 ##n <- 3
 probs <- 0.5
@@ -87,19 +88,20 @@ nd <- dgp_NO(1000, probs = probs)
 message("    -------------------------------")
 message("       Using N = ", n)
 #message("       Calling devtools load_all")
-#devtools::load_all("../")
+devtools::load_all("../")
 message("    -------------------------------")
-t1 <- system.time(
-    mod1 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE)
-)
+ncores <- 1
+#t1 <- system.time(
+#    mod1 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE, ncores = ncores)
+#)
 t2 <- system.time(
-    mod2 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = TRUE)
+    mod2 <- sim_NO(d, nd, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = TRUE, ncores = ncores)
 )
-print(t1)
+#print(t1)
 print(t2)
-print(c("R version" = logLik(mod1), "C version" = logLik(mod2)))
-#print(c("C version" = logLik(mod2)))
-TransitionModels:::tm_check_omp();
+#print(c("R version" = logLik(mod1), "C version" = logLik(mod2)))
+print(c("C version" = logLik(mod2)))
+tm_detect_cores()
 
 #devtools::load_all("../")
 #set.seed(111)
