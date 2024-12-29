@@ -3,8 +3,14 @@ library("gamlss2")
 
 ## Load the 'storms' dataset from the 'WeatherGermany' package and fit a transition model.
 data("storms", package = "WeatherGermany")
-f <- counts ~ s(theta) + ti(alt) + ti(year) + ti(lon, lat) + ti(alt, year)
+f <- counts ~ theta0 + s(theta) + s(log(alt + 1)) + s(lon, lat)
 b <- tm(f, data = storms)
+rootogram(b, K = 20)
+
+storms$log_alt <- log(storms$alt + 1)
+
+f <- counts ~ theta + lon + lat
+m <- tm(f, data = storms, engine = "nnet", scale.x = TRUE, size = 50, maxit = 5000, decay = 0.01)
 
 ## Generate random count data and visualize its probability density function (PDF).
 set.seed(123)

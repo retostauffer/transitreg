@@ -43,7 +43,7 @@ tm_data <- function(data, response = NULL, verbose = TRUE) {
       "index" = i,
       Y = Y,
       theta = c(0:k),
-      row_data[rep(1, length(Y)), ]
+      row_data[rep(1, length(Y)), , drop = FALSE]
     )
 
     ## Add to list.
@@ -593,7 +593,7 @@ residuals.tm <- function(object, newdata = NULL, y = NULL, ...)
 rootogram.tm <- function(object, newdata = NULL, plot = TRUE,
   width = 0.9, style = c("hanging", "standing", "suspended"),
   scale = c("sqrt", "raw"), expected = TRUE, confint = TRUE,
-  ref = TRUE, xlab = NULL, ylab = NULL, main = NULL, ...)
+  ref = TRUE, K = NULL, xlab = NULL, ylab = NULL, main = NULL, ...)
 {
   if(is.null(newdata))
     newdata <- object$model.frame
@@ -604,6 +604,8 @@ rootogram.tm <- function(object, newdata = NULL, plot = TRUE,
   y <- newdata[[object$response]]
   n <- length(y)
 
+  if(!is.null(K))
+    object$maxcounts <- K
   counts <- 0:object$maxcounts
   p <- NULL; obs <- NULL
   for(j in counts) {

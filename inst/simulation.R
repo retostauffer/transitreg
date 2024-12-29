@@ -65,6 +65,42 @@ dgp_NO <- function(n = 1000, probs = c(0.01, 0.1, 0.5, 0.9, 0.99), breaks = 20, 
   return(d)
 }
 
+dgp_BCPE <- function(n = 1000, probs = c(0.01, 0.1, 0.5, 0.9, 0.99), breaks = 20, ...)
+{
+  ## Covariate.
+  x <- runif(n, -3, 3)
+
+  ## Parameters.
+  mu <- exp(-2 + cos(x))
+  sigma <- exp(-2 + cos(x))
+  nu <- 4 + 2*x
+  tau <- exp(0.5*x^2)
+
+  ## Response
+  y_cont <- rBCPEo(n, mu, sigma, nu, tau) * 100
+
+  ## Discretize the normal data into count categories.
+  yr <- range(y_cont)
+  breaks <- seq(0, 100, length.out = breaks)
+  y_count <- cut(y_cont, breaks = breaks, labels = FALSE, include.lowest = TRUE) - 1
+
+  ## Combine.
+  d <- data.frame("x" = x, "counts" = y_count, "num" = y_cont)
+
+  ## Add quantiles.
+  qu <- quc <- NULL
+  for(j in probs) {
+    qj <- qBCPEo(j, mu = mu, sigma = sigma, nu = nu, tau = tau)*100
+    qu <- cbind(qu, qj)
+    quc <- cbind(quc, cut(qj, breaks = breaks, labels = FALSE, include.lowest = TRUE) - 1)
+  }
+  colnames(qu) <- colnames(quc) <- paste0(probs * 100, "%")
+  d$quantiles <- qu
+  d$count.quantiles <- quc
+
+  return(d)
+}
+
 dgp_ZINBI <- function(n = 1000, probs = c(0.01, 0.1, 0.5, 0.9, 0.99), ...)
 {
   ## Covariate data.
@@ -130,6 +166,104 @@ sim_NO <- function(n = 1000, breaks = NULL, counts = FALSE, family = NO, seed = 
     m <- gamlss2(log(num + 1) ~ s(x) | s(x), family = family, data = d)
   } else {
     m <- gamlss2(num ~ s(x) | s(x), family = family, data = d)
+  }
+
+  ## Quantile regression.
+  if(counts) {
+    g <- mqgam(log(num + 1) ~ s(x,k=20), data = d, qu = qu)
+  } else {
+    g <- mqgam(num ~ s(x,k=20), data = d, qu = qu)
+  }
+
+  ## Predict quantiles.
+  p <- do.call("cbind",
+    lapply(qu, function(j) {
+      predict(b, newdata = nd, prob = j)
+  }))
+
+  par <- predict(m, newdata = nd)
+  pm <- do.call("cbind",
+    lapply(qu, function(j) {
+      m$family$q(j, par)
+  }))
+  if(counts && (family()$type == "Continuous"))
+    pm <- exp(pm) - 1
+
+  pg <- do.call("cbind",
+    lapply(qu, function(j) {
+      qdo(g, j, predict, newdata = nd)
+  }))
+  if(counts)
+    pg <- exp(pg) - 1
+
+  ## Compute loss.
+  err_b <- sqrt(mean((p - nd$quantiles)^2))
+  err_m <- sqrt(mean((pm - nd$quantiles)^2))
+  err_g <- sqrt(mean((pg - nd$quantiles)^2))
+
+  ## Plot data and fitted median.
+  if(is.null(ylim))
+    ylim <- range(d$num, nd$num, p, pm, pg)
+
+  plot(num ~ x, data = d, xlim = xlim, ylim = ylim,
+    col = rgb(0.1, 0.1, 0.1, alpha = 0.2), pch = 16,
+    main = "", xlab = "x", ylab = "y", ...)
+
+  i <- order(nd$x)
+
+  matplot(nd$x[i], nd$quantiles[i,], type = "l",
+    col = rgb(0.1, 0.1, 0.1, alpha = 0.3),
+    lty = 1, lwd = 6, add = TRUE)
+
+  matplot(nd$x[i], pm[i, ], type = "l",
+    lty = 1, col = 2, lwd = 2, add = TRUE)
+  matplot(nd$x[i], pg[i, ], type = "l",
+    lty = 1, col = 3, lwd = 2, add = TRUE)
+  matplot(nd$x[i], p[i, ], type = "l",
+    lty = 1, col = 4, lwd = 2, add = TRUE)
+
+  qe <- paste(c("TM", paste("GAMLSS", family()$family[1]), "QGAM"), "=", round(c(err_b, err_m, err_g), 2))
+
+  legend(pos, qe, lwd = 2, col = c(4, 2, 3), bty = "n") ##title = "Quantile Error (RMSE)")
+}
+
+sim_BCPE <- function(n = 1000, breaks = NULL, counts = FALSE, family = BCPEo, seed = 111,
+  xlim = NULL, ylim = NULL, engine = "bam", pos = "topleft", probs = 0.5, ...)
+{
+  if(!is.null(seed))
+    set.seed(seed)
+
+  ## Simulate data.
+  d <- dgp_BCPE(n, probs = probs)
+
+  ## Simulate new data.
+  nd <- dgp_BCPE(1000, probs = probs)
+
+  if(counts) {
+    d$num <- d$counts
+    nd$num <- nd$counts
+    d$quantiles <- d$count.quantiles
+    nd$quantiles <- nd$count.quantiles
+  }
+
+  ## Set quantiles.
+  qu <- colnames(nd$quantiles)
+  qu <- as.numeric(gsub("%", "", qu, fixed = TRUE))/100
+
+  ## Estimate transition model.
+  if(engine != "nnet") {
+    f <- num ~ s(theta) + s(x) + te(theta,x,k=10)
+  } else {
+    f <- num ~ theta + x
+  }
+  b <- tm(f, data = d, breaks = breaks, engine = engine,
+    scale.x = TRUE, size = 40, maxit = 1000, decay = 0.01)
+
+  ## Corresponding GAMLSS.
+  if(counts && (family()$type == "Continuous")) {
+    m <- gamlss2(log(num + 1) ~ s(x) | s(x) | s(x) | s(x), family = family, data = d)
+  } else {
+    m <- gamlss2(num ~ s(x) | s(x) | s(x) | s(x), family = family, data = d)
   }
 
   ## Quantile regression.
@@ -361,7 +495,7 @@ mtext("y", side = 2 , line = 2.5, outer = TRUE)
 }
 
 
-if(TRUE) {
+if(FALSE) {
 x11(width = 10, height = 4)
 
 par(mfrow = c(1, 3), mar = rep(0, 4), oma = c(4, 4, 3, 3))
