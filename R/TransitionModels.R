@@ -1,6 +1,18 @@
 ## Main paper: https://link.springer.com/article/10.1007/s10260-021-00558-6
 
 
+#' Detect number of cores for OpenMP
+#'
+#' The calculation of CDFs and PDFs is implemented in C and allows
+#' for parallelization using OpenMP. This function detects how may
+#' cores are available in total (if OpenMP is available).
+#'
+#' @param verbose logical, if \code{TRUE} a message is shown.
+#'
+#' @return Number of available cores (integer). If OpenMP is not
+#' available, \code{1L} is returned.
+#'
+#' @author Reto
 tm_detect_cores <- function(verbose = TRUE) {
     stopifnot("'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose))
     ncores <- .Call(C_tm_detect_cores)
@@ -12,7 +24,22 @@ tm_detect_cores <- function(verbose = TRUE) {
     return(ncores)
 }
 
-
+#' Get number of cores for OpenMP
+#'
+#' Some parts of the package use C routines which allow for parallelization
+#' using OpenMP. This function is used to specify how many cores to be used.
+#'
+#' @param ncores \code{NULL} or a positive integer.
+#' @param verbose logical, if \code{TRUE} a message is shown.
+#'
+#' @return Number of cores to be used in OpenMP parallelization (integer).
+#'
+#' @details If \code{ncores} is \code{NULL} the number of available
+#' cores is auto-detected and set to 'total number of cores - 2'.
+#' If integer, it is checked if this number of cores is available,
+#' else set tot he 'total number of cores available'.
+#'
+#' @author Reto
 tm_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
   ## Number of cores to be used for OpenMP. If
   ## - NULL: Guess cores (max cores - 2L)
@@ -48,7 +75,7 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
 
   response_values <- data[[response]]
   df_list <- vector("list", n)
-  timer("[tm_data] extracted response, allocated list")
+  timer("[tm_data] extracted response, allocated list", verbose)
 
   ## If any missing value in response: stop
   if (any(is.na(response_values)))
@@ -80,7 +107,7 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
         utils::setTxtProgressBar(pb, i)
       }
     }
-    timer("[tm_data] loop over n - R")
+    timer("[tm_data] loop over n - R", verbose)
 
     if (verbose)
       close(pb)
@@ -88,7 +115,7 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
 
     ## Combine all rows into a single data frame.
     result <- do.call("rbind", df_list)
-    timer("[tm_data] results combined - loop")
+    timer("[tm_data] results combined - loop", verbose)
 
   } else {
     ## TODO(R): This is the 'faster version' of the
@@ -118,7 +145,7 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
     for (n in names(data)) result[[n]] <- rep(data[[n]], response_values + 1)
 
     result <- as.data.frame(result)
-    timer("[tm_data] faster vectorized version")
+    timer("[tm_data] faster vectorized version", verbose)
   }
 
   ## Attach the response column as an attribute.
@@ -231,7 +258,10 @@ tm_predict <- function(object, newdata,
       }
 
       if (type == "quantile") {
+          print(prob)
+        print(pj)
         cj <- 1 - pj[1]
+          print(c(j = j, cj = cj))
         if (cj >= prob[j]) {
           probs[j] <- 0L
         } else {
@@ -335,13 +365,14 @@ tm_dist <- function(y, data = NULL, ...)
   return(invisible(b))
 }
 
-timer <- function(msg = NULL) {
+timer <- function(msg = NULL, verbose = TRUE) {
     if (is.null(msg) || !exists("ttotal")) ttotal <<- Sys.time()
     if (!is.null(msg) && "treto" %in% ls(envir = .GlobalEnv)) {
         t <- as.numeric(Sys.time() - treto, units = "secs")
         tt <- as.numeric(Sys.time() - ttotal, units = "secs")
-        message(sprintf("[timing] Elapsed  %8.1f ms  - %8.1f total     (%s)",
-                        t * 1000, tt * 1000, msg))
+        if (verbose)
+            message(sprintf("[timing] Elapsed  %8.1f ms  - %8.1f total     (%s)",
+                            t * 1000, tt * 1000, msg))
     }
     treto <<- Sys.time()
 }
@@ -387,7 +418,7 @@ timer(NULL)
   mf[[1L]] <- quote(stats::model.frame)
   mf <- eval(mf, parent.frame())
 
-  timer("building model frame")
+  timer("building model frame", verbose)
 
   ## Response name.
   rn <- response_name(formula)
@@ -419,7 +450,7 @@ timer(NULL)
 
     mf[[rn]] <- yc
   }
-  timer("discretize response")
+  timer("discretize response", verbose)
 
   ## Scaling data.
   scaler <- NULL
@@ -432,21 +463,21 @@ timer(NULL)
       }
     }
   }
-  timer("data scaling")
+  timer("data scaling", verbose)
 
   ## Max. counts.
   ymax <- max(mf[[rn]], na.rm = TRUE)
   k <- min(c(ymax - 1L, 20L))
-  timer("find min/max")
+  timer("find min/max", verbose)
 
   ## Transform data.
   tmf <- tm_data(mf, response = rn, useC = useC, verbose = verbose)
-  timer("transforming data (tm_df)")
+  timer("transforming data (tm_df)", verbose)
 
   if (!is.null(scaler)) {
     scaler$theta <- list("mean" = mean(tmf$theta), "sd" = sd(tmf$theta))
     tmf$theta <- (tmf$theta - scaler$theta$mean) / scaler$theta$sd
-    timer("scaling theta")
+    timer("scaling theta", verbose)
   }
 
   if (length(tv)) {
@@ -454,7 +485,7 @@ timer(NULL)
       i <- as.integer(gsub("theta", "", j))
       tmf[[j]] <- as.integer(tmf$theta == i)
     }
-    timer(paste("loop over tv (length ", length(tv), ")"))
+    timer(paste("loop over tv (length ", length(tv), ")"), verbose)
   }
 
   ## Setup return value.
@@ -472,7 +503,7 @@ timer(NULL)
   } else {
     rval$new_formula <- update(formula, as.factor(Y) ~ .)
   }
-  timer("updated formula")
+  timer("updated formula", verbose)
 
   ## Estimate model.
   warn <- getOption("warn")
@@ -486,7 +517,7 @@ timer(NULL)
   if (engine == "nnet") {
     rval$model <- nnet::nnet(rval$new_formula, data = tmf, ...)
   }
-  timer("estimation")
+  timer("estimation", verbose)
   options("warn" = warn)
 
   ## Additional info.
@@ -502,7 +533,7 @@ timer(NULL)
   } else {
     p <- predict(rval$model, type = "response", useC = useC)
   }
-  timer("prediction")
+  timer("prediction", verbose)
 
   ## Remove model frame.
   if (!model)
@@ -519,7 +550,7 @@ timer(NULL)
     probs  <- tmp$pdf
     cprobs <- tmp$cdf
     rm(tmp)
-    timer("calculating CDF - C")
+    timer("calculating CDF - C", verbose)
   } else {
     for (j in ui) {
       pj <- p[tmf$index == j]
@@ -534,7 +565,7 @@ timer(NULL)
       }
       cprobs[j] <- sum(cj)
     }
-    timer("calculating CDF - R")
+    timer("calculating CDF - R", verbose)
   }
 
   probs[probs < 1e-15] <- 1e-15
@@ -543,7 +574,7 @@ timer(NULL)
   cprobs[cprobs > 0.999999] <- 0.999999
 
   rval$probs <- data.frame("pdf" = probs, "cdf" = cprobs)
-  timer("building rval")
+  timer("building rval", verbose)
 
   ## If binning.
   if (bin.y) {
@@ -551,7 +582,7 @@ timer(NULL)
     rval$ym <- ym
     rval$yc_tab <- table(yc)
     rval$breaks <- breaks
-    timer("ended if bin.y")
+    timer("ended if bin.y", verbose)
   }
 
   ## Assign class.
