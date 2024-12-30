@@ -180,8 +180,6 @@ tm_predict <- function(object, newdata,
 
   ui <- unique(nd$index)
 
-  probs <- numeric(length(ui))
-
   if (useC) {
     probs <- .Call(C_tm_predict, ui, nd$index, p, type = type, ncores = ncores);
   }
@@ -189,6 +187,7 @@ tm_predict <- function(object, newdata,
   # -------------------
   # Original R version, TODO(R): May be removed in the future
   if (!useC) {
+    probs <- numeric(length(ui))
     for(j in ui) {
 
       pj <- p[nd$index == j]
