@@ -36,7 +36,7 @@ tm(formula, data, subset, na.action,
     critical for continuous responses.}
   \item{model}{Logical value indicating whether the model frame should be included in 
     the return object.}
-  \item{ncores}{\code{NULL} (default) or single numeric. See 'OpenMP' for more information.
+  \item{ncores}{\code{NULL} (default) or single numeric. See 'OpenMP' for more information.}
   \item{verbose}{Logical value indicating whether progress and diagnostic messages 
     should be printed. Default is \code{FALSE}.}
   \item{\dots}{Additional arguments to be passed to the estimation engine.}
@@ -96,6 +96,9 @@ b <- tm(y ~ s(theta) + s(x))
 
 ## GAM summary.
 summary(b)
+
+## GAM coefficients
+coef(b)
 
 ## Effect plots.
 plot(b)

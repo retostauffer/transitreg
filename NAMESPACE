@@ -9,7 +9,7 @@ importFrom("grDevices", "rgb")
 importFrom("graphics", "barplot", "grid", "hist", "lines", "par",
   "points", "rug")
 
-importFrom("stats", "median", "runif",
+importFrom("stats", "median", "runif", "coef",
   "as.formula", "binomial", "density", "dnorm",
   "fitted", "lm", "model.frame", "model.response", "na.omit",
   "pnorm", "ppoints", "predict", "qnorm", "qqnorm",
@@ -27,6 +27,7 @@ S3method(predict, tm)
 S3method(residuals, tm)
 S3method(logLik, tm)
 S3method(summary, tm)
+S3method(coef, tm)
 S3method(print, tm)
 S3method(rootogram, tm)
 

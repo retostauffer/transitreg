@@ -28,26 +28,26 @@ tm_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
 ## Function to set up expanded data set.
 tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
   ## Ensure data is a data frame.
-  if(!is.data.frame(data)) {
+  if (!is.data.frame(data)) {
     data <- as.data.frame(data)
   }
 
   ## Determine response column.
-  if(is.null(response)) {
+  if (is.null(response)) {
     response <- names(data)[1L]
   }
-  if(!response %in% names(data)) {
+  if (!response %in% names(data)) {
     stop("The specified response column does not exist in the data!")
   }
 
   ## Initialize progress bar.
-  if(verbose) {
+  if (verbose) {
     pb <- utils::txtProgressBar(min = 0, max = nrow(data), style = 3)
   }
 
   ## Preallocate list.
   n <- nrow(data)
-  if(n > 20)
+  if (n > 20)
     step <- floor(n / 20)
   else
     step <- 1
@@ -81,13 +81,13 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
       df_list[[i]] <- di
 
       ## Update progress bar.
-      if(verbose && (i %% step == 0)) {
+      if (verbose && (i %% step == 0)) {
         utils::setTxtProgressBar(pb, i)
       }
     }
     timer("[tm_data] loop over n - R")
 
-    if(verbose) {
+    if (verbose) {
       close(pb)
     }
 
@@ -140,25 +140,25 @@ tm_predict <- function(object, newdata,
   verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
   factor = FALSE, ncores = NULL, useC = TRUE)
 {
-  if(is.null(response))
+  if (is.null(response))
     response <- names(newdata)[1L]
 
-  if(is.null(newdata[[response]])) {
+  if (is.null(newdata[[response]])) {
     newdata[[response]] <- maxcounts + floor(0.1 * maxcounts)
   }
 
   nd <- tm_data(newdata, response = response, verbose = verbose)
-  if(factor)
+  if (factor)
     nd$theta <- as.factor(nd$theta)
 
-  if(!is.null(theta_vars)) {
+  if (!is.null(theta_vars)) {
     for(j in theta_vars) {
       i <- as.integer(gsub("theta", "", j))
       nd[[j]] <- as.integer(nd$theta == i)
     }
   }
 
-  if(!is.null(theta_scaler)) {
+  if (!is.null(theta_scaler)) {
     nd$theta <- (nd$theta - theta_scaler$mean) / theta_scaler$sd
   }
 
@@ -174,7 +174,7 @@ tm_predict <- function(object, newdata,
   type <- tolower(type)
   type <- match.arg(type)
 
-  if(type == "quantile") {
+  if (type == "quantile") {
     prob <- rep(prob, length.out = nrow(newdata))
   }
 
@@ -193,28 +193,28 @@ tm_predict <- function(object, newdata,
       pj <- p[nd$index == j]
       k <- length(pj)
 
-      if(type == "pdf") {
+      if (type == "pdf") {
         probs[j] <- (1 - pj[k]) * prod(pj[-k])
       }
 
-      if(type == "cdf") {
+      if (type == "cdf") {
         cj <- 1 - pj[1]
-        if(length(pj) > 1) {
+        if (length(pj) > 1) {
           for(jj in 2:length(pj))
             cj <- cj + (1 - pj[jj]) * prod(pj[1:(jj - 1)])
         }
         probs[j] <- cj
       }
 
-      if(type == "quantile") {
+      if (type == "quantile") {
         cj <- 1 - pj[1]
-        if(cj >= prob[j]) {
+        if (cj >= prob[j]) {
           probs[j] <- 0L
         } else {
-          if(length(pj) > 1) {
+          if (length(pj) > 1) {
             for(jj in 2:length(pj)) {
               cj <- cj + (1 - pj[jj]) * prod(pj[1:(jj - 1)])
-              if(cj >= prob[j]) {
+              if (cj >= prob[j]) {
                 probs[j] <- jj - 1L
                 break
               }
@@ -225,11 +225,11 @@ tm_predict <- function(object, newdata,
         }
       }
 
-      if(type == "pmax") {
+      if (type == "pmax") {
         # That is my count
         cj <- numeric(k)
         cj[1] <- 1 - pj[1]
-        if(length(pj) > 1) {
+        if (length(pj) > 1) {
           for(jj in 2:length(pj))
             cj[jj] <- (1 - pj[jj]) * prod(pj[1:(jj - 1)])
         }
@@ -243,11 +243,11 @@ tm_predict <- function(object, newdata,
 
 tm_dist <- function(y, data = NULL, ...)
 {
-  if(is.null(y))
+  if (is.null(y))
     stop("argument y is NULL!")
 
   is_f <- FALSE
-  if(inherits(y, "formula")) {
+  if (inherits(y, "formula")) {
     yn <- response_name(y)
     f <- y
     is_f <- TRUE
@@ -262,19 +262,19 @@ tm_dist <- function(y, data = NULL, ...)
   ## Estimate model.
   b <- tm(f, data = data, ...)
 
-  if(inherits(y, "formula"))
+  if (inherits(y, "formula"))
     y <- model.response(b$model.frame)
 
   ## Predict probabilities.
   nd <- data.frame("y" = 0:b$maxcounts)
-  if((yn != "y") & is_f)
+  if ((yn != "y") & is_f)
     names(nd) <- yn
   pb <- predict(b, newdata = nd)
 
   nl <- NULL
 
-  if(is.null(b$yc_tab)) {
-    if(!is.null(data) & is_f)
+  if (is.null(b$yc_tab)) {
+    if (!is.null(data) & is_f)
       y <- data[[yn]]
     tab <- prop.table(table(y))
   } else {
@@ -289,18 +289,18 @@ tm_dist <- function(y, data = NULL, ...)
 
   ## Set labels.
   ylim <- list(...)$ylim
-  if(is.null(ylim)) 
+  if (is.null(ylim)) 
     ylim <- range(c(0, tab, pb * 1.1), na.rm = TRUE)
   ylab <- list(...)$ylab
-  if(is.null(ylab))
+  if (is.null(ylab))
     ylab <- "Probability"
   xlab <- list(...)$xlab
-  if(is.null(xlab)) {
-    xlab <- if(is.null(b$yc_tab)) "#Counts" else yn
+  if (is.null(xlab)) {
+    xlab <- if (is.null(b$yc_tab)) "#Counts" else yn
   }
 
   ## Plot.
-  if(!is.null(nl)) {
+  if (!is.null(nl)) {
     names(tab) <- nl[as.integer(names(tab)) + 1L]
   }
   x <- barplot(tab, xlab = xlab, ylab = ylab, ylim = ylim)
@@ -355,7 +355,7 @@ timer(NULL)
   tv <- all.vars(ff2)
   tv <- grep("theta", tv, value = TRUE)
   tv <- tv[tv != "theta"]
-  if(length(tv)) {
+  if (length(tv)) {
     for(j in tv)
       ff2 <- eval(parse(text = paste0("update(ff2, . ~ . -", j, ")")))
   }
@@ -369,8 +369,8 @@ timer(NULL)
   rn <- response_name(formula)
 
   ## Discretize response?
-  if(bin.y <- !is.null(breaks)) {
-    if(length(breaks) < 2L) {
+  if (bin.y <- !is.null(breaks)) {
+    if (length(breaks) < 2L) {
       dy <- diff(range(model.response(mf)))
       bins <- seq(min(model.response(mf)) - 0.1*dy,
         max(model.response(mf)) + 0.1*dy, length = breaks)
@@ -388,9 +388,9 @@ timer(NULL)
     lower <- list(...)$lower
     upper <- list(...)$upper
 
-    if(!is.null(lower))
+    if (!is.null(lower))
       ym[ym < lower] <- lower
-    if(!is.null(upper))
+    if (!is.null(upper))
       ym[ym > upper] <- upper
 
     mf[[rn]] <- yc
@@ -399,10 +399,10 @@ timer(NULL)
 
   ## Scaling data.
   scaler <- NULL
-  if(scale.x & (ncol(mf) > 1L)) {
+  if (scale.x & (ncol(mf) > 1L)) {
     scaler <- list()
     for(j in names(mf)[-1L]) {
-      if(!is.factor(mf[[j]])) {
+      if (!is.factor(mf[[j]])) {
         scaler[[j]] <- list("mean" = mean(mf[[j]]), "sd" = sd(mf[[j]]))
         mf[[j]] <- (mf[[j]] - scaler[[j]]$mean) / scaler[[j]]$sd
       }
@@ -419,13 +419,13 @@ timer(NULL)
   tmf <- tm_data(mf, response = rn, useC = useC, verbose = verbose)
   timer("transforming data (tm_df)")
 
-  if(!is.null(scaler)) {
+  if (!is.null(scaler)) {
     scaler$theta <- list("mean" = mean(tmf$theta), "sd" = sd(tmf$theta))
     tmf$theta <- (tmf$theta - scaler$theta$mean) / scaler$theta$sd
     timer("scaling theta")
   }
 
-  if(length(tv)) {
+  if (length(tv)) {
     for(j in tv) {
       i <- as.integer(gsub("theta", "", j))
       tmf[[j]] <- as.integer(tmf$theta == i)
@@ -437,8 +437,8 @@ timer(NULL)
   rval <- list()
 
   ## New formula.
-  if(engine %in% c("gam", "bam")) {
-    if(isTRUE(list(...)$factor)) {
+  if (engine %in% c("gam", "bam")) {
+    if (isTRUE(list(...)$factor)) {
       tmf$theta <- as.factor(tmf$theta)
       rval$new_formula <- update(formula, as.factor(Y) ~ theta + .)
     } else {
@@ -453,13 +453,13 @@ timer(NULL)
   ## Estimate model.
   warn <- getOption("warn")
   options("warn" = -1)
-  if(engine == "bam") {
+  if (engine == "bam") {
     rval$model <- bam(rval$new_formula, data = tmf, family = binomial, discrete = TRUE)
   }
-  if(engine == "gam") {
+  if (engine == "gam") {
     rval$model <- gam(rval$new_formula, data = tmf, family = binomial, ...)
   }
-  if(engine == "nnet") {
+  if (engine == "nnet") {
     rval$model <- nnet::nnet(rval$new_formula, data = tmf, ...)
   }
   timer("estimation")
@@ -473,7 +473,7 @@ timer(NULL)
   rval$theta_vars <- tv
   rval$factor <- isTRUE(list(...)$factor)
 
-  if(inherits(rval$model, "nnet")) {
+  if (inherits(rval$model, "nnet")) {
     p <- predict(rval$model, type = "raw", useC = useC)
   } else {
     p <- predict(rval$model, type = "response", useC = useC)
@@ -481,7 +481,7 @@ timer(NULL)
   timer("prediction")
 
   ## Remove model frame.
-  if(!model)
+  if (!model)
     rval$model$model <- NULL
 
   ## Compute probabilities.
@@ -504,7 +504,7 @@ timer(NULL)
 
       cj <- numeric(k)
       cj[1] <- 1 - pj[1]
-      if(length(pj) > 1) {
+      if (length(pj) > 1) {
         for(jj in 2:length(pj))
           cj[jj] <- (1 - pj[jj]) * prod(pj[1:(jj - 1)])
       }
@@ -522,7 +522,7 @@ timer(NULL)
   timer("building rval")
 
   ## If binning.
-  if(bin.y) {
+  if (bin.y) {
     rval$bins <- bins
     rval$ym <- ym
     rval$yc_tab <- table(yc)
@@ -541,20 +541,20 @@ plot.tm <- function(x, which = "effects", spar = TRUE, k = 5, ...)
 {
   ## What should be plotted?
   which.match <- c("effects", "hist-resid", "qq-resid", "wp-resid")
-  if(!is.character(which)) {
-    if(any(which > 4L))
+  if (!is.character(which)) {
+    if (any(which > 4L))
       which <- which[which <= 4L]
     which <- which.match[which]
   } else which <- which.match[grep2(tolower(which), which.match, fixed = TRUE)]
-  if(length(which) > length(which.match) || !any(which %in% which.match))
+  if (length(which) > length(which.match) || !any(which %in% which.match))
     stop("argument which is specified wrong!")
 
-  if(any("effects" %in% which) & inherits(x$model, "gam")) {
+  if (any("effects" %in% which) & inherits(x$model, "gam")) {
     plot(x$model, ...)
     return(invisible(NULL))
   } else {
     which <- which[which != "effects"]
-    if(length(which) < 1L) {
+    if (length(which) < 1L) {
       which <- c("hist-resid", "qq-resid", "wp-resid")
     }
   }
@@ -565,21 +565,21 @@ plot.tm <- function(x, which = "effects", spar = TRUE, k = 5, ...)
   resids <- apply(resids, 1, median)
 
   ## Number of plots.
-  if(spar) {
+  if (spar) {
     oma <- par(no.readonly = TRUE)
     par(mfrow = c(1, length(which)))
     on.exit(par(oma))
   }
 
-  if("hist-resid" %in% which) {
+  if ("hist-resid" %in% which) {
     plot_hist(resids, ...)
   }
 
-  if("qq-resid" %in% which) {
+  if ("qq-resid" %in% which) {
     plot_qq(resids, ...)
   }
 
-  if("wp-resid" %in% which) {
+  if ("wp-resid" %in% which) {
     plot_wp(resids, ...)
   }
 }
@@ -588,6 +588,12 @@ plot.tm <- function(x, which = "effects", spar = TRUE, k = 5, ...)
 summary.tm <- function(object, ...)
 {
   summary(object$model)
+}
+
+## Coef method.
+coef.tm <- function(object, ...)
+{
+  coef(object$model)
 }
 
 ## Model frame extractor.
@@ -614,50 +620,65 @@ predict.tm <- function(object, newdata = NULL,
   ## Get number of cores for OpenMP parallelization
   ncores <- tm_get_number_of_cores(ncores, FALSE)
 
-  if(!is.null(prob))
+  if (!is.null(prob))
     type <- "quantile"
 
-  if(is.null(prob) & (type == "quantile"))
+  if (is.null(prob) && type == "quantile")
     prob <- 0.5
 
-  if(is.null(newdata)) {
-    if((type %in% c("pdf", "cdf")) & is.null(y)) {
+  if (is.null(newdata)) {
+    if (type %in% c("pdf", "cdf") && is.null(y)) {
+      ## Returning pdf/cdf stored on object
       return(object$probs[[type]])
     } else {
+      ## Extracting model.frame used for model training as 'newdata'
       newdata <- model.frame(object)
     }
   }
 
-  if(!is.null(y))
+  ## Overwriting response to evaluate pdf/cdf/pmax at specific y's,
+  ## if type is either pmax or quantile: drop response altogether
+  if (!is.null(y) && type %in% c("pdf", "cdf")) {
     newdata[[object$response]] <- y
-
-  if(type %in% c("pmax", "quantile"))
+  } else if (type %in% c("pmax", "quantile")) {
     newdata[[object$response]] <- NULL
+  }
 
-  if(!is.null(object$scaler)) {
-    for(j in names(object$scaler)) {
-      if(j != "theta") {
+  ## Applying scaler if needed; standardize data (except theta)
+  if (!is.null(object$scaler)) {
+    for (j in names(object$scaler)) {
+      if (j != "theta") {
         newdata[[j]] <- (newdata[[j]] - object$scaler[[j]]$mean) / object$scaler[[j]]$sd
       }
     }
   }
 
-  pred <- tm_predict(object$model, newdata = newdata, ncores = ncores,
-    response = object$response, type = type,
-    maxcounts = object$maxcounts, prob = prob,
-    theta_scaler = object$scaler$theta,
-    theta_vars = object$theta_vars,
-    factor = object$factor, ...)
+  ## Calling tm_predict to perform the actual prediction
+  pred <- tm_predict(object$model,
+                     newdata      = newdata,
+                     ncores       = ncores,
+                     response     = object$response,
+                     type         = type,
+                     maxcounts    = object$maxcounts,
+                     prob         = prob,
+                     theta_scaler = object$scaler$theta,
+                     theta_vars   = object$theta_vars,
+                     factor       = object$factor,
+                     ...)
 
-  if(!is.null(object$bins)) {
-    if(type %in% c("quantile", "pmax")) {
+  ## If binning is used (pseudo-counts), convert predicted
+  ## bin to numeric (center of the bin)
+  if (!is.null(object$bins)) {
+    if (type %in% c("quantile", "pmax")) {
       pred <- object$ym[pred + 1L]
     }
   }
 
-  if(type %in% c("pdf", "cdf")) {
-    pred[pred < 1e-15] <- 1e-15
-    pred[pred > 0.999999] <- 0.999999
+  ## Ensure PDF/CDF lie inside [0, 1]
+  if (type %in% c("pdf", "cdf")) {
+    eps <- sqrt(.Machine$double.eps)
+    pred[pred < eps]     <- eps
+    pred[pred > 1 - eps] <- 1 - eps
   }
 
   return(pred)
@@ -666,7 +687,7 @@ predict.tm <- function(object, newdata = NULL,
 ## logLik method.
 logLik.tm <- function(object, newdata = NULL, ...)
 {
-  if(is.null(newdata)) {
+  if (is.null(newdata)) {
     p <- object$probs$pdf
   } else {
     p <- predict(object, newdata = newdata, type = "pdf", ...)
@@ -681,17 +702,17 @@ logLik.tm <- function(object, newdata = NULL, ...)
 ## Residuals method.
 residuals.tm <- function(object, newdata = NULL, y = NULL, ...)
 {
-  if(is.null(newdata)) {
-    if(is.null(object$model.frame))
+  if (is.null(newdata)) {
+    if (is.null(object$model.frame))
       stop("cannot compute residuals, no model.frame including the response!")
     newdata <- object$model.frame
   }
 
-  if(is.null(y)) {
+  if (is.null(y)) {
     y <- newdata[[object$response]]
   }
 
-  if(is.null(y)) {
+  if (is.null(y)) {
     stop("cannot compute residuals, response is missing!")
   }
 
@@ -703,9 +724,9 @@ residuals.tm <- function(object, newdata = NULL, y = NULL, ...)
 
   p[i] <- runif(sum(i), pL, pU)
 
-  if(any(!i)) {
+  if (any(!i)) {
     pU <- predict(object, newdata = newdata[!i, , drop = FALSE], y = y[!i], type = "cdf")
-    p[!i] <- runif(sum(!i), 0, pU)
+    p[!i] <- runif (sum(!i), 0, pU)
   }
 
   p[p < 1e-15] <- 1e-15
@@ -720,10 +741,10 @@ rootogram.tm <- function(object, newdata = NULL, plot = TRUE,
   scale = c("sqrt", "raw"), expected = TRUE, confint = TRUE,
   ref = TRUE, xlab = NULL, ylab = NULL, main = NULL, ...)
 {
-  if(is.null(newdata))
+  if (is.null(newdata))
     newdata <- object$model.frame
 
-  if(is.null(newdata[[object$response]]))
+  if (is.null(newdata[[object$response]]))
     stop("response missing in newdata!")
 
   y <- newdata[[object$response]]
@@ -732,13 +753,13 @@ rootogram.tm <- function(object, newdata = NULL, plot = TRUE,
   counts <- 0:object$maxcounts
   p <- NULL; obs <- NULL
   for(j in counts) {
-    if(isTRUE(list(...)$verbose))
+    if (isTRUE(list(...)$verbose))
       cat(j, "/", sep = "")
     p <- cbind(p, predict(object, newdata = newdata, type = "pdf", y = j))
     obs <- c(obs, sum(y == j))
   }
 
-  if(isTRUE(list(...)$verbose))
+  if (isTRUE(list(...)$verbose))
     cat("\n")
 
   e <- colMeans(p) * n  
@@ -748,7 +769,7 @@ rootogram.tm <- function(object, newdata = NULL, plot = TRUE,
 
   scale <- match.arg(scale)
 
-  if(scale == "sqrt") {
+  if (scale == "sqrt") {
     rg$observed <- sqrt(rg$observed)
     rg$expected <- sqrt(rg$expected)
   }
@@ -763,13 +784,13 @@ rootogram.tm <- function(object, newdata = NULL, plot = TRUE,
   attr(rg, "expected") <- expected
   attr(rg, "confint") <- confint
   attr(rg, "ref") <- ref
-  attr(rg, "xlab") <- if(is.null(xlab)) "#Counts" else xlab
-  attr(rg, "ylab") <- if(is.null(ylab)) "sqrt(Frequency)" else ylab
-  attr(rg, "main") <- if(is.null(main)) "Rootogram" else main
+  attr(rg, "xlab") <- if (is.null(xlab)) "#Counts" else xlab
+  attr(rg, "ylab") <- if (is.null(ylab)) "sqrt(Frequency)" else ylab
+  attr(rg, "main") <- if (is.null(main)) "Rootogram" else main
 
   class(rg) <- c("rootogram", "data.frame")
 
-  if(plot)
+  if (plot)
     plot(rg, ...)
 
   return(invisible(rg))
