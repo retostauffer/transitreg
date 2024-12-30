@@ -28,29 +28,24 @@ tm_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
 ## Function to set up expanded data set.
 tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
   ## Ensure data is a data frame.
-  if (!is.data.frame(data)) {
+  if (!is.data.frame(data))
     data <- as.data.frame(data)
-  }
 
   ## Determine response column.
-  if (is.null(response)) {
+  if (is.null(response))
     response <- names(data)[1L]
-  }
-  if (!response %in% names(data)) {
+
+  if (!response %in% names(data))
     stop("The specified response column does not exist in the data!")
-  }
 
   ## Initialize progress bar.
-  if (verbose) {
+  if (verbose)
     pb <- utils::txtProgressBar(min = 0, max = nrow(data), style = 3)
-  }
 
   ## Preallocate list.
-  n <- nrow(data)
-  if (n > 20)
-    step <- floor(n / 20)
-  else
-    step <- 1
+  n    <- nrow(data)
+  step <- if (n > 20) floor(n / 20) else 1
+
   response_values <- data[[response]]
   df_list <- vector("list", n)
   timer("[tm_data] extracted response, allocated list")
@@ -64,7 +59,7 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
   if (!useC) {
 
     ## Process each row.
-    for(i in seq_len(n)) {
+    for (i in seq_len(n)) {
       k <- response_values[i] # Count or pseudocount
       Y <- c(rep(1, k), 0)
       row_data <- data[i, , drop = FALSE]
@@ -74,7 +69,7 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
         "index" = i,
         Y = Y,
         theta = c(0:k),
-        row_data[rep(1, length(Y)), ]
+        x = row_data[rep(1, length(Y)), ]
       )
 
       ## Add to list.
@@ -87,9 +82,8 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
     }
     timer("[tm_data] loop over n - R")
 
-    if (verbose) {
+    if (verbose)
       close(pb)
-    }
 
 
     ## Combine all rows into a single data frame.
@@ -123,6 +117,7 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
     ## Appending the remaining data from 'data'
     for (n in names(data)) result[[n]] <- rep(data[[n]], response_values + 1)
 
+    result <- as.data.frame(result)
     timer("[tm_data] faster vectorized version")
   }
 
@@ -140,44 +135,74 @@ tm_predict <- function(object, newdata,
   verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
   factor = FALSE, ncores = NULL, useC = TRUE)
 {
-  if (is.null(response))
-    response <- names(newdata)[1L]
 
-  if (is.null(newdata[[response]])) {
+  ## Pre-processing inputs
+  type <- tolower(type)
+  type <- match.arg(type)
+  if (length(prob) > 1)
+    warning("Argument 'prob' has length > 1, only first element will be used.")
+
+  if (type == "quantile") {
+    prob <- as.numeric(prob)[1L]
+    stopifnot("'prob' must be numeric in [0, 1]" = prob >= 0 & prob <= 1)
+  }
+
+  if (is.null(ncores))
+    ncores <- tm_get_number_of_cores(ncores, verbose = verbose)
+
+  ## Staying sane
+  stopifnot(
+    "'newdata' must be data.frame" = is.data.frame(newdata),
+    "'response' must be character of length 1 (or NULL)" =
+        (is.character(response) && length(response) == 1) || is.null(response),
+    "'y' must be NULL or a vector" = is.null(y) || is.vector(y),
+    "'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
+    "'factor' must be logical TRUE or FALSE" = isTRUE(factor) || isFALSE(factor),
+    "'ncores' must be NULL or numeric >= 1" = is.null(ncores) || (ncores >= 1)
+  )
+  ## TODO(R) Not all arguments are checked above
+
+
+  ## If response is not specified explicitly, assume the first
+  ## variable in the response; should be avoided if possible.
+  if (is.null(response)) {
+    response <- names(newdata)[1L]
+  ## If response was specified but does not exist; set to maxcounts
+  } else if (is.null(newdata[[response]])) {
+    ## TODO(N): Reto is not sure when this is used and what
+    ##          the reason for the + floor(0.1 * maxcounts) is?
     newdata[[response]] <- maxcounts + floor(0.1 * maxcounts)
   }
 
-  nd <- tm_data(newdata, response = response, verbose = verbose)
+  ## Preparing data
+  nd <- tm_data(newdata, response = response, verbose = verbose, useC = useC)
   if (factor)
     nd$theta <- as.factor(nd$theta)
 
-  if (!is.null(theta_vars)) {
-    for(j in theta_vars) {
+  if (!is.null(theta_vars) && length(theta_vars) > 0L) {
+    for (j in theta_vars) {
       i <- as.integer(gsub("theta", "", j))
       nd[[j]] <- as.integer(nd$theta == i)
     }
   }
 
-  if (!is.null(theta_scaler)) {
+  ## Scaling (standardizing) theta if requested
+  if (!is.null(theta_scaler))
     nd$theta <- (nd$theta - theta_scaler$mean) / theta_scaler$sd
-  }
 
+  ## Specify argument for generic prediction method called below
   what <- switch(class(object)[1L],
-    "bam" = "response",
-    "gam" = "response",
+    "bam"  = "response",
+    "gam"  = "response",
     "nnet" = "raw"
   )
-
   p <- as.numeric(predict(object, newdata = nd, type = what))
 
-  ## What to predict?
-  type <- tolower(type)
-  type <- match.arg(type)
+# RETO RETO RETO RETO
+reto <<- list(p = p, object = object, nd = nd, type = what)
+print(head(nd))
 
-  if (type == "quantile") {
-    prob <- rep(prob, length.out = nrow(newdata))
-  }
-
+  ## Extract unique indices
   ui <- unique(nd$index)
 
   if (useC) {
@@ -188,7 +213,7 @@ tm_predict <- function(object, newdata,
   # Original R version, TODO(R): May be removed in the future
   if (!useC) {
     probs <- numeric(length(ui))
-    for(j in ui) {
+    for (j in ui) {
 
       pj <- p[nd$index == j]
       k <- length(pj)
@@ -200,7 +225,7 @@ tm_predict <- function(object, newdata,
       if (type == "cdf") {
         cj <- 1 - pj[1]
         if (length(pj) > 1) {
-          for(jj in 2:length(pj))
+          for (jj in 2:length(pj))
             cj <- cj + (1 - pj[jj]) * prod(pj[1:(jj - 1)])
         }
         probs[j] <- cj
@@ -212,7 +237,7 @@ tm_predict <- function(object, newdata,
           probs[j] <- 0L
         } else {
           if (length(pj) > 1) {
-            for(jj in 2:length(pj)) {
+            for (jj in 2:length(pj)) {
               cj <- cj + (1 - pj[jj]) * prod(pj[1:(jj - 1)])
               if (cj >= prob[j]) {
                 probs[j] <- jj - 1L
@@ -230,7 +255,7 @@ tm_predict <- function(object, newdata,
         cj <- numeric(k)
         cj[1] <- 1 - pj[1]
         if (length(pj) > 1) {
-          for(jj in 2:length(pj))
+          for (jj in 2:length(pj))
             cj[jj] <- (1 - pj[jj]) * prod(pj[1:(jj - 1)])
         }
         probs[j] <- which.max(cj) - 1L
@@ -356,7 +381,7 @@ timer(NULL)
   tv <- grep("theta", tv, value = TRUE)
   tv <- tv[tv != "theta"]
   if (length(tv)) {
-    for(j in tv)
+    for (j in tv)
       ff2 <- eval(parse(text = paste0("update(ff2, . ~ . -", j, ")")))
   }
   mf[["formula"]] <- ff2
@@ -401,7 +426,7 @@ timer(NULL)
   scaler <- NULL
   if (scale.x & (ncol(mf) > 1L)) {
     scaler <- list()
-    for(j in names(mf)[-1L]) {
+    for (j in names(mf)[-1L]) {
       if (!is.factor(mf[[j]])) {
         scaler[[j]] <- list("mean" = mean(mf[[j]]), "sd" = sd(mf[[j]]))
         mf[[j]] <- (mf[[j]] - scaler[[j]]$mean) / scaler[[j]]$sd
@@ -426,7 +451,7 @@ timer(NULL)
   }
 
   if (length(tv)) {
-    for(j in tv) {
+    for (j in tv) {
       i <- as.integer(gsub("theta", "", j))
       tmf[[j]] <- as.integer(tmf$theta == i)
     }
@@ -497,7 +522,7 @@ timer(NULL)
     rm(tmp)
     timer("calculating CDF - C")
   } else {
-    for(j in ui) {
+    for (j in ui) {
       pj <- p[tmf$index == j]
       k <- length(pj)
       probs[j] <- (1 - pj[k]) * prod(pj[-k])
@@ -505,7 +530,7 @@ timer(NULL)
       cj <- numeric(k)
       cj[1] <- 1 - pj[1]
       if (length(pj) > 1) {
-        for(jj in 2:length(pj))
+        for (jj in 2:length(pj))
           cj[jj] <- (1 - pj[jj]) * prod(pj[1:(jj - 1)])
       }
       cprobs[j] <- sum(cj)
@@ -560,7 +585,7 @@ plot.tm <- function(x, which = "effects", spar = TRUE, k = 5, ...)
   }
 
   resids <- NULL
-  for(j in 1:k)
+  for (j in 1:k)
     resids <- cbind(resids, residuals(x, newdata = list(...)$newdata))
   resids <- apply(resids, 1, median)
 
@@ -752,7 +777,7 @@ rootogram.tm <- function(object, newdata = NULL, plot = TRUE,
 
   counts <- 0:object$maxcounts
   p <- NULL; obs <- NULL
-  for(j in counts) {
+  for (j in counts) {
     if (isTRUE(list(...)$verbose))
       cat(j, "/", sep = "")
     p <- cbind(p, predict(object, newdata = newdata, type = "pdf", y = j))
