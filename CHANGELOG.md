@@ -1,4 +1,12 @@
 
+## Version 0.1-9001
+
+* Added proper `NA` handling to `tm_calc_cdf`, `tm_calc_pdf`,
+    and `tm_calc_pmax` in C.
+* Made the default development mode less verbose.
+* Fixed R-version of `predict(...)` to properly deal with missing values
+    when `type = "pmax"` or `type = "quantile"` (may be obsolete in the near future).
+* Implemented C-function for quantile prediction/evaluation.
 
 ## Version 0.1-9000
 

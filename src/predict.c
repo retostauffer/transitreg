@@ -92,19 +92,23 @@ double tm_calc_cdf(int* positions, int count, double* pptr) {
 }
 
 /* Helper function for type = "pmax"
- *
  */
 double tm_calc_pmax(int* positions, int count, double* pptr) {
+    // If the first value is NA: return NA immediately
+    if (ISNAN(pptr[positions[0]])) { return R_NaReal; }
+
     // Initialize with (1 - p[0])
     double res = 1.0 - pptr[positions[0]];
     double max_res = res; // Current maximum
     int    pmax = 0;      // Position of highest value (max cdf)
 
     // Does the same as tm_calc_cdf except summing up, and only
-    // keeps the index of the highest value.
+    // keeps the index of the highest value. As soon as we
+    // detect a missing value - return NA.
     if (count > 0) {
         double pprod = 1.0; // Initialize with 1.0 for product
         for (int i = 1; i < count; i++) {
+            if (ISNAN(pptr[positions[i - 1]])) { return R_NaReal; }
             pprod *= pptr[positions[i - 1]]; // Multiply with previous element
             res    = (1.0 - pptr[positions[i]]) * pprod;
             if (res > max_res) {
@@ -116,12 +120,46 @@ double tm_calc_pmax(int* positions, int count, double* pptr) {
     return pmax; // Return as is (zero based)
 }
 
+/* Helper function for type = "quantile"
+ */
+double tm_calc_quantile(int* positions, int count, double* pptr, double prob) {
+    // If the first value is NA: return NA immediately
+    if (ISNAN(pptr[positions[0]])) { return R_NaReal; }
+
+    // Initialize with (1 - p[0])
+    double cj = 1.0 - pptr[positions[0]];
+    int res = 0; // Initial quantile index
+
+    // If the probability on (1 - p[0]) is larger than the
+    // quantile we are looking for, return index 0.
+    if (cj >= prob) { return res; }
+
+    // Else looping over the remaining elements to find the
+    // quantile; as soon as found return the 'quantile index' (int).
+    // As soon as we find a missing value, return NA. If the
+    // quantile is found, immediately return the 'quantile index'.
+    if (count > 0) {
+        double pprod = 1.0; // Initialize with 1.0 for product
+        for (int i = 1; i < count; i++) {
+            if (ISNAN(pptr[positions[i - 1]])) { return R_NaReal; }
+            pprod *= pptr[positions[i - 1]]; // Multiply with previous element
+            cj    += (1.0 - pptr[positions[i]]) * pprod;
+            if (cj >= prob) { return i; }
+        }
+    }
+    // TODO(R): Is this correct?
+    return 0; // Else just return index o
+}
+
 /* Calculating elementwise pdf
  *
  * @param uidx integer vector with unique indices in data.
  * @param idx integer with indices, length of idx is sample size times breaks.
  * @param p probabilities, same length as idx vector.
  * @param type character, either 'pdf', 'cdf', or 'pmax'.
+ * @param prob only used if type is 'quantile'; can be NULL (as not used) if
+ *        the type is different. Else it is expected to be a vector of doubles
+ *        with the same length as 'uidx'.
  * @param ncores integer, number of cores to be used (ignored if OMP not available).
  *
  * @details Internally loops over all unique indices in `uidx`.
@@ -131,7 +169,7 @@ double tm_calc_pmax(int* positions, int count, double* pptr) {
  * 
  * @return Returns SEXP double vector of length (length(uidx)).
  */
-SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP ncores) {
+SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob, SEXP ncores) {
 
     double *pptr    = REAL(p);
     int    *uidxptr = INTEGER(uidx);     // Unique indices in the dtaa
@@ -141,10 +179,19 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP ncores) {
     int    un       = LENGTH(uidx);
     int    i;
 
-    // Evaluate 'type' to define what to do
+    // Evaluate 'type' to define what to do. Store a set of
+    // boolean values to only do the string comparison once.
     const char* thetype = CHAR(STRING_ELT(type, 0));
-    bool do_pdf = strcmp(thetype, "pdf") == 0;
-    bool do_cdf = strcmp(thetype, "cdf") == 0;
+    bool do_pdf  = strcmp(thetype, "pdf")  == 0;
+    bool do_cdf  = strcmp(thetype, "cdf")  == 0;
+    bool do_pmax = strcmp(thetype, "pmax") == 0;
+    bool do_q    = strcmp(thetype, "quantile") == 0;
+    // ... if none of them is true, it must be "do quantile"
+
+    // This is only used if type == "quantile"; on the R side it is ensured
+    // that 'prob' is a numeric vector of LENGTH(uidx) if type = 'quantile',
+    // thus we do not check it here.
+    double *probptr = REAL(prob);        // Probability used for quantiles
 
     // Custom struct object to mimik "which()"
     tmWhich which;
@@ -164,8 +211,10 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP ncores) {
             probsptr[i] = tm_calc_pdf(which.index, which.length, pptr);
         } else if (do_cdf) {
             probsptr[i] = tm_calc_cdf(which.index, which.length, pptr);
-        } else {
+        } else if (do_pmax) {
             probsptr[i] = tm_calc_pmax(which.index, which.length, pptr);
+        } else {
+            probsptr[i] = tm_calc_quantile(which.index, which.length, pptr, probptr[i]);
         }
         free(which.index); // Free allocated memory
     }

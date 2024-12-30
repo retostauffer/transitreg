@@ -232,7 +232,14 @@ tm_predict <- function(object, newdata,
   prob <- rep(prob, length(ui))
 
   if (useC) {
-    probs <- .Call(C_tm_predict, ui, nd$index, p, type = type, ncores = ncores);
+    ## Ensure we hand over the correct thing to C
+    if (type == "quantile") {
+        stopifnot(is.numeric(prob), length(prob) == length(ui),
+                  all(!is.na(prob)), all(prob >= 0 & prob <= 1))
+    } else if (is.null(prob)) {
+        prob <- 42.0 # dummy value for C (not used if type != 'quantile')
+    }
+    probs <- .Call(C_tm_predict, ui, nd$index, p, type = type, prob = prob, ncores = ncores);
   }
 
   # -------------------
@@ -258,11 +265,10 @@ tm_predict <- function(object, newdata,
       }
 
       if (type == "quantile") {
-          print(prob)
-        print(pj)
         cj <- 1 - pj[1]
-          print(c(j = j, cj = cj))
-        if (cj >= prob[j]) {
+        if (any(is.na(pj))) {
+          probs[j] <- NA_integer_
+        } else if (cj >= prob[j]) {
           probs[j] <- 0L
         } else {
           if (length(pj) > 1) {
@@ -287,7 +293,7 @@ tm_predict <- function(object, newdata,
           for (jj in 2:length(pj))
             cj[jj] <- (1 - pj[jj]) * prod(pj[1:(jj - 1)])
         }
-        probs[j] <- which.max(cj) - 1L
+        probs[j] <- if (all(is.na(cj))) NA_integer_  else which.max(cj) - 1L
       }
     }
   } ## end !useC (R version)

@@ -64,7 +64,7 @@ double tm_calc_pdf(int* positions, int count, double* pptr);
 double tm_calc_cdf(int* positions, int count, double* pptr);
 double tm_calc_pmax(int* positions, int count, double* pptr);
 
-SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP ncores);
+SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob, SEXP ncores);
 SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores);
 SEXP tm_detect_cores();
 
