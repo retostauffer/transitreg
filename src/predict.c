@@ -172,7 +172,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP ncores) {
  * @param type character, either 'pdf', 'cdf', or 'pmax'.
  * @param ncores integer, number of cores to be used (ignored if OMP not available).
  *
- * @details Does the same as c_tm_predict but calculates both PDF and
+ * @details Does the same as tm_predict but calculates both PDF and
  * CDF simultanously, returning a named list. This is used in the
  * main `tm()` function, calculating both at the same time should
  * help to speed up the calculations.
