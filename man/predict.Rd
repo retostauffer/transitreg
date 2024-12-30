@@ -14,7 +14,7 @@
 
 \usage{
 \method{predict}{tm}(object, newdata = NULL, y = NULL, prob = NULL,
-  type = c("pdf", "cdf", "pmax", "quantile"), ...)
+  type = c("pdf", "cdf", "pmax", "quantile"), ncores = NULL, ...)
 }
 
 \arguments{
@@ -34,6 +34,8 @@
       \item{\code{"quantile"}}{The quantile of the response specified by \code{prob}.}
     }
   }
+  \item{ncores}{\code{NULL} (default) or single numeric. See section 'OpenMP'
+    of the \code{\link{tm}} man page for more details.}
   \item{\dots}{Additional arguments passed to the prediction function.}
 }
 

@@ -1,7 +1,7 @@
 Package: TransitionModels
 Title: Flexible Transition Models for Probabilistic Learning
-Version: 0.1-0
-Date: 2024-12-11
+Version: 0.1-9000
+Date: 2024-12-29
 Authors@R: c(person(
                given = "Nikolaus", 
                family = "Umlauf", 

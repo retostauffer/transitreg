@@ -12,7 +12,7 @@
 }
 
 \usage{
-\method{plot}{tm}(x, which = "effects", spar = TRUE, ...)
+\method{plot}{tm}(x, which = "effects", spar = TRUE, k = 5, ...)
 }
 
 \arguments{
@@ -30,6 +30,7 @@
     Multiple options can be specified as a character vector or numeric indices.}
   \item{spar}{Logical. If \code{TRUE}, multiple plots are arranged in a
     single window. Default is \code{TRUE}.}
+  \item{k}{Integer, TODO(N): Describe argument. Defaults to \code{5}.}
   \item{\dots}{Additional arguments passed to the underlying plotting functions.}
 }
 

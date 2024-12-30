@@ -16,7 +16,7 @@
 tm(formula, data, subset, na.action,
   engine = "bam", scale.x = FALSE,
   breaks = NULL, model = TRUE,
-  verbose = FALSE, ...)
+  ncores = NULL, verbose = FALSE, ...)
 }
 
 \arguments{
@@ -36,6 +36,7 @@ tm(formula, data, subset, na.action,
     critical for continuous responses.}
   \item{model}{Logical value indicating whether the model frame should be included in 
     the return object.}
+  \item{ncores}{\code{NULL} (default) or single numeric. See 'OpenMP' for more information.}
   \item{verbose}{Logical value indicating whether progress and diagnostic messages 
     should be printed. Default is \code{FALSE}.}
   \item{\dots}{Additional arguments to be passed to the estimation engine.}
@@ -53,6 +54,22 @@ tm(formula, data, subset, na.action,
   discretizing the response, enabling the application of count-based transition models.
 }
 
+\section{OpenMP}{
+  For improved performance \code{"tm"} is partially implemented in \code{C}, making
+  use of the OpenMP library for parallelization. The argument \code{ncores} allows
+  the user to control how many cores to be used for the \code{C} functions shipped
+  with this package. By default, the number of cores will be detected
+  automatically (\code{ncores = NULL}). The following rules are applied:
+
+  \itemize{
+    \item If OpenMP is not available, the number of cores is set to \code{1L} in all cases.
+    \item If \code{ncores = NULL} the total number of cores (\code{N}) is detected
+        automatically, and \code{ncores} is set to \code{N - 2L}.
+    \item If \code{ncores < 1L}, one core will be used (single-core processing).
+    \item If \code{ncores > 1L} all available cores will be utilized.
+  }
+}
+
 \value{
   An object of class \code{"tm"}, which includes the following components:
   \itemize{
@@ -60,6 +77,7 @@ tm(formula, data, subset, na.action,
     \item Methods for \code{plot}, \code{summary}, \code{residuals}, and \code{predict}.
     \item Model diagnostics and transformation details.
   }
+  See \code{\link{tm_detect_cores}} for some more details.
 }
 
 \seealso{
@@ -78,6 +96,9 @@ b <- tm(y ~ s(theta) + s(x))
 
 ## GAM summary.
 summary(b)
+
+## GAM coefficients
+coef(b)
 
 ## Effect plots.
 plot(b)

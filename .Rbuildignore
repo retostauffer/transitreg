@@ -1,3 +1,7 @@
 inst
+lib
 README.qmd
-
+.gitignore
+CHANGELOG.md
+Makefile
+_coverage.html
