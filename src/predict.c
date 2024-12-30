@@ -53,8 +53,14 @@ tmWhich find_positions(int x, int* y, int n) {
  * logarithm of each element in pptr.
  */
 double tm_calc_pdf(int* positions, int count, double* pptr) {
+    // If the last value is NA: return NA immediately
+    if (ISNAN(pptr[positions[count - 1]])) { return R_NaReal; }
+
+    // Else start calculation. As soon as we detect a missing
+    // value, return NA as well.
     double res = 1.0; // Initialize with 1.0 for product
     for (int i = 0; i < (count - 1); i++) {
+        if (ISNAN(pptr[positions[i]])) { return R_NaReal; }
         // Calculates product over the first (count - 1) elements
         res *= pptr[positions[i]];
     }
@@ -67,12 +73,17 @@ double tm_calc_pdf(int* positions, int count, double* pptr) {
  *
  */
 double tm_calc_cdf(int* positions, int count, double* pptr) {
-    // Initialize with (1 - p[0])
-    double res = 1.0 - pptr[positions[0]];
+    // If the first value is NA: return NA immediately
+    if (ISNAN(pptr[positions[0]])) { return R_NaReal; }
+
+    // Else start calculation. As soon as we detect a missing
+    // value, return NA as well.
+    double res = 1.0 - pptr[positions[0]]; // Initialize with (1 - p[0])
     if (count > 0) {
         double pprod = 1.0; // Initialize with 1.0 for product
         // Looping over all elements except first
         for (int i = 1; i < count; i++) {
+            if (ISNAN(pptr[positions[i - 1]])) { return R_NaReal; }
             pprod *= pptr[positions[i - 1]]; // Multiply with previous element
             res += (1.0 - pptr[positions[i]]) * pprod;
         }
