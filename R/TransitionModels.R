@@ -69,7 +69,7 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
         "index" = i,
         Y = Y,
         theta = c(0:k),
-        x = row_data[rep(1, length(Y)), ]
+        row_data[rep(1, length(Y)), ]
       )
 
       ## Add to list.
