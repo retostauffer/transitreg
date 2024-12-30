@@ -9,6 +9,10 @@ test:
 	Rscript -e "tinytest::test_all()"
 	##Rscript -e "library(TransitionModels); tinytest::test_all()"
 
+.PHONY: coverage
+coverage:
+	Rscript -e "covr::report(file = \"_coverage.html\")"
+
 .PHONY: install
 install:
 	@echo Installing current version: $(VERSION)

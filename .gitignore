@@ -3,3 +3,5 @@
 # Ignore compiled shared objects (C)
 /src/*.o
 /src/*.so
+/lib
+/_coverage.html

@@ -2,8 +2,8 @@
 # Testing implementation of CDF, PDF, pmax
 # -------------------------------------------------------------------
 
+suppressPackageStartupMessages(library("TransitionModels"))
 if (interactive()) library("tinytest")
-suppressPackageStartupMessages(stopifnot(requireNamespace("TransitionModels")))
 
 # -------------------------------------------------------------------
 # Drawing probability for x = 0:10 from a binomial distribution.

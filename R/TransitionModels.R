@@ -615,6 +615,13 @@ summary.tm <- function(object, ...)
   summary(object$model)
 }
 
+## formula method.
+formula.tm <- function(object, ...)
+{
+  formula(object$model)
+}
+
+
 ## Coef method.
 coef.tm <- function(object, ...)
 {
@@ -701,7 +708,7 @@ predict.tm <- function(object, newdata = NULL,
 
   ## Ensure PDF/CDF lie inside [0, 1]
   if (type %in% c("pdf", "cdf")) {
-    eps <- sqrt(.Machine$double.eps)
+    eps <- abs(.Machine$double.eps)
     pred[pred < eps]     <- eps
     pred[pred > 1 - eps] <- 1 - eps
   }
