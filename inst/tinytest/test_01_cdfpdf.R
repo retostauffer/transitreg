@@ -84,9 +84,10 @@ expect_equal(res_tm, res_manual,
 # now testing against tm_predict which returns either CDF or PDF,
 # or pmax (tested later).
 # -------------------------------------------------------------------
-tm_fun2 <- function(r, p, type) {
+# prob = 42 is a dummy value (must be double; not used)
+tm_fun2 <- function(r, p, type, prob = 42.0) {
     # Index 666 is just a random index
-    .Call("tm_predict", 666L, rep(666L, r), p = p[1:r], type, 1L,
+    .Call("tm_predict", 666L, rep(666L, r), p = p[1:r], type, prob, 1L,
           PACKAGE = "TransitionModels")
 }
 
