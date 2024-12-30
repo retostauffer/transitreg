@@ -58,14 +58,6 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
   ##         though the new implementation has nothing to do with C.
   if (!useC) {
 
-    ## Create expanded data frame for the current row.
-    di <- data.frame(
-      "index" = i,
-      Y = Y,
-      theta = c(0:k),
-      row_data[rep(1, length(Y)), , drop = FALSE]
-    )
-
     ## Process each row.
     for (i in seq_len(n)) {
       k <- response_values[i] # Count or pseudocount
@@ -77,7 +69,7 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
         "index" = i,
         Y = Y,
         theta = c(0:k),
-        row_data[rep(1, length(Y)), ]
+        row_data[rep(1, length(Y)), , drop = FALSE]
       )
 
       ## Add to list.
@@ -141,19 +133,21 @@ tm_predict <- function(object, newdata,
   type = c("pdf", "cdf", "quantile", "pmax"),
   response = NULL, y = NULL, prob = 0.5, maxcounts = 1e+03,
   verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
-  factor = FALSE, ncores = NULL, useC = TRUE)
+  factor = FALSE, ncores = NULL, useC = FALSE)
 {
 
   ## Pre-processing inputs
   type <- tolower(type)
   type <- match.arg(type)
-  if (length(prob) > 1)
-    warning("Argument 'prob' has length > 1, only first element will be used.")
 
-  if (type == "quantile") {
-    prob <- as.numeric(prob)[1L]
-    stopifnot("'prob' must be numeric in [0, 1]" = prob >= 0 & prob <= 1)
-  }
+  ## TODO(R): I assume this check is not correct
+  ##if (length(prob) > 1)
+  ##  warning("Argument 'prob' has length > 1, only first element will be used.")
+
+  ##if (type == "quantile") {
+  ##  prob <- as.numeric(prob)[1L]
+  ##  stopifnot("'prob' must be numeric in [0, 1]" = prob >= 0 & prob <= 1)
+  ##}
 
   if (is.null(ncores))
     ncores <- tm_get_number_of_cores(ncores, verbose = verbose)
@@ -208,6 +202,7 @@ tm_predict <- function(object, newdata,
 
   ## Extract unique indices
   ui <- unique(nd$index)
+  prob <- rep(prob, length(ui))
 
   if (useC) {
     probs <- .Call(C_tm_predict, ui, nd$index, p, type = type, ncores = ncores);
