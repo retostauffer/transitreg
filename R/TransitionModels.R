@@ -198,10 +198,6 @@ tm_predict <- function(object, newdata,
   )
   p <- as.numeric(predict(object, newdata = nd, type = what))
 
-# RETO RETO RETO RETO
-reto <<- list(p = p, object = object, nd = nd, type = what)
-print(head(nd))
-
   ## Extract unique indices
   ui <- unique(nd$index)
 
