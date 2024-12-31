@@ -574,18 +574,19 @@ timer(NULL)
     timer("calculating CDF - R", verbose)
   }
 
-  probs[probs < 1e-15] <- 1e-15
-  probs[probs > 0.999999] <- 0.999999
-  cprobs[cprobs < 1e-15] <- 1e-15
-  cprobs[cprobs > 0.999999] <- 0.999999
+  eps <- abs(.Machine$double.eps)
+  probs[probs  < eps]      <- eps
+  probs[probs  > 1 - eps]  <- 1 - eps
+  cprobs[cprobs < eps]     <- eps
+  cprobs[cprobs > 1 - eps] <- 1 - eps
 
   rval$probs <- data.frame("pdf" = probs, "cdf" = cprobs)
   timer("building rval", verbose)
 
   ## If binning.
   if (bin.y) {
-    rval$bins <- bins
-    rval$ym <- ym
+    rval$bins   <- bins
+    rval$ym     <- ym
     rval$yc_tab <- table(yc)
     rval$breaks <- breaks
     timer("ended if bin.y", verbose)
@@ -597,8 +598,10 @@ timer(NULL)
   return(rval)
 }
 
+## TODO(R): Added useC option, remove once we streamlined this. Both in the
+##          method call as well as in the residuals() call further down.
 ## Plotting method.
-plot.tm <- function(x, which = "effects", spar = TRUE, k = 5, ...)
+plot.tm <- function(x, which = "effects", spar = TRUE, k = 5, useC = FALSE, ...)
 {
   ## What should be plotted?
   which.match <- c("effects", "hist-resid", "qq-resid", "wp-resid")
@@ -622,7 +625,7 @@ plot.tm <- function(x, which = "effects", spar = TRUE, k = 5, ...)
 
   resids <- NULL
   for (j in 1:k)
-    resids <- cbind(resids, residuals(x, newdata = list(...)$newdata))
+    resids <- cbind(resids, residuals(x, newdata = list(...)$newdata, useC = useC))
   resids <- apply(resids, 1, median)
 
   ## Number of plots.
@@ -787,27 +790,31 @@ residuals.tm <- function(object, newdata = NULL, y = NULL, ...)
   i <- y > 0
   p <- numeric(length(y))
 
-  pL <- predict(object, newdata = newdata[i, , drop = FALSE], y = y[i] - 1L, type = "cdf")
-  pU <- predict(object, newdata = newdata[i, , drop = FALSE], y = y[i], type = "cdf")
+  pL <- predict(object, newdata = newdata[i, , drop = FALSE], y = y[i] - 1L, type = "cdf", ...)
+  pU <- predict(object, newdata = newdata[i, , drop = FALSE], y = y[i], type = "cdf", ...)
 
   p[i] <- runif(sum(i), pL, pU)
 
   if (any(!i)) {
-    pU <- predict(object, newdata = newdata[!i, , drop = FALSE], y = y[!i], type = "cdf")
+    pU <- predict(object, newdata = newdata[!i, , drop = FALSE], y = y[!i], type = "cdf", ...)
     p[!i] <- runif (sum(!i), 0, pU)
   }
 
-  p[p < 1e-15] <- 1e-15
-  p[p > 0.999999] <- 0.999999
+  eps <- abs(.Machine$double.eps)
+  p[p < eps]     <- eps
+  p[p > 1 - eps] <- 1 - eps
 
   return(qnorm(p))
 }
 
+
+## TODO(R): Remove useC option once we streamline that; as input to the
+##          method as well as in the predict call further down.
 ## Rootogram method.
 rootogram.tm <- function(object, newdata = NULL, plot = TRUE,
   width = 0.9, style = c("hanging", "standing", "suspended"),
   scale = c("sqrt", "raw"), expected = TRUE, confint = TRUE,
-  ref = TRUE, K = NULL, xlab = NULL, ylab = NULL, main = NULL, ...)
+  ref = TRUE, K = NULL, xlab = NULL, ylab = NULL, main = NULL, useC = FALSE, ...)
 {
   if (is.null(newdata))
     newdata <- object$model.frame
@@ -825,7 +832,7 @@ rootogram.tm <- function(object, newdata = NULL, plot = TRUE,
   for (j in counts) {
     if (isTRUE(list(...)$verbose))
       cat(j, "/", sep = "")
-    p <- cbind(p, predict(object, newdata = newdata, type = "pdf", y = j))
+    p <- cbind(p, predict(object, newdata = newdata, type = "pdf", y = j, useC = useC))
     obs <- c(obs, sum(y == j))
   }
 

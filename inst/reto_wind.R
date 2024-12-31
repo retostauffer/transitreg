@@ -55,6 +55,8 @@ ggplot() +
 # Estimating the model
 f <- Wmax ~ ti(alt) + ti(lon, lat) + ti(year) + ti(alt, year)
 system.time(b <- tm(f, data = x, breaks = 100, useC = TRUE))
+#b <- readRDS("____b.rds")
+rootogram(b, useC = TRUE)
 
 nd <- as.data.frame(dem)
 names(nd) <- c("lon", "lat", "alt")
