@@ -103,26 +103,34 @@ print(t2)
 print(c("C version" = logLik(mod2)))
 tm_detect_cores()
 
-#devtools::load_all("../")
-#set.seed(111)
-#t1 <- system.time(
-#    mod1 <- sim_NO(d, nd, ncores, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = FALSE)
-#)
-#set.seed(111)
-#t2 <- system.time(
-#    mod2 <- sim_NO(d, nd, ncores, breaks = 40, counts = FALSE, family = NO, engine = "bam", useC = TRUE)
-#)
-#message("Speed improvement factor:     x ",  
-#        round(t1["elapsed"] / t2["elapsed"] ,2),
-#        "   with n = ", n)
-#
-#
-## Comparing model estimates
-#table(coef_comparison = coef(mod1$model) == coef(mod2$model))
-#table(abs(mod1$probs$pdf - mod2$probs$pdf) < sqrt(.Machine$double.eps))
-#print(sqrt(mean((predict(mod1) - predict(mod2))^2)))
-#
-#sapply(list(mod1 = mod1, mod2 = mod2), logLik)
+devtools::load_all("../")
 
+#####################################
+mod2
+eps <- residuals(mod2)
+hist(eps)
+qqnorm(eps); qqline(eps)
+
+head(d)
+summary(d$counts)
+nbin <- length(mod2$bins)
+u <- sapply(0:(nbin - 1), function(y) predict(mod2, newdata = d[1, ], type = "pdf", y = y))
+barplot(u)
+sum(u)
+hist(d$num, freq = FALSE)
+lines(mod2$bins, u, lwd = 2, col = "tomato")
+with(density(d$num), lines(x, y, col = "steelblue", lwd = 2))
+
+set.seed(111)
+t1 <- system.time(eps1 <- residuals(mod2))
+t1 # 20 s
+devtools::load_all("../")
+set.seed(111)
+t2 <- system.time(eps2 <- residuals(mod2, useC = TRUE))
+t2 # 1 s
+plot(eps1, eps2)
+
+devtools::load_all("../")
+system.time(rootogram(mod2, useC = TRUE, verbose = TRUE))
 
 

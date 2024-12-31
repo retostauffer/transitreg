@@ -59,9 +59,7 @@ ggplot() +
 f <- Wmax ~ ti(alt) + ti(lon, lat) + ti(year) + ti(alt, year)
 system.time(b <- tm(f, data = x, breaks = 100, useC = TRUE))
 saveRDS(b, "____b.rds")
-
-dim(b$model.frame)
-dim(model.frame(b$model))
+#b <- readRDS("____b.rds")
 
 nd <- as.data.frame(dem)
 names(nd) <- c("lon", "lat", "alt")
