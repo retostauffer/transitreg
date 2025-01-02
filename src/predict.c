@@ -14,8 +14,8 @@
 #include <R.h>
 #include <Rdefines.h>
 #include <Rinternals.h>
-#include <stdbool.h>
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include "tm.h" // Include header, required to have the OPENMP_ON macro available.
 
@@ -52,7 +52,8 @@ tmWhich find_positions(int x, int* y, int n) {
  * Note for future me: Using log-sums is slower as we need to take the
  * logarithm of each element in pptr.
  */
-double tm_calc_pdf(int* positions, int count, double* pptr) {
+/* ELEMENT-WISE VERSION, RETURNS ONE DOUBLE */
+double tm_calc_pdf_dbl(int* positions, int count, double* pptr) {
     // If the last value is NA: return NA immediately
     if (ISNAN(pptr[positions[count - 1]])) { return R_NaReal; }
 
@@ -66,6 +67,30 @@ double tm_calc_pdf(int* positions, int count, double* pptr) {
     }
     // Multiplies (1 - p[count]) * the product from above
     res *= (1.0 - pptr[positions[count - 1]]);
+    return res;
+}
+/* VECTOR VERSION, RETURNS AN OBJECT OF CLASS doubleVec,
+ * used for elementwise = FALSE */
+doubleVec tm_calc_pdf_vec(int* positions, int count, double* pptr) {
+
+    // Initialize return value/object
+    doubleVec res;
+    res.values = (double*)malloc(count * sizeof(double));  // Allocate max possible size
+    res.length = count;
+                                                  //
+    if (res.values == NULL) { error("Memory allocation failed for doubleVec.values."); }
+
+    // Start calculating
+    double prod = 1.0; // Initialize product
+    for (int i = 0; i < (count - 1); i++) {
+        if (ISNAN(pptr[positions[i]])) {
+            error("TODO(R): First element ISNAN, must be adressed in C");
+            //return R_NaReal; 
+        }
+        prod *= pptr[positions[i]];
+        res.values[i] *= (1.0 - pptr[positions[count - 1]]);
+    }
+    // Multiplies (1 - p[count]) * the product from above
     return res;
 }
 
@@ -169,15 +194,28 @@ double tm_calc_quantile(int* positions, int count, double* pptr, double prob) {
  * 
  * @return Returns SEXP double vector of length (length(uidx)).
  */
-SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob, SEXP ncores) {
+SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
+                SEXP ncores, SEXP elementwise) {
 
     double *pptr    = REAL(p);
     int    *uidxptr = INTEGER(uidx);     // Unique indices in the dtaa
     int    *idxptr  = INTEGER(idx);      // Index vector
+    printf(" here \n");
     int    nthreads = asInteger(ncores); // Number of threads for OMP
     int    n        = LENGTH(idx);
     int    un       = LENGTH(uidx);
     int    i;
+    bool   ewise    = asLogical(elementwise); // C boolean value
+
+    printf(" ---------- elementwise %d\n", ewise);
+
+    // Allocating return vector. If ewise is FALSE the length of the
+    // vector is the same as 'un', else 'un * LENGTH(p);'.
+    int np = (!ewise) ? 1 : LENGTH(p);
+
+    SEXP probs;
+    PROTECT(probs = allocVector(REALSXP, un * np));
+    double *probsptr = REAL(probs);
 
     // Evaluate 'type' to define what to do. Store a set of
     // boolean values to only do the string comparison once.
@@ -185,7 +223,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob, SEXP ncores) 
     bool do_pdf  = strcmp(thetype, "pdf")  == 0;
     bool do_cdf  = strcmp(thetype, "cdf")  == 0;
     bool do_pmax = strcmp(thetype, "pmax") == 0;
-    bool do_q    = strcmp(thetype, "quantile") == 0;
+    // ELSE bool do_q    = strcmp(thetype, "quantile") == 0;
     // ... if none of them is true, it must be "do quantile"
 
     // This is only used if type == "quantile"; on the R side it is ensured
@@ -196,27 +234,31 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob, SEXP ncores) 
     // Custom struct object to mimik "which()"
     tmWhich which;
 
-    // Initialize results vector
-    SEXP probs;
-    PROTECT(probs = allocVector(REALSXP, un));
-    double *probsptr = REAL(probs);
+    if (!ewise) {
+        // Initialize results vector
+        // Vector length == length of 'un' (not elementwise)
 
-
-    #if OPENMP_ON
-    #pragma omp parallel for num_threads(nthreads) private(which)
-    #endif
-    for (i = 0; i < un; i++) {
-        which = find_positions(uidxptr[i], idxptr, n);
-        if (do_pdf) {
-            probsptr[i] = tm_calc_pdf(which.index, which.length, pptr);
-        } else if (do_cdf) {
-            probsptr[i] = tm_calc_cdf(which.index, which.length, pptr);
-        } else if (do_pmax) {
-            probsptr[i] = tm_calc_pmax(which.index, which.length, pptr);
-        } else {
-            probsptr[i] = tm_calc_quantile(which.index, which.length, pptr, probptr[i]);
+        #if OPENMP_ON
+        #pragma omp parallel for num_threads(nthreads) private(which)
+        #endif
+        for (i = 0; i < un; i++) {
+            which = find_positions(uidxptr[i], idxptr, n);
+            if (do_pdf) {
+                probsptr[i] = tm_calc_pdf_dbl(which.index, which.length, pptr);
+            } else if (do_cdf) {
+                probsptr[i] = tm_calc_cdf(which.index, which.length, pptr);
+            } else if (do_pmax) {
+                probsptr[i] = tm_calc_pmax(which.index, which.length, pptr);
+            } else {
+                probsptr[i] = tm_calc_quantile(which.index, which.length, pptr, probptr[i]);
+            }
+            free(which.index); // Free allocated memory
         }
-        free(which.index); // Free allocated memory
+    } else {
+        // Call vectorized version of tm_calc_pdf
+        probsptr[0] = 3;
+        error("TODO(R): Next step, call _vec version of pdf/df/ ... check speed");
+        //error("I am here in C");
     }
 
     UNPROTECT(1); // Releasing protected objects
@@ -239,7 +281,8 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob, SEXP ncores) 
  * 
  * @return Returns SEXP double vector of length (length(uidx)).
  */
-SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores) {
+SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p,
+                       SEXP ncores, SEXP elementwise) {
 
     double *pptr    = REAL(p);
     int    *uidxptr = INTEGER(uidx);  // Unique indices in the dtaa
@@ -267,7 +310,7 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores) {
     #endif
     for (i = 0; i < un; i++) {
         which = find_positions(uidxptr[i], idxptr, n);
-        pdfptr[i] = tm_calc_pdf(which.index, which.length, pptr);
+        pdfptr[i] = tm_calc_pdf_dbl(which.index, which.length, pptr);
         cdfptr[i] = tm_calc_cdf(which.index, which.length, pptr);
         free(which.index); // Free allocated memory
     }

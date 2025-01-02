@@ -1,6 +1,8 @@
 
 /* Strongly inspired by the great mgcv package! */
 
+#include <stdbool.h>
+
 /* Most compilers with openMP support supply a pre-defined compiler macro
  * _OPENMP. Following facilitates selective turning off (by testing value or
  * defining multiple versions OPENMP_ON1, OPENMP_ON2...)
@@ -50,6 +52,14 @@ typedef struct {
     int length;
 } tmWhich;
 
+/* Custom type: stuctured object with ...
+ * a double vector and length.
+ * NOTE: .values must be freed by the user! */
+typedef struct {
+    double* values;
+    int length;
+} doubleVec;
+
 /* The custom struct is used by find_position.
  * Searches for 'x' (int) in integer vector 'y' with a max length of 'n'.
  *
@@ -59,13 +69,16 @@ typedef struct {
  */
 tmWhich find_positions(int x, int* y, int n);
 
-void fun(double *y, double *H);
-double tm_calc_pdf(int* positions, int count, double* pptr);
+// TODO(R): Delete me! // void fun(double *y, double *H);
+
+double    tm_calc_pdf_dbl(int* positions, int count, double* pptr);
+doubleVec tm_calc_pdf_vec(int* positions, int count, double* pptr);
+
 double tm_calc_cdf(int* positions, int count, double* pptr);
 double tm_calc_pmax(int* positions, int count, double* pptr);
 
-SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob, SEXP ncores);
-SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores);
+SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob, SEXP ncores, SEXP elementwise);
+SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores, SEXP elementwise);
 SEXP tm_detect_cores();
 
 
