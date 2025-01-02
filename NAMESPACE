@@ -32,3 +32,10 @@ S3method(coef, tm)
 S3method(print, tm)
 S3method(rootogram, tm)
 
+## Distributions3 implementation
+export("tmdist")
+S3method(as.data.frame,  tmdist)
+S3method(format,         tmdist)
+S3method(quantile,       tmdist)
+S3method(pdf,            tmdist)
+
