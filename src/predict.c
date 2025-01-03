@@ -77,20 +77,20 @@ doubleVec tm_calc_pdf_vec(int* positions, int count, double* pptr) {
     doubleVec res;
     res.values = (double*)malloc(count * sizeof(double));  // Allocate max possible size
     res.length = count;
-                                                  //
+
     if (res.values == NULL) { error("Memory allocation failed for doubleVec.values."); }
 
     // Start calculating
     double prod = 1.0; // Initialize product
-    for (int i = 0; i < (count - 1); i++) {
+    for (int i = 0; i < count; i++) {
         if (ISNAN(pptr[positions[i]])) {
             error("TODO(R): First element ISNAN, must be adressed in C");
             //return R_NaReal; 
         }
+        res.values[i] = prod * (1.0 - pptr[positions[i]]);
+        // Updating vector product
         prod *= pptr[positions[i]];
-        res.values[i] *= (1.0 - pptr[positions[count - 1]]);
     }
-    // Multiplies (1 - p[count]) * the product from above
     return res;
 }
 
@@ -200,19 +200,20 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
     double *pptr    = REAL(p);
     int    *uidxptr = INTEGER(uidx);     // Unique indices in the dtaa
     int    *idxptr  = INTEGER(idx);      // Index vector
-    printf(" here \n");
     int    nthreads = asInteger(ncores); // Number of threads for OMP
     int    n        = LENGTH(idx);
     int    un       = LENGTH(uidx);
-    int    i;
     bool   ewise    = asLogical(elementwise); // C boolean value
+    int    i, j;
 
-    printf(" ---------- elementwise %d\n", ewise);
+    // This is only used if type == "quantile"; on the R side it is ensured
+    // that 'prob' is a numeric vector of LENGTH(uidx) if type = 'quantile',
+    // thus we do not check it here.
+    double *probptr = REAL(prob);        // Probability used for quantiles
 
     // Allocating return vector. If ewise is FALSE the length of the
     // vector is the same as 'un', else 'un * LENGTH(p);'.
     int np = (!ewise) ? 1 : LENGTH(p);
-
     SEXP probs;
     PROTECT(probs = allocVector(REALSXP, un * np));
     double *probsptr = REAL(probs);
@@ -222,22 +223,23 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
     const char* thetype = CHAR(STRING_ELT(type, 0));
     bool do_pdf  = strcmp(thetype, "pdf")  == 0;
     bool do_cdf  = strcmp(thetype, "cdf")  == 0;
-    bool do_pmax = strcmp(thetype, "pmax") == 0;
-    // ELSE bool do_q    = strcmp(thetype, "quantile") == 0;
-    // ... if none of them is true, it must be "do quantile"
+    bool do_q    = strcmp(thetype, "quantile") == 0;
+    // ... if none of them is true, it must be "do pmax"
+    // bool do_pmax = strcmp(thetype, "pmax") == 0;
 
-    // This is only used if type == "quantile"; on the R side it is ensured
-    // that 'prob' is a numeric vector of LENGTH(uidx) if type = 'quantile',
-    // thus we do not check it here.
-    double *probptr = REAL(prob);        // Probability used for quantiles
+    // If mode is not pdf, cdf, or quantile, elementwise must be false.
+    // Else we throw an error here. That is for pmax where elementwise
+    // makes no sense.
+    if (!do_pdf & !do_cdf & !do_q & ewise) {
+        printf("Using \"%s\" with elementwise = true not allowed.\n", CHAR(STRING_ELT(type, 0)));
+        exit(99);
+    }
 
     // Custom struct object to mimik "which()"
     tmWhich which;
 
+    // If !ewise: Calculate pdf/
     if (!ewise) {
-        // Initialize results vector
-        // Vector length == length of 'un' (not elementwise)
-
         #if OPENMP_ON
         #pragma omp parallel for num_threads(nthreads) private(which)
         #endif
@@ -247,18 +249,32 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
                 probsptr[i] = tm_calc_pdf_dbl(which.index, which.length, pptr);
             } else if (do_cdf) {
                 probsptr[i] = tm_calc_cdf(which.index, which.length, pptr);
-            } else if (do_pmax) {
-                probsptr[i] = tm_calc_pmax(which.index, which.length, pptr);
-            } else {
+            } else if (do_q) {
                 probsptr[i] = tm_calc_quantile(which.index, which.length, pptr, probptr[i]);
+            } else {
+                probsptr[i] = tm_calc_pmax(which.index, which.length, pptr);
             }
             free(which.index); // Free allocated memory
         }
     } else {
-        // Call vectorized version of tm_calc_pdf
-        probsptr[0] = 3;
-        error("TODO(R): Next step, call _vec version of pdf/df/ ... check speed");
-        //error("I am here in C");
+        // Initialize tmp with custom struct to store vector result (double)
+        doubleVec tmp;
+
+        #if OPENMP_ON
+        #pragma omp parallel for num_threads(nthreads) private(which)
+        #endif
+        for (i = 0; i < un; i++) {
+            which = find_positions(uidxptr[i], idxptr, n);
+            if (do_pdf) {
+                tmp = tm_calc_pdf_vec(which.index, which.length, pptr);
+                for (j = 0; j < tmp.length; j++) {
+                    probsptr[i * np + j] = tmp.values[j];
+                }
+            }
+            // Free allocated memory
+            free(tmp.values);
+            free(which.index);
+        }
     }
 
     UNPROTECT(1); // Releasing protected objects
