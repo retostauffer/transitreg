@@ -68,20 +68,20 @@ dgp_NO <- function(n = 1000, probs = c(0.01, 0.1, 0.5, 0.9, 0.99), breaks = 20, 
 dgp_BCPE <- function(n = 1000, probs = c(0.01, 0.1, 0.5, 0.9, 0.99), breaks = 20, ...)
 {
   ## Covariate.
-  x <- runif(n, -3, 3)
+  x <- runif(n, -2, 4 )
 
   ## Parameters.
-  mu <- exp(-2 + cos(x))
-  sigma <- exp(-2 + cos(x))
-  nu <- 4 + 2*x
-  tau <- exp(0.5*x^2)
+  mu <- 2 + sin(x)
+  sigma <- 0.12 + 0.1 * cos(x)
+  nu <- 1.65 - 4 * cos(x)
+  tau <- 2 + cos(x)
 
   ## Response
-  y_cont <- rBCPEo(n, mu, sigma, nu, tau) * 100
+  y_cont <- rBCPE(n, mu, sigma, nu, tau) * 10
 
   ## Discretize the normal data into count categories.
   yr <- range(y_cont)
-  breaks <- seq(0, 100, length.out = breaks)
+  breaks <- seq(yr[1] - 1, yr[2] + 1, length.out = breaks)
   y_count <- cut(y_cont, breaks = breaks, labels = FALSE, include.lowest = TRUE) - 1
 
   ## Combine.
@@ -90,7 +90,7 @@ dgp_BCPE <- function(n = 1000, probs = c(0.01, 0.1, 0.5, 0.9, 0.99), breaks = 20
   ## Add quantiles.
   qu <- quc <- NULL
   for(j in probs) {
-    qj <- qBCPEo(j, mu = mu, sigma = sigma, nu = nu, tau = tau)*100
+    qj <- qBCPE(j, mu = mu, sigma = sigma, nu = nu, tau = tau) * 10
     qu <- cbind(qu, qj)
     quc <- cbind(quc, cut(qj, breaks = breaks, labels = FALSE, include.lowest = TRUE) - 1)
   }
@@ -227,7 +227,7 @@ sim_NO <- function(n = 1000, breaks = NULL, counts = FALSE, family = NO, seed = 
   legend(pos, qe, lwd = 2, col = c(4, 2, 3), bty = "n") ##title = "Quantile Error (RMSE)")
 }
 
-sim_BCPE <- function(n = 1000, breaks = NULL, counts = FALSE, family = BCPEo, seed = 111,
+sim_BCPE <- function(n = 1000, breaks = NULL, counts = FALSE, family = BCPE, seed = 111,
   xlim = NULL, ylim = NULL, engine = "bam", pos = "topleft", probs = 0.5, ...)
 {
   if(!is.null(seed))
@@ -237,6 +237,7 @@ sim_BCPE <- function(n = 1000, breaks = NULL, counts = FALSE, family = BCPEo, se
   d <- dgp_BCPE(n, probs = probs)
 
   ## Simulate new data.
+  set.seed(1)
   nd <- dgp_BCPE(1000, probs = probs)
 
   if(counts) {
@@ -252,12 +253,13 @@ sim_BCPE <- function(n = 1000, breaks = NULL, counts = FALSE, family = BCPEo, se
 
   ## Estimate transition model.
   if(engine != "nnet") {
-    f <- num ~ s(theta) + s(x) + te(theta,x,k=10)
+    f <- num ~ te(theta,x,k=10)
+    b <- tm(f, data = d, breaks = breaks, engine = engine)
   } else {
     f <- num ~ theta + x
+    b <- tm(f, data = d, breaks = breaks, engine = engine,
+      scale.x = TRUE, size = 40, maxit = 1000, decay = 0.01)
   }
-  b <- tm(f, data = d, breaks = breaks, engine = engine,
-    scale.x = TRUE, size = 40, maxit = 1000, decay = 0.01)
 
   ## Corresponding GAMLSS.
   if(counts && (family()$type == "Continuous")) {
@@ -268,9 +270,9 @@ sim_BCPE <- function(n = 1000, breaks = NULL, counts = FALSE, family = BCPEo, se
 
   ## Quantile regression.
   if(counts) {
-    g <- mqgam(log(num + 1) ~ s(x,k=20), data = d, qu = qu)
+    g <- mqgam(log(num + 1) ~ s(x), data = d, qu = qu)
   } else {
-    g <- mqgam(num ~ s(x,k=20), data = d, qu = qu)
+    g <- mqgam(num ~ s(x), data = d, qu = qu)
   }
 
   ## Predict quantiles.
@@ -295,23 +297,27 @@ sim_BCPE <- function(n = 1000, breaks = NULL, counts = FALSE, family = BCPEo, se
     pg <- exp(pg) - 1
 
   ## Compute loss.
-  err_b <- sqrt(mean((p - nd$quantiles)^2))
-  err_m <- sqrt(mean((pm - nd$quantiles)^2))
-  err_g <- sqrt(mean((pg - nd$quantiles)^2))
+  err_b <- err_m <- err_g <- NULL
+  for(j in seq_along(qu)) {
+    err_b <- c(err_b, qgam::pinLoss(nd$num, p[, j], qu[j]))
+    err_m <- c(err_m, qgam::pinLoss(nd$num, pm[, j], qu[j]))
+    err_g <- c(err_g, qgam::pinLoss(nd$num, pg[, j], qu[j]))
+  }
+  err_b <- sum(err_b)
+  err_m <- sum(err_m)
+  err_g <- sum(err_g)
 
   ## Plot data and fitted median.
   if(is.null(ylim))
-    ylim <- range(d$num, nd$num, p, pm, pg)
+    ylim <- range(d$num, nd$num, p, pm, pg, na.rm = TRUE)
 
-  plot(num ~ x, data = d, xlim = xlim, ylim = ylim,
+  plot(num ~ x, data = nd, xlim = xlim, ylim = ylim,
     col = rgb(0.1, 0.1, 0.1, alpha = 0.2), pch = 16,
     main = "", xlab = "x", ylab = "y", ...)
 
-  i <- order(nd$x)
+  points(d$x, d$num, col = rgb(236/255, 236/255, 83/255, alpha = 0.2), pch = 16)
 
-  matplot(nd$x[i], nd$quantiles[i,], type = "l",
-    col = rgb(0.1, 0.1, 0.1, alpha = 0.3),
-    lty = 1, lwd = 6, add = TRUE)
+  i <- order(nd$x)
 
   matplot(nd$x[i], pm[i, ], type = "l",
     lty = 1, col = 2, lwd = 2, add = TRUE)

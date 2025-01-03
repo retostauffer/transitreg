@@ -384,6 +384,25 @@ timer <- function(msg = NULL, verbose = TRUE) {
 }
 timer(NULL)
 
+## Function to create bins.
+make_bins <- function(y, breaks = 30, scale = FALSE , ...) {
+  if(scale) {
+    my <- min(y)
+    y <- sqrt(y - my + 0.01)
+    dy <- diff(range(y))
+    bins <- (seq(min(y) - 0.1*dy,
+      max(y) + 0.1*dy, length = breaks))^2 - 0.01 + my
+  } else {
+    dy <- diff(range(y))
+    bins <- seq(min(y) - 0.1*dy,
+      max(y) + 0.1*dy, length = breaks)
+#    bins <- c(min(y) - 0.5*dy,
+#      quantile(y, probs = seq(0, 1, length = breaks)),
+#      max(y) + 0.5*dy)
+  }
+  return(bins)
+}
+
 ## Wrapper function to estimate CTMs.
 # TODO(R): Adding useC option for testing; must be removed in the future.
 tm <- function(formula, data, subset, na.action,
@@ -429,12 +448,12 @@ timer(NULL)
   ## Response name.
   rn <- response_name(formula)
 
+  yscale <- NULL
+
   ## Discretize response?
   if (bin.y <- !is.null(breaks)) {
     if (length(breaks) < 2L) {
-      dy <- diff(range(model.response(mf)))
-      bins <- seq(min(model.response(mf)) - 0.1*dy,
-        max(model.response(mf)) + 0.1*dy, length = breaks)
+      bins <- make_bins(model.response(mf), breaks = breaks)
     } else {
       bins <- breaks
     }
