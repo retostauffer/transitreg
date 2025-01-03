@@ -535,12 +535,12 @@ timer(NULL)
   options("warn" = -1)
   if (engine == "bam") {
     rval$model <- bam(rval$new_formula, data = tmf, family = binomial, discrete = TRUE)
-  }
-  if (engine == "gam") {
+  } else if (engine == "gam") {
     rval$model <- gam(rval$new_formula, data = tmf, family = binomial, ...)
-  }
-  if (engine == "nnet") {
+  } else if (engine == "nnet") {
     rval$model <- nnet::nnet(rval$new_formula, data = tmf, ...)
+  } else if (engine == "glmnet") {
+    rval$model <- tm_glmnet(rval$new_formula, data = tmf, ...)
   }
   timer("estimation", verbose)
   options("warn" = warn)

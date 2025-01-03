@@ -32,3 +32,6 @@ S3method(coef, tm)
 S3method(print, tm)
 S3method(rootogram, tm)
 
+## GLMNET test
+importFrom("mgcv", "interpret.gam", "smoothCon")
+
