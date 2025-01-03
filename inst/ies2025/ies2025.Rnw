@@ -36,7 +36,7 @@
 \linespread{1.2}
 
 %% https://ies2025.sis-statistica.it/
-\title{Transition Models for Wind Speed Climatology Estimation}
+\title{Transition Models for Precipitation Climatology Estimation}
 
 \author{$\mathrm{Nikolaus \ Umlauf}^\mathrm{1},  
 	\  \mathrm{Reto \ Stauffer}^\mathrm{1}$\\  
@@ -50,6 +50,14 @@
 options(width = 70, prompt = "R> ", continue = "+  ",
   SweaveHooks = list(fig = function() par(mar = c(4.1, 4.1, 1, 1))))
 library("TransitionModels")
+library("qgam")
+library("gamlss2")
+library("gamlss.cens")
+
+data("WeatherGermany", package = "WeatherGermany")
+
+WeatherGermany$yday <- as.POSIXlt(WeatherGermany$date)$yday
+WeatherGermany$year <- as.POSIXlt(WeatherGermany$date)$year + 1900
 @
 
 \begin{document}
@@ -57,7 +65,7 @@ library("TransitionModels")
 
 
 \begin{abstract}
-Transition models are widely recognized for their flexibility in count data regression and are commonly applied in ordinal regression, where they are also known as continuation ratio models. The core concept involves modeling transition probabilities, specifically the conditional probability of observing counts greater than a threshold. These probabilities can be estimated using standard binary regression methods with an augmented dataset, allowing the use of any software designed for binary response models. In this paper, we demonstrate that transition models can be extended to continuous data by employing a slicing technique, which transforms continuous observations into count-like data. This approach enables the estimation of full probabilistic models, such as distributional or quantile regression, using simple binary regression methods. Through simulated examples, we showcase the robustness and practical utility of this approach, illustrated further with an application to wind speed climatology estimation in northern Germany.
+Transition models are widely recognized for their flexibility in count data regression and are commonly applied in ordinal regression, where they are also known as continuation ratio models. The core concept involves modeling transition probabilities, specifically the conditional probability of observing counts greater than a threshold. These probabilities can be estimated using standard binary regression methods with an augmented dataset, allowing the use of any software designed for binary response models. In this paper, we demonstrate that transition models can be extended to continuous data by employing a slicing technique, which transforms continuous observations into count-like data. This approach enables the estimation of full probabilistic models, such as distributional or quantile regression, using simple binary regression methods. We showcase the robustness and practical utility of this approach with an application to precipiation climatology estimation in Germany.
 \noindent 
 \hspace{1cm}\\
 \emph{Keywords}: transition models, probabilistic models
@@ -67,51 +75,68 @@ Transition models are widely recognized for their flexibility in count data regr
 
 \begin{figure}[!ht]
 \centering
-\setkeys{Gin}{width=1\textwidth}
-<<echo=FALSE, results=hide, fig=TRUE, width=7, height=5>>=
-source("../simulation.R")
+%% \setkeys{Gin}{width=1\textwidth}
+<<echo=FALSE, results=hide>>=
+if(!file.exists("ts_hist.png")) {
+  gen.cens("NO", type = "left")
+  fam <- NOlc
 
-par(mfrow = c(2, 3), mar = rep(0, 4), oma = c(4, 4, 3, 3))
+  d <- subset(WeatherGermany, name == "Brocken")
 
-ylim <- c(-0.5, 10)
-seed <- 111
-n <- 1000
+  b <- gamlss2(Surv(sqrt(d$pre), d$pre > 0) ~ 1, data = d, family = fam)
+  y <- seq(0, 18, length = 100)
+  par <- predict(b, newdata = data.frame(y = y))
+  dy <- family(b)$d(Surv(y, y > 0), par)
 
-sim_BCPE(n = n, counts = FALSE, breaks = 30, probs = 0.5,
-  family = BCPEo, ylim = ylim, axes = FALSE, seed = seed)
-box()
-axis(2)
-mtext("Median", side = 3, line = 1, font = 2)
+  breaks <- c(-0.15, seq(0.15, 13, by = 0.3))
 
-sim_BCPE(n = n, counts = FALSE, breaks = 30, probs = c(0.1, 0.9),
-  family = BCPEo, ylim = ylim, axes = FALSE, seed = seed)
-box()
-mtext("10% and 90% Quantile", side = 3, line = 1, font = 2)
+  d$sqrt_pre <- sqrt(d$pre)
+  m <- tm(sqrt_pre ~ theta0 + theta1 + s(theta,k=20), data = d, breaks = breaks)
 
-sim_BCPE(n = n, counts = FALSE, breaks = 30, probs = c(0.01, 0.99),
-  family = BCPEo, ylim = ylim, axes = FALSE, seed = seed)
-box()
-mtext("1% and 99% Quantile", side = 3, line = 1, font = 2)
+  nd <- data.frame("sqrt_pre" = 1:m$maxcounts)
+  pm <- predict(m, newdata = nd, type = "cdf")
+  ym <- m$ym[1:m$maxcounts + 1]
+  f <- splinefun(ym, pm)
 
+  nd0 <- data.frame("sqrt_pre" = 0:1)
+  pm0 <- sum(predict(m, newdata = nd0, type = "cdf"))
+  ym <- c(0, ym)
 
-sim_BCPE(n = n, counts = FALSE, breaks = 200, probs = 0.5,
-  family = BCPEo, ylim = ylim, axes = FALSE, seed = seed)
-box()
+  dy2 <- c(pm0, f(y[-1], deriv = 1))
 
-sim_BCPE(n = n, counts = FALSE, breaks = 200, probs = c(0.1, 0.9),
-  family = BCPEo, ylim = ylim, axes = FALSE, seed = seed)
-box()
-axis(1)
+  png("ts_hist.png", units = "in", res = 200, width = 8, height = 3.1)
 
-sim_BCPE(n = n, counts = FALSE, breaks = 200, probs = c(0.01, 0.99),
-  family = BCPEo, ylim = ylim, axes = FALSE, seed = seed)
-box()
-axis(4)
+  par(mfrow = c(1, 2), mar = c(4, 4, 0, 1))
 
-mtext("x", side = 1, line = 2.5, outer = TRUE)
-mtext("y", side = 2 , line = 2.5, outer = TRUE)
+  plot(sqrt_pre ~ yday, data = d, type = "h", col = rgb(0.1, 0.1, 0.1, alpha = 0.4),
+    xlab = "Day of the year", ylab = "sqrt(Precipitation)")
+
+  a <- aggregate(sqrt_pre ~ yday, data = d, FUN = function(x) {
+    quantile(x, prob = c(0.01, 0.1, 0.5, 0.9, 0.99))
+  })
+
+  matplot(a$yday, a[, -1], type = "l", lty = 1, col = 4, add = TRUE, lwd = 0.5)
+
+  hist(d$sqrt_pre, breaks = breaks, freq = FALSE,
+    xlab = "sqrt(Precipitation)", main = "")
+  rug(d$sqrt_pre, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
+  lines(y, dy, col = 2, lwd = 2)
+  lines(y, dy2, col = 4, lwd = 2)
+  legend("center", c("Censored Normal", "Transition Model"),
+    lwd = 2, col = c(2, 4), bty = "n")
+
+  dev.off()
+}
 @
-\caption{\label{fig:sim1} Simulated data example}
+\includegraphics[width=1  \textwidth]{ts_hist.png}
+
+\caption{\label{fig:data} Precipitation data for the Brocken region in Germany.
+  The left panel illustrates the seasonal variation in square root-transformed 
+  precipitation values, with empirical quantiles (1st, 10th, 50th, 90th, and 99th 
+  percentiles) plotted for each day of the year. The right panel presents a histogram
+  of the square root-transformed precipitation values, overlaid with the fitted
+  densities of a censored normal distribution (red line) and a transition model
+  (blue line).}
 \end{figure}
 
 \subsection{Subsection}\label{sec.subsection}
@@ -169,3 +194,62 @@ mtext("y", side = 2 , line = 2.5, outer = TRUE)
 
 \end{document}
 
+
+set.seed(123)
+
+i <- sample(c(TRUE, FALSE), size = nrow(d), replace = TRUE, prob = c(0.5, 0.5))
+dtrain <- d[i, ]
+dtest <- d[!i, ]
+
+f <- sqrt(pre) ~ theta0 + s(theta) + s(yday,bs="cc",by=as.factor(theta0)) +
+  te(theta,yday,bs=c("cr","cc"),by=as.factor(theta0))
+
+breaks <- c(-0.01, seq(0.01, 14, length = 100))
+
+b <- tm(f, data = dtrain, breaks = breaks)
+
+qu <- c(0.01, 0.1, 0.5, 0.9, 0.999)
+
+g <- mqgam(sqrt(pre) ~ s(yday,bs="cc"), data = dtrain, qu = qu)
+
+m <- gamlss2(Surv(sqrt(pre), pre > 0) ~ s(yday,bs="cc") | s(yday,bs="cc"), data = dtrain, family = NOlc, maxit = c(100, 100))
+
+p <- do.call("cbind",
+  lapply(qu, function(j) {
+    predict(b, newdata = dtest, prob = j)^2
+}))
+
+pg <- do.call("cbind",
+  lapply(qu, function(j) {
+    qdo(g, j, predict, newdata = dtest)^2
+}))
+
+par <- predict(m, newdata = dtest)
+pm <- do.call("cbind",
+  lapply(qu, function(j) {
+    m$family$q(j, par)^2
+}))
+
+plot(pre ~ yday, data = dtest, type = "h",
+  col = rgb(0.1, 0.1, 0.1, alpha = 0.2), pch = 16)
+
+i <- order(dtest$yday)
+
+matplot(dtest$yday[i], pg[i, ], type = "l",
+  lty = 1, col = 2, lwd = 2, add = TRUE)
+
+matplot(dtest$yday[i], pm[i, ], type = "l",
+  lty = 1, col = 3, lwd = 2, add = TRUE)
+
+matplot(dtest$yday[i], p[i, ], type = "l",
+  lty = 1, col = 4, lwd = 2, add = TRUE)
+
+err_b <- err_g <- err_m <- NULL
+for(j in seq_along(qu)) {
+  err_b <- c(err_b, qgam::pinLoss(dtest$pre, p[, j], qu[j]))
+  err_g <- c(err_g, qgam::pinLoss(dtest$pre, pg[, j], qu[j]))
+  err_m <- c(err_m, qgam::pinLoss(dtest$pre, pm[, j], qu[j]))
+}
+err_b <- sum(err_b)
+err_g <- sum(err_g)
+err_m <- sum(err_m)
