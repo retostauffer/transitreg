@@ -53,26 +53,25 @@ tmWhich find_positions(int x, int* y, int n) {
  * logarithm of each element in pptr.
  */
 /* ELEMENT-WISE VERSION, RETURNS ONE DOUBLE */
-double tm_calc_pdf_dbl(int* positions, int count, double* pptr) {
-    // If the last value is NA: return NA immediately
-    if (ISNAN(pptr[positions[count - 1]])) { return R_NaReal; }
-
-    // Else start calculation. As soon as we detect a missing
-    // value, return NA as well.
-    double res = 1.0; // Initialize with 1.0 for product
-    for (int i = 0; i < (count - 1); i++) {
-        if (ISNAN(pptr[positions[i]])) { return R_NaReal; }
-        // Calculates product over the first (count - 1) elements
-        res *= pptr[positions[i]];
-    }
-    // Multiplies (1 - p[count]) * the product from above
-    res *= (1.0 - pptr[positions[count - 1]]);
-    return res;
-}
+////////double tm_calc_pdf_dbl(int* positions, int count, double* pptr) {
+////////    // If the last value is NA: return NA immediately
+////////    if (ISNAN(pptr[positions[count - 1]])) { return R_NaReal; }
+////////
+////////    // Else start calculation. As soon as we detect a missing
+////////    // value, return NA as well.
+////////    double res = 1.0; // Initialize with 1.0 for product
+////////    for (int i = 0; i < (count - 1); i++) {
+////////        if (ISNAN(pptr[positions[i]])) { return R_NaReal; }
+////////        // Calculates product over the first (count - 1) elements
+////////        res *= pptr[positions[i]];
+////////    }
+////////    // Multiplies (1 - p[count]) * the product from above
+////////    res *= (1.0 - pptr[positions[count - 1]]);
+////////    return res;
+////////}
 /* VECTOR VERSION, RETURNS AN OBJECT OF CLASS doubleVec,
  * used for elementwise = FALSE */
-doubleVec tm_calc_pdf_vec(int* positions, int count, double* pptr) {
-
+doubleVec tm_calc_pdf(int* positions, int count, double* pptr) {
     // Initialize return value/object
     doubleVec res;
     res.values = (double*)malloc(count * sizeof(double));  // Allocate max possible size
@@ -97,20 +96,32 @@ doubleVec tm_calc_pdf_vec(int* positions, int count, double* pptr) {
 /* Helper function for type = "cdf".
  *
  */
-double tm_calc_cdf(int* positions, int count, double* pptr) {
-    // If the first value is NA: return NA immediately
-    if (ISNAN(pptr[positions[0]])) { return R_NaReal; }
+doubleVec tm_calc_cdf(int* positions, int count, double* pptr) {
+    // Initialize return value/object
+    doubleVec res;
+    res.values = (double*)malloc(count * sizeof(double));  // Allocate max possible size
+    res.length = count;
+
+    if (res.values == NULL) { error("Memory allocation failed for doubleVec.values."); }
+
+    if (ISNAN(pptr[positions[0]])) {
+        error("TODO(R): First element ISNAN, must be adressed in C");
+        //return R_NaReal; 
+    }
 
     // Else start calculation. As soon as we detect a missing
     // value, return NA as well.
-    double res = 1.0 - pptr[positions[0]]; // Initialize with (1 - p[0])
+    res.values[0] = 1.0 - pptr[positions[0]]; // Initialize with (1 - p[0])
     if (count > 0) {
         double pprod = 1.0; // Initialize with 1.0 for product
         // Looping over all elements except first
         for (int i = 1; i < count; i++) {
-            if (ISNAN(pptr[positions[i - 1]])) { return R_NaReal; }
+            if (ISNAN(pptr[positions[i - 1]])) {
+                error("TODO(R): ISNAN must be implemented first (doubleVec; in cdf)");
+                //return R_NaReal;
+            }
             pprod *= pptr[positions[i - 1]]; // Multiply with previous element
-            res += (1.0 - pptr[positions[i]]) * pprod;
+            res.values[i] = res.values[i - 1] + (1.0 - pptr[positions[i]]) * pprod;
         }
     }
     return res;
@@ -237,44 +248,38 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
 
     // Custom struct object to mimik "which()"
     tmWhich which;
+    doubleVec tmp;
 
-    // If !ewise: Calculate pdf/
-    if (!ewise) {
-        #if OPENMP_ON
-        #pragma omp parallel for num_threads(nthreads) private(which)
-        #endif
-        for (i = 0; i < un; i++) {
-            which = find_positions(uidxptr[i], idxptr, n);
+    #if OPENMP_ON
+    #pragma omp parallel for num_threads(nthreads) private(which)
+    #endif
+    for (i = 0; i < un; i++) {
+        which = find_positions(uidxptr[i], idxptr, n);
+        if (do_pdf | do_cdf | do_q) {
+            // --- Calculating probability density
             if (do_pdf) {
-                probsptr[i] = tm_calc_pdf_dbl(which.index, which.length, pptr);
+                tmp = tm_calc_pdf(which.index, which.length, pptr);
+            // --- Calculating cumulative distribution
             } else if (do_cdf) {
-                probsptr[i] = tm_calc_cdf(which.index, which.length, pptr);
-            } else if (do_q) {
-                probsptr[i] = tm_calc_quantile(which.index, which.length, pptr, probptr[i]);
+                tmp = tm_calc_cdf(which.index, which.length, pptr);
             } else {
-                probsptr[i] = tm_calc_pmax(which.index, which.length, pptr);
+                probsptr[i] = tm_calc_quantile(which.index, which.length, pptr, probptr[i]);
             }
-            free(which.index); // Free allocated memory
-        }
-    } else {
-        // Initialize tmp with custom struct to store vector result (double)
-        doubleVec tmp;
 
-        #if OPENMP_ON
-        #pragma omp parallel for num_threads(nthreads) private(which)
-        #endif
-        for (i = 0; i < un; i++) {
-            which = find_positions(uidxptr[i], idxptr, n);
-            if (do_pdf) {
-                tmp = tm_calc_pdf_vec(which.index, which.length, pptr);
-                for (j = 0; j < tmp.length; j++) {
-                    probsptr[i * np + j] = tmp.values[j];
-                }
+            // Store results. If !elementwise, store last value
+            if (!ewise) {
+                probsptr[i] = tmp.values[tmp.length - 1];
+            // Else store the entire vector
+            } else {
+                for (j = 0; j < tmp.length; j++) { probsptr[i * np + j] = tmp.values[j]; }
             }
-            // Free allocated memory
-            free(tmp.values);
-            free(which.index);
+        // Else it must be pmax
+        } else {
+            probsptr[i] = tm_calc_pmax(which.index, which.length, pptr);
         }
+        // Free allocated memory
+        free(tmp.values);
+        free(which.index);
     }
 
     UNPROTECT(1); // Releasing protected objects
@@ -310,6 +315,8 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p,
 
     // Custom struct object to mimik "which()"
     tmWhich which;
+    doubleVec tmppdf;
+    doubleVec tmpcdf;
 
     // Initialize results vector
     int nProtected = 0;
@@ -326,9 +333,15 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p,
     #endif
     for (i = 0; i < un; i++) {
         which = find_positions(uidxptr[i], idxptr, n);
-        pdfptr[i] = tm_calc_pdf_dbl(which.index, which.length, pptr);
-        cdfptr[i] = tm_calc_cdf(which.index, which.length, pptr);
-        free(which.index); // Free allocated memory
+        tmppdf = tm_calc_pdf(which.index, which.length, pptr);
+        tmpcdf = tm_calc_cdf(which.index, which.length, pptr);
+        // Store last value
+        pdfptr[i] = tmppdf.values[tmppdf.length - 1];
+        cdfptr[i] = tmpcdf.values[tmpcdf.length - 1];
+        // Free allocated memory
+        free(which.index);
+        free(tmppdf.values);
+        free(tmpcdf.values);
     }
 
     /* ----------------------------------- */

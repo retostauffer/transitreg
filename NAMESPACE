@@ -38,4 +38,5 @@ S3method(as.data.frame,  tmdist)
 S3method(format,         tmdist)
 S3method(quantile,       tmdist)
 S3method(pdf,            tmdist)
+S3method(cdf,            tmdist)
 

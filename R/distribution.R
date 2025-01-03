@@ -87,9 +87,7 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ...) {
 
     # Setting up all unique combinations needed
     # (1) Use same 'x' for all distributions
-    if (length(x) == 1) {
-        x <- rep(x, length(d))
-    }
+    if (length(x) == 1 && length(d) > 1L) x <- rep(x, length(d))
 
     # Scopes 'd' and 'grd'
     fn <- function(i) {
@@ -125,8 +123,75 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ...) {
         stop(" --- TODO(R): Can we end up here, and if so, why? Work needed --- ")
     }
     # TODO(R): Currently no OpenMP (ncores = 1L)
-    .Call("tm_predict", ui, d$index, p = d$tp, type = "pdf", prob = 42,
-          ncores = 1L, elementwise = elementwise)
+    res <- .Call("tm_predict", ui, d$index, p = d$tp, type = "pdf", prob = 42,
+                 ncores = 1L, elementwise = elementwise)
+
+    if (elementwise) {
+        res <- matrix(res, ncol = length(x),
+                      dimnames = list(NULL, paste("x", format(x, digits = 3), sep = "_")))
+    }
+    return(res)
+
+  #FUN <- function(at, d) dempirical(x = at, y = as.matrix(d), ...)
+  #apply_dpqr(d = d, FUN = FUN, at = x, type = "density", drop = drop, elementwise = elementwise)
+}
+
+
+cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ...) {
+    stopifnot("currently only designed length 1" = length(d) == 1L)
+
+    # TODO(R): Hack
+    if (is.null(elementwise)) {
+        elementwise <- FALSE
+        warning("cdf.tmdist; setting elementwise FALSE if is NULL, requires some work")
+    }
+
+    # Setting up all unique combinations needed
+    # (1) Use same 'x' for all distributions
+    if (length(x) == 1 && length(d) > 1L) x <- rep(x, length(d))
+
+    # Scopes 'd' and 'grd'
+    fn <- function(i) {
+        grd <- as.list(grd[i, ])
+        tmp <- as.data.frame(d[grd$d])
+        cutoff <- tmp$bin[which.min(abs(tmp$binmid - grd$p))]
+        tmp$index <- grd$index
+        subset(tmp, bin <= cutoff)
+    }
+
+    # If there is one distribution and one point at which to evaluate this
+    # distribution, or 'elementwise' is FALSE we can proceed setting up the
+    # data.frame used to call the C function performing the calculations.
+    # Note: If length(d) != length(x) the vectors will be recycled.
+    if ((length(d) == 1L && length(x) == 1L) || isFALSE(elementwise)) {
+
+        # Create 'grid' for evaluation
+        if (length(d) > length(x)) {
+            grd <- data.frame(d = seq_along(d), p = rep(x, length(d)))
+        } else {
+            grd <- data.frame(d = rep(seq_along(d), length(x)), p = x)
+        }
+        grd$index <- seq_len(nrow(grd)) # Pseudo-index
+
+        ui <- seq_len(nrow(grd))
+        d <- do.call(rbind, lapply(ui, fn))
+    } else if (elementwise) {
+        # We're 
+        ui <- seq_along(d) # Number of distributions
+        d  <- as.data.frame(d)
+        d$index <- 1L ## TODO(R): Only works if length(d) == 1
+    } else {
+        stop(" --- TODO(R): Can we end up here, and if so, why? Work needed --- ")
+    }
+    # TODO(R): Currently no OpenMP (ncores = 1L)
+    res <- .Call("tm_predict", ui, d$index, p = d$tp, type = "cdf", prob = 42,
+                 ncores = 1L, elementwise = elementwise)
+
+    if (elementwise) {
+        res <- matrix(res, ncol = length(x),
+                      dimnames = list(NULL, paste("x", format(x, digits = 3), sep = "_")))
+    }
+    return(res)
 
   #FUN <- function(at, d) dempirical(x = at, y = as.matrix(d), ...)
   #apply_dpqr(d = d, FUN = FUN, at = x, type = "density", drop = drop, elementwise = elementwise)
