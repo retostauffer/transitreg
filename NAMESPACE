@@ -39,4 +39,5 @@ S3method(format,         tmdist)
 S3method(quantile,       tmdist)
 S3method(pdf,            tmdist)
 S3method(cdf,            tmdist)
+S3method(quantile,       tmdist)
 

@@ -73,8 +73,8 @@ tmWhich find_positions(int x, int* y, int n);
 
 doubleVec tm_calc_pdf(int* positions, int count, double* pptr);
 doubleVec tm_calc_cdf(int* positions, int count, double* pptr);
+doubleVec tm_calc_quantile(int* positions, int count, double* pptr, double* prob, int np);
 
-//double tm_calc_cdf(int* positions, int count, double* pptr);
 double tm_calc_pmax(int* positions, int count, double* pptr);
 
 SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob, SEXP ncores, SEXP elementwise);

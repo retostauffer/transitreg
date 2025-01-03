@@ -197,4 +197,36 @@ cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ...) {
   #apply_dpqr(d = d, FUN = FUN, at = x, type = "density", drop = drop, elementwise = elementwise)
 }
 
+quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ...) {
+    stopifnot("currently only designed length 1" = length(d) == 1L)
+
+    # TODO(R): Hack
+    if (is.null(elementwise)) {
+        elementwise <- FALSE
+        warning("cdf.tmdist; setting elementwise FALSE if is NULL, requires some work")
+    }
+
+    # Setting up all unique combinations needed
+    # (1) Use same 'x' for all distributions
+    if (length(probs) == 1 && length(d) > 1L) probs <- rep(probs, length(d))
+
+    if (!elementwise & length(probs) > length(d))
+        stop("length of 'probs' can't be larger than number of distributions in 'd'",
+             "if elementwise = FALSE");
+
+    if (elementwise) probs <- sort(probs) # Important
+
+    ui <- seq_along(d)
+    d <- as.data.frame(d)
+    d$index <- 1L # TODO(R) Only works if length(d) == 1
+
+    # TODO(R): Currently no OpenMP (ncores = 1L)
+    res <- .Call("tm_predict", ui, d$index, p = d$tp, type = "quantile", prob = probs,
+                 ncores = 1L, elementwise = elementwise)
+
+    return(res)
+  #FUN <- function(at, d) qempirical(at, y = as.matrix(d), ...)
+  #apply_dpqr(d = x, FUN = FUN, at = probs, type = "quantile", drop = drop, elementwise = elementwise)
+}
+
 

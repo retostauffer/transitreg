@@ -127,6 +127,72 @@ doubleVec tm_calc_cdf(int* positions, int count, double* pptr) {
     return res;
 }
 
+/* Helper function for type = "quantile"
+ */
+doubleVec tm_calc_quantile(int* positions, int count, double* pptr, double* prob, int np) {
+
+    int i, j;
+
+    // Get max(prob), allows for early stopping in the loop
+    double pmax = -1;
+    for (i = 0; i < np; i++) {
+        if (prob[i] > pmax) { pmax = prob[i]; }
+    }
+
+    // Initialize return value/object
+    doubleVec res;
+    res.values = (double*)malloc(np * sizeof(double));  // Allocate max possible size
+    res.length = np;
+
+    // Temporary double vector to store calculated quantiles
+    double* tmp;
+    tmp = (double*)malloc(count * sizeof(double)); // Allocate max possible size
+
+    if (res.values == NULL) { error("Memory allocation failed for doubleVec.values."); }
+
+    if (ISNAN(pptr[positions[0]])) {
+        error("TODO(R): First element ISNAN, must be adressed in C");
+        //return R_NaReal; 
+    }
+
+    // TODO(R): Should not be needed, just initializing quantile with 0 for safety/testing
+    for (i = 0; i < np; i++) { res.values[i] = -1; } 
+
+    // Initialize with (1 - p[0])
+    tmp[0] = 1.0 - pptr[positions[0]];
+
+    // Looping over 'pptr' (counts) to calculate the quantiles; store in 'tmp'.
+    // As soon as the calculated quantile tmp[i] is larger than pmax we can stop
+    // as we will not need it.
+    if (count > 0) {
+        double pprod = 1.0; // Initialize with 1.0 for product
+        for (int i = 1; i < count; i++) {
+            if (ISNAN(pptr[positions[i - 1]])) {
+                error("TODO(R): ISNAN must be implemented first (doubleVec; in cdf)");
+                //return R_NaReal;
+            }
+            pprod *= pptr[positions[i - 1]]; // Multiply with previous element
+            tmp[i] = tmp[i - 1] + (1.0 - pptr[positions[i]]) * pprod;
+
+            // Break for loop as tmp[i] is already larger than pmax
+            if (tmp[i] > pmax) { break; }
+        }
+    }
+
+    // Assign correct quantile to each element in res.values.
+    // i: Loops over the quantiles we are looking for
+    // j: Loops over calculated quantiles
+    j = 0;
+    for (i = 0; i < np; i++) {
+        for (j = j; j < count; j++) {
+            if (prob[i] < tmp[j]) { res.values[i] = j; break; }
+        }
+    }
+    free(tmp); // Freeing allocated memory
+
+    return res;
+}
+
 /* Helper function for type = "pmax"
  */
 double tm_calc_pmax(int* positions, int count, double* pptr) {
@@ -156,36 +222,6 @@ double tm_calc_pmax(int* positions, int count, double* pptr) {
     return pmax; // Return as is (zero based)
 }
 
-/* Helper function for type = "quantile"
- */
-double tm_calc_quantile(int* positions, int count, double* pptr, double prob) {
-    // If the first value is NA: return NA immediately
-    if (ISNAN(pptr[positions[0]])) { return R_NaReal; }
-
-    // Initialize with (1 - p[0])
-    double cj = 1.0 - pptr[positions[0]];
-    int res = 0; // Initial quantile index
-
-    // If the probability on (1 - p[0]) is larger than the
-    // quantile we are looking for, return index 0.
-    if (cj >= prob) { return res; }
-
-    // Else looping over the remaining elements to find the
-    // quantile; as soon as found return the 'quantile index' (int).
-    // As soon as we find a missing value, return NA. If the
-    // quantile is found, immediately return the 'quantile index'.
-    if (count > 0) {
-        double pprod = 1.0; // Initialize with 1.0 for product
-        for (int i = 1; i < count; i++) {
-            if (ISNAN(pptr[positions[i - 1]])) { return R_NaReal; }
-            pprod *= pptr[positions[i - 1]]; // Multiply with previous element
-            cj    += (1.0 - pptr[positions[i]]) * pprod;
-            if (cj >= prob) { return i; }
-        }
-    }
-    // TODO(R): Is this correct?
-    return 0; // Else just return index o
-}
 
 /* Calculating elementwise pdf
  *
@@ -215,19 +251,13 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
     int    n        = LENGTH(idx);
     int    un       = LENGTH(uidx);
     bool   ewise    = asLogical(elementwise); // C boolean value
-    int    i, j;
+    int    i, j, np;
 
     // This is only used if type == "quantile"; on the R side it is ensured
     // that 'prob' is a numeric vector of LENGTH(uidx) if type = 'quantile',
     // thus we do not check it here.
     double *probptr = REAL(prob);        // Probability used for quantiles
 
-    // Allocating return vector. If ewise is FALSE the length of the
-    // vector is the same as 'un', else 'un * LENGTH(p);'.
-    int np = (!ewise) ? 1 : LENGTH(p);
-    SEXP probs;
-    PROTECT(probs = allocVector(REALSXP, un * np));
-    double *probsptr = REAL(probs);
 
     // Evaluate 'type' to define what to do. Store a set of
     // boolean values to only do the string comparison once.
@@ -237,6 +267,27 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
     bool do_q    = strcmp(thetype, "quantile") == 0;
     // ... if none of them is true, it must be "do pmax"
     // bool do_pmax = strcmp(thetype, "pmax") == 0;
+
+    // Allocating return vector.
+    // If type is "pdf" or "df" and ewise is FALSE: the length of the
+    //     vector is the same as 'un', else 'un * LENGTH(p);'.
+    SEXP res;
+    if (do_pdf | do_cdf) {
+        np = (!ewise) ? 1 : LENGTH(p);
+        PROTECT(res = allocVector(REALSXP, un * np));
+    // If type is "quantile" and ewise is FALSE: the length of the
+    //     vector is also the same length as 'un', else 'un' times LENGTH(prob);
+    } else if (do_q) {
+        np = (!ewise) ? 1 : LENGTH(prob);
+        PROTECT(res = allocVector(REALSXP, un * np));
+    // Else it is type = "pmax", so length of res is equal to 'un'.
+    } else {
+        np = 1;
+        PROTECT(res = allocVector(REALSXP, un));
+    }
+
+    // Pointer on results vector 'res'
+    double *resptr = REAL(res);
 
     // If mode is not pdf, cdf, or quantile, elementwise must be false.
     // Else we throw an error here. That is for pmax where elementwise
@@ -263,27 +314,32 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
             } else if (do_cdf) {
                 tmp = tm_calc_cdf(which.index, which.length, pptr);
             } else {
-                probsptr[i] = tm_calc_quantile(which.index, which.length, pptr, probptr[i]);
+                // Single quantile
+                if (!ewise) {
+                    tmp = tm_calc_quantile(which.index, which.length, pptr, &probptr[i], 1);
+                // Multiple quantiles (elementwise)
+                } else {
+                    tmp = tm_calc_quantile(which.index, which.length, pptr, probptr, LENGTH(prob));
+                }
             }
 
             // Store results. If !elementwise, store last value
             if (!ewise) {
-                probsptr[i] = tmp.values[tmp.length - 1];
+                resptr[i] = tmp.values[tmp.length - 1];
             // Else store the entire vector
             } else {
-                for (j = 0; j < tmp.length; j++) { probsptr[i * np + j] = tmp.values[j]; }
+                for (j = 0; j < tmp.length; j++) { resptr[i * np + j] = tmp.values[j]; }
             }
+            free(tmp.values); // Free allocated memory
         // Else it must be pmax
         } else {
-            probsptr[i] = tm_calc_pmax(which.index, which.length, pptr);
+            resptr[i] = tm_calc_pmax(which.index, which.length, pptr);
         }
-        // Free allocated memory
-        free(tmp.values);
-        free(which.index);
+        free(which.index); // Free allocated memory
     }
 
     UNPROTECT(1); // Releasing protected objects
-    return probs;
+    return res;
 }
 
 
