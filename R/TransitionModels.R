@@ -239,7 +239,8 @@ tm_predict <- function(object, newdata,
     } else if (is.null(prob)) {
         prob <- 42.0 # dummy value for C (not used if type != 'quantile')
     }
-    probs <- .Call(C_tm_predict, ui, nd$index, p, type = type, prob = prob, ncores = ncores);
+    probs <- .Call(C_tm_predict, ui, nd$index, p, type = type, prob = prob,
+                   ncores = ncores, elementwise = FALSE);
   }
 
   # -------------------
@@ -655,9 +656,9 @@ summary.tm <- function(object, ...)
 }
 
 ## formula method.
-formula.tm <- function(object, ...)
+formula.tm <- function(x, ...)
 {
-  formula(object$model)
+  formula(x$model)
 }
 
 

@@ -52,23 +52,7 @@ tmWhich find_positions(int x, int* y, int n) {
  * Note for future me: Using log-sums is slower as we need to take the
  * logarithm of each element in pptr.
  */
-/* ELEMENT-WISE VERSION, RETURNS ONE DOUBLE */
-////////double tm_calc_pdf_dbl(int* positions, int count, double* pptr) {
-////////    // If the last value is NA: return NA immediately
-////////    if (ISNAN(pptr[positions[count - 1]])) { return R_NaReal; }
-////////
-////////    // Else start calculation. As soon as we detect a missing
-////////    // value, return NA as well.
-////////    double res = 1.0; // Initialize with 1.0 for product
-////////    for (int i = 0; i < (count - 1); i++) {
-////////        if (ISNAN(pptr[positions[i]])) { return R_NaReal; }
-////////        // Calculates product over the first (count - 1) elements
-////////        res *= pptr[positions[i]];
-////////    }
-////////    // Multiplies (1 - p[count]) * the product from above
-////////    res *= (1.0 - pptr[positions[count - 1]]);
-////////    return res;
-////////}
+
 /* VECTOR VERSION, RETURNS AN OBJECT OF CLASS doubleVec,
  * used for elementwise = FALSE */
 doubleVec tm_calc_pdf(int* positions, int count, double* pptr) {

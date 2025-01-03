@@ -53,37 +53,22 @@ format.tmdist <- function(x, digits = pmax(3L, getOption("digits") - 3L), ...) {
 }
 
 
-#' tm Quantiles
-#'
-#' @param x object of class \code{"tmdist"}.
-#' @param probs numeric, numeric vector of probabilities with values in [0,1].
-#' @param drop logical TODO(R) explain.
-#' @param elementwise TODO(R) not yet implemented as we force length(x) == 1
-#' @param .. TODO(R) check and extend if needed.
-#'
-#' At the end there will be one man page for tmdist.
-quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ...) {
-    stopifnot("currently only designed length 1" = length(x) == 1L)
-    # Convert input to data.frame; expand data.frame (make a copy
-    # of the data.frame for each element in 'probs' such that we can
-    # call tm_predict only once).
-    ui <- seq_along(probs) # 'unique index'
-    x  <- as.data.frame(x)
-    x  <- lapply(ui, function(i, x) { x$index <- i; return(x) }, x = x)
-    x  <- do.call(rbind, x)
-    # TODO(R): Currently no OpenMP (ncores = 1L)
-    warning("elementwise = NULL equals boolean elementwise = 1 on the C end; needs adaption");
-    .Call("tm_predict", ui, x$index, p = x$tp, type = "quantile", prob = probs, 1L, elementwise = elementwise)
+log_pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
+    return(log(pdf(d, x, drop = drop, elementwise = elementwise, ncores = ncores, ...)))
 }
 
-pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ...) {
+pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
     stopifnot("currently only designed length 1" = length(d) == 1L)
 
-    # TODO(R): Hack
-    if (is.null(elementwise)) {
-        elementwise <- FALSE
-        warning("pdf.tmdist; setting elementwise FALSE if is NULL, requires some work")
-    }
+    ## Get number of cores for OpenMP parallelization
+    ncores <- tm_get_number_of_cores(ncores, FALSE)
+
+    # Guessing elementwise if set NULL
+    if (is.null(elementwise)) elementwise <- !length(x) == length(d)
+
+    if (!elementwise & length(x) > length(d))
+        stop("length of 'x' can't be larger than number of distributions in 'd'",
+             "if elementwise = FALSE");
 
     # Setting up all unique combinations needed
     # (1) Use same 'x' for all distributions
@@ -95,7 +80,7 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ...) {
         tmp <- as.data.frame(d[grd$d])
         cutoff <- tmp$bin[which.min(abs(tmp$binmid - grd$p))]
         tmp$index <- grd$index
-        subset(tmp, bin <= cutoff)
+        tmp[tmp$bin <= cutoff, ]
     }
 
     # If there is one distribution and one point at which to evaluate this
@@ -122,9 +107,10 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ...) {
     } else {
         stop(" --- TODO(R): Can we end up here, and if so, why? Work needed --- ")
     }
-    # TODO(R): Currently no OpenMP (ncores = 1L)
+
+    ## Calling C to calculate the required PDFs
     res <- .Call("tm_predict", ui, d$index, p = d$tp, type = "pdf", prob = 42,
-                 ncores = 1L, elementwise = elementwise)
+                 ncores = ncores, elementwise = elementwise)
 
     if (elementwise) {
         res <- matrix(res, ncol = length(x),
@@ -137,18 +123,22 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ...) {
 }
 
 
-cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ...) {
+cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
     stopifnot("currently only designed length 1" = length(d) == 1L)
 
-    # TODO(R): Hack
-    if (is.null(elementwise)) {
-        elementwise <- FALSE
-        warning("cdf.tmdist; setting elementwise FALSE if is NULL, requires some work")
-    }
+    ## Get number of cores for OpenMP parallelization
+    ncores <- tm_get_number_of_cores(ncores, FALSE)
 
     # Setting up all unique combinations needed
     # (1) Use same 'x' for all distributions
     if (length(x) == 1 && length(d) > 1L) x <- rep(x, length(d))
+
+    # Guessing elementwise if set NULL
+    if (is.null(elementwise)) elementwise <- !length(x) == length(d)
+
+    if (!elementwise & length(x) > length(d))
+        stop("length of 'x' can't be larger than number of distributions in 'd'",
+             "if elementwise = FALSE");
 
     # Scopes 'd' and 'grd'
     fn <- function(i) {
@@ -183,9 +173,10 @@ cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ...) {
     } else {
         stop(" --- TODO(R): Can we end up here, and if so, why? Work needed --- ")
     }
-    # TODO(R): Currently no OpenMP (ncores = 1L)
+
+    ## Calling C to calculate the required CDFs
     res <- .Call("tm_predict", ui, d$index, p = d$tp, type = "cdf", prob = 42,
-                 ncores = 1L, elementwise = elementwise)
+                 ncores = ncores, elementwise = elementwise)
 
     if (elementwise) {
         res <- matrix(res, ncol = length(x),
@@ -197,32 +188,47 @@ cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ...) {
   #apply_dpqr(d = d, FUN = FUN, at = x, type = "density", drop = drop, elementwise = elementwise)
 }
 
-quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ...) {
-    stopifnot("currently only designed length 1" = length(d) == 1L)
+quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
+    stopifnot("currently only designed length 1" = length(x) == 1L)
 
-    # TODO(R): Hack
-    if (is.null(elementwise)) {
-        elementwise <- FALSE
-        warning("cdf.tmdist; setting elementwise FALSE if is NULL, requires some work")
-    }
+    ## Get number of cores for OpenMP parallelization
+    ncores <- tm_get_number_of_cores(ncores, FALSE)
+
+    # Guessing elementwise if set NULL
+    if (is.null(elementwise)) elementwise <- !length(x) == length(x)
 
     # Setting up all unique combinations needed
     # (1) Use same 'x' for all distributions
-    if (length(probs) == 1 && length(d) > 1L) probs <- rep(probs, length(d))
+    if (length(probs) == 1 && length(x) > 1L) probs <- rep(probs, length(x))
 
-    if (!elementwise & length(probs) > length(d))
+    if (!elementwise & length(probs) > length(x))
         stop("length of 'probs' can't be larger than number of distributions in 'd'",
              "if elementwise = FALSE");
 
     if (elementwise) probs <- sort(probs) # Important
 
-    ui <- seq_along(d)
-    d <- as.data.frame(d)
-    d$index <- 1L # TODO(R) Only works if length(d) == 1
+    ui <- seq_along(x)
+    x <- as.data.frame(x)
+    x$index <- 1L # TODO(R) Only works if length(d) == 1
 
-    # TODO(R): Currently no OpenMP (ncores = 1L)
-    res <- .Call("tm_predict", ui, d$index, p = d$tp, type = "quantile", prob = probs,
-                 ncores = 1L, elementwise = elementwise)
+    ## Calling C to calculate the required quantiles
+    res <- .Call("tm_predict", ui, x$index, p = x$tp, type = "quantile", prob = probs,
+                 ncores = ncores, elementwise = elementwise)
+
+    # Translate quantile bins to numeric values (binmid)
+    bin2num <- function(x, d, p, ewise) {
+        idx <- if (ewise) rep(1L, length(p)) else 1L
+        x   <- data.frame(bin = res, index = idx)
+        res <- merge(d, x, by = c("bin", "index"), all.x = FALSE, all.y = TRUE)
+        return(res[order(res$index, res$bin), "binmid", drop = TRUE])
+    }
+    res <- bin2num(res, x, probs, elementwise)
+
+    # If elementwise: Return matrix of dimension length(d) x length(probs)
+    if (elementwise) {
+        res <- matrix(res, ncol = length(probs),
+                      dimnames = list(NULL, paste("q", format(probs, digits = 3), sep = "_")))
+    }
 
     return(res)
   #FUN <- function(at, d) qempirical(at, y = as.matrix(d), ...)
@@ -230,3 +236,32 @@ quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ...) {
 }
 
 
+median.tmdist <- function(x, ...) {
+    quantile(x, probs = 0.5, ...)
+}
+
+
+## Draw random values
+random.tmdist <- function(x, n = 1L, drop = TRUE, ...) {
+    stopifnot("currently only designed length 1" = length(x) == 1L)
+
+    ## Helper function, draw weighted sample of length 'n'.
+    ## Scoping 'x' and 'n'
+    fn <- function(i) {
+        tmp     <- as.data.frame(x[i])
+        tmp$pdf <- as.numeric(pdf(x[i], tmp$binmid))
+        sample(tmp$binmid, size = n, prob = tmp$pdf, replace = TRUE)
+    }
+    res <- lapply(seq_along(x), fn)
+
+    res <- if (length(res) > 1) rbind(res) else res[[1]]
+    return(res)
+}
+
+mean.tmdist <- function(x, ...) {
+    stopifnot("currently only designed length 1" = length(x) == 1L)
+    d <- as.data.frame(x)
+    d$pdf <- as.numeric(pdf(x, d$binmid))
+    print(d)
+    return(sum(d$pdf * d$binmid))
+}

@@ -20,8 +20,8 @@ Description: Provides infrastructure for estimating flexible transition models,
   supporting both count and continuous responses. For continuous responses, a 
   slicing trick is applied to estimate fully probabilistic models. 
 License: GPL-2 | GPL-3
-Depends: R (>= 4.1.0), mgcv, topmodels
+Depends: R (>= 4.1.0), mgcv, topmodels, distributions3
 Imports: Formula
-Suggests: colorspace, distributions3, nnet, quarto
+Suggests: colorspace, nnet, quarto
 VignetteBuilder: quarto
 

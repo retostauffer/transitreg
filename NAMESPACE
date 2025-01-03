@@ -13,7 +13,10 @@ importFrom("stats", "median", "runif", "coef",
   "as.formula", "binomial", "density", "dnorm",
   "fitted", "lm", "model.frame", "model.response", "na.omit",
   "pnorm", "ppoints", "predict", "qnorm", "qqnorm",
-  "quantile", "residuals", "sd", "terms", "update")
+  "quantile", "residuals", "sd", "terms", "update",
+  "formula", "setNames")
+
+importFrom("distributions3", "pdf", "log_pdf", "cdf", "random")
 
 export(
   "tm",
@@ -38,6 +41,10 @@ S3method(as.data.frame,  tmdist)
 S3method(format,         tmdist)
 S3method(quantile,       tmdist)
 S3method(pdf,            tmdist)
+S3method(log_pdf,        tmdist)
 S3method(cdf,            tmdist)
 S3method(quantile,       tmdist)
+S3method(median,         tmdist)
+S3method(mean,           tmdist)
+S3method(random,         tmdist)
 
