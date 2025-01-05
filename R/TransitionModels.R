@@ -553,7 +553,9 @@ timer(NULL)
   if (useC) {
     ## c_tm_predict_pdfcdf returns a list with PDF and CDF, calculating
     ## both simultanously in C to improve speed.
+cat("--- calling C_tm_predict_pdfcdf\n")
     tmp    <- .Call(C_tm_predict_pdfcdf, uidx = ui, idx = tmf$index, p = p, ncores = ncores)
+cat("--- end of C_tm_predict_pdfcdf\n")
     probs  <- tmp$pdf
     cprobs <- tmp$cdf
     rm(tmp)

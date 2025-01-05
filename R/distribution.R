@@ -7,18 +7,62 @@
 #' a series of \code{K} numeric values representing the (center of) the
 #' corresponding bins.
 #'
+#' @param x one (or multiple) transitionmodel distributions. See section
+#'        'Input' for more details.
 #' @param probs numeric vector with transition probabilities (0, ..., K).
 #' @param bins numeric vector with numeric value for bin 0, ..., K.
 #'
+#' @section Input:
+#' In contrast to may parametric distributions, a 'tm' distribution
+#' does not consist of a set of distribution parameters, but of a set
+#' of transition probabilities (\code{tp}) and a set of 'bins' (same length
+#' as \code{tp}). The \code{tp}s define the probability that that an observation
+#' is larger than the current one (in terms of \code{bins}).
+#'
+#' This constructor function allows for different input formats for convenience,
+#' and tries to accomodate everything that easy to detect and not ambiguous.
+#' For all cases covered the following conditions must be met:
+#'
+#' * Both (\code{tp}, \code{bins}) must be numeric and of same length.
+#' * \code{tp} must be in the range of \code{[0, 1]}
+#'   (for now; TODO(R): Do we always need the full distribution or is it enough if
+#'    we allow for 'partial' ones? If cut at the upper end it may be OK, but
+#'    if cut at the lower that goes wrong at all times, right?).
+#' * \code{bins} must be monotonically increasing (sorted).
+#'
+#' Input argument \code{x} can be:
+#'
+#' 1. Named list or data.frame with two elements: \code{tp} and \code{bins}.
+#' 2. Unnamed list of length 2, expecting the first entry to be \code{tp},
+#'    the second \code{bins}.
+#'
+#'
 #' @return Returns an object of class \code{c("tmdist", "distribution")}.
 #' @author Reto
-tmdist <- function(probs, bins) {
+tmdist <- function(x) {
+    k <- tmdist_convert_input(x)
+    print(k)
+    stop()
+
     stopifnot(is.numeric(probs), is.numeric(bins), length(probs) == length(bins))
     n <- length(probs)
     x <- c(setNames(as.list(probs), sprintf("tp_%d", seq_len(n) - 1L)),
            setNames(as.list(bins),  sprintf("bin_%d", seq_len(n) - 1)))
     x <- as.data.frame(x)
     class(x) <- c("tmdist", "distribution")
+    return(x)
+}
+
+tmdist_convert_input <- function(x) {
+    # Unnamed list of length 2; where each entry in x is a vector
+    if (is.list(x) && all(sapply(x, is.atomic)) && length(x) == 2L && is.null(names(x))) {
+        x <- data.frame(tp = x[[1]], bins = x[[2]])
+        stopifnot(all(sapply(x, is.numeric)))
+        stopifnot(all(x$tp >= 0 & x$tp <= 1))
+        stopifnot(all(diff(x$bins) >= 0))
+    } else {
+        stop("Problem converting user input to 'tm distribution'")
+    }
     return(x)
 }
 

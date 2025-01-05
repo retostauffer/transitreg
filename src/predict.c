@@ -327,7 +327,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
 }
 
 
-/* Calculating elementwise pdf and cdf (both at the same time)
+/* Calculating pdf and cdf (both at the same time)
  *
  * @param uidx integer vector with unique indices in data.
  * @param idx integer with indices, length of idx is sample size times breaks.
@@ -342,8 +342,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
  * 
  * @return Returns SEXP double vector of length (length(uidx)).
  */
-SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p,
-                       SEXP ncores, SEXP elementwise) {
+SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores) {
 
     double *pptr    = REAL(p);
     int    *uidxptr = INTEGER(uidx);  // Unique indices in the dtaa
@@ -369,7 +368,7 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p,
 
     /* Warning for future me: Do not use Rprintf inside omp -> segfault */
     #if OPENMP_ON
-    #pragma omp parallel for num_threads(nthreads) private(which)
+    #pragma omp parallel for num_threads(nthreads) private(which, tmppdf, tmpcdf)
     #endif
     for (i = 0; i < un; i++) {
         which = find_positions(uidxptr[i], idxptr, n);
