@@ -53,11 +53,6 @@ library("TransitionModels")
 library("qgam")
 library("gamlss2")
 library("gamlss.cens")
-
-data("WeatherGermany", package = "WeatherGermany")
-
-WeatherGermany$yday <- as.POSIXlt(WeatherGermany$date)$yday
-WeatherGermany$year <- as.POSIXlt(WeatherGermany$date)$year + 1900
 @
 
 \begin{document}
@@ -338,10 +333,13 @@ if(!file.exists("ts_hist.png")) {
 
   m2 <- tm(f, data = dtrain, breaks = breaks2)
 
-  f <- Surv(sqrt_pre, sqrt_pre > 0) ~ s(day,bs="cc") | s(day,bs="cc")
+  f <- Surv(sqrt_pre, sqrt_pre > 0) ~ s(day,k=20,bs="cc") | s(day,k=20,bs="cc")
   b2 <- gamlss2(f, data = dtrain, family = NOlc)
 
   qu <- c(0.8, 0.9, 0.99)
+
+  g2 <- mqgam(sqrt_pre ~ s(day,k=20,bs="cc"), data = dtrain, qu = qu)
+
   nd <- data.frame("day" = 0:365)
   pm2 <- do.call("cbind",
     lapply(qu, function(j) {
@@ -354,18 +352,24 @@ if(!file.exists("ts_hist.png")) {
       b2$family$q(j, par)
   }))
 
-  err_b <- err_m <- NULL
-  qu <- 0.99
-  for(j in seq_along(qu)) {
+  pg2 <- do.call("cbind",
+    lapply(qu, function(j) {
+      qdo(g2, j, predict, newdata = dtest)
+  }))
+
+  err_b <- err_m <- err_g <- NULL
+  for(j in 3) {
     err_b <- c(err_b, qgam::pinLoss(dtest$sqrt_pre, pb2[, j], qu[j]))
     err_m <- c(err_m, qgam::pinLoss(dtest$sqrt_pre, pm2[, j], qu[j]))
+    err_g <- c(err_g, qgam::pinLoss(dtest$sqrt_pre, pg2[, j], qu[j]))
   }
   err_b <- sum(err_b)
   err_m <- sum(err_m)
+  err_g <- sum(err_g)
 
-  png("ts_hist.png", units = "in", res = 200, width = 8, height = 3.1)
+  png("ts_hist.png", units = "in", res = 200, width = 8, height = 4)
 
-  par(mfrow = c(1, 2), mar = c(4, 4, 0, 1))
+  par(mfrow = c(1, 2), mar = c(4, 4, 1, 1))
 
   hist(df$sqrt_pre, breaks = breaks, freq = FALSE,
     xlab = "sqrt(Precipitation)", main = "")
@@ -374,19 +378,20 @@ if(!file.exists("ts_hist.png")) {
   lines(dm ~ mids, col = 4, lwd = 2)
   rug(df$sqrt_pre, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
 
-  legend("center", c("Censored Normal", "Transition Model"),
+  legend("center", c("CN", "TM"),
     lwd = 2, col = c(2, 4), bty = "n")
 
   plot(sqrt_pre ~ day, data = dtest, type = "h", col = rgb(0.1, 0.1, 0.1, alpha = 0.4),
-    xlab = "Day of the year", ylab = "sqrt(Precipitation)")
+    xlab = "Day of the year", ylab = "sqrt(Precipitation)", ylim = c(0, 11))
 
   j <- order(dtest$day)
-  matplot(dtest$day[j], pb2[j, ], type = "l", lty = 1, col = 2, add = TRUE)
-  matplot(dtest$day[j], pm2[j, ], type = "l", lty = 1, col = 4, add = TRUE)
+  matplot(dtest$day[j], pb2[j, 3], type = "l", lty = 1, col = 2, add = TRUE)
+  matplot(dtest$day[j], pg2[j, 3], type = "l", lty = 1, col = 5, add = TRUE)
+  matplot(dtest$day[j], pm2[j, 3], type = "l", lty = 1, col = 4, add = TRUE)
 
-  legend("topleft", paste(c("CN 99%-Q Err. =", "TM 99%-Q Err. ="),
-      round(c(err_b, err_m))),
-    lwd = 2, col = c(2, 4), bty = "n")
+  legend("topleft", paste(c("CN 99%-Q Err. =", "QR 99%-Q Err. =", "TM 99%-Q Err. ="),
+      round(c(err_b, err_g, err_m))),
+    lwd = 2, col = c(2, 5, 4), bty = "n")
 
   dev.off()
 }
