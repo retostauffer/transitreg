@@ -336,7 +336,7 @@ if(!file.exists("ts_hist.png")) {
   f <- Surv(sqrt_pre, sqrt_pre > 0) ~ s(day,k=20,bs="cc") | s(day,k=20,bs="cc")
   b2 <- gamlss2(f, data = dtrain, family = NOlc)
 
-  qu <- c(0.8, 0.9, 0.99)
+  qu <- c(0.01, 0.1, 0.5, 0.9, 0.99)
 
   g2 <- mqgam(sqrt_pre ~ s(day,k=20,bs="cc"), data = dtrain, qu = qu)
 
@@ -358,7 +358,7 @@ if(!file.exists("ts_hist.png")) {
   }))
 
   err_b <- err_m <- err_g <- NULL
-  for(j in 3) {
+  for(j in 1:3) {
     err_b <- c(err_b, qgam::pinLoss(dtest$sqrt_pre, pb2[, j], qu[j]))
     err_m <- c(err_m, qgam::pinLoss(dtest$sqrt_pre, pm2[, j], qu[j]))
     err_g <- c(err_g, qgam::pinLoss(dtest$sqrt_pre, pg2[, j], qu[j]))
@@ -385,18 +385,18 @@ if(!file.exists("ts_hist.png")) {
     xlab = "Day of the year", ylab = "sqrt(Precipitation)", ylim = c(0, 11))
 
   j <- order(dtest$day)
-  matplot(dtest$day[j], pb2[j, 3], type = "l", lty = 1, col = 2, add = TRUE)
-  matplot(dtest$day[j], pg2[j, 3], type = "l", lty = 1, col = 5, add = TRUE)
-  matplot(dtest$day[j], pm2[j, 3], type = "l", lty = 1, col = 4, add = TRUE)
+  matplot(dtest$day[j], pb2[j, ], type = "l", lty = 1, col = 2, add = TRUE)
+  matplot(dtest$day[j], pg2[j, ], type = "l", lty = 1, col = 5, add = TRUE)
+  matplot(dtest$day[j], pm2[j, ], type = "l", lty = 1, col = 4, add = TRUE)
 
-  legend("topleft", paste(c("CN 99%-Q Err. =", "QR 99%-Q Err. =", "TM 99%-Q Err. ="),
+  legend("topleft", paste(c("CN pinLoss =", "QR pinLoss =", "TM pinLoss ="),
       round(c(err_b, err_g, err_m))),
     lwd = 2, col = c(2, 5, 4), bty = "n")
 
   dev.off()
 }
 @
-\includegraphics[width=1  \textwidth]{ts_hist.png}
+\includegraphics[width=0.9\textwidth]{ts_hist.png}
 \caption{\label{fig:data} Precipitation data for the Brocken region in Germany.
   The left panel illustrates the seasonal variation in square root-transformed 
   precipitation values, with empirical quantiles (1st, 10th, 50th, 90th, and 99th 
