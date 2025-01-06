@@ -397,7 +397,7 @@ if(!file.exists("ts_hist.png")) {
 }
 @
 \includegraphics[width=0.9\textwidth]{ts_hist.png}
-\caption{\label{fig:data} Precipitation data for Kirchberg in Tirol region in Austria.
+\caption{\label{fig:data} Precipitation data for Kirchberg in Tirol in Austria.
   The left panel illustrates the seasonal variation in square root-transformed 
   precipitation values, with empirical quantiles (1st, 10th, 50th, 90th, and 99th 
   percentiles) plotted for each day of the year. The right panel presents a histogram
