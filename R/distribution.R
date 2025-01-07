@@ -169,7 +169,7 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
     ## binmid: Required as we need to know where to stop.
     ## y: threshold at which to evaluate the pdf.
     print(x)
-    res <- .Call("tm_predict", uidx = ui, idx = d$index, tp = d$tp, binmid = NA_real_, y = x,
+    res <- .Call("tm_predict", uidx = ui, idx = d$index, tp = d$tp, binmid = d$binmid, y = x,
                  type = "pdf", ncores = ncores, elementwise = elementwise)
     print(res)
     print(head(d))

@@ -47,10 +47,14 @@ tmWhich find_positions(int x, int* y, int n) {
 
 /* Helper function for type = "pdf" */
 doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny) {
+    int i;
+
     // Initialize return value/object
     doubleVec res;
     res.values = (double*)malloc(ny * sizeof(double));  // Allocate vector result
     res.length = ny;
+
+    for (i = 0; i < ny; i++) { res.values[i] = NA_REAL; }
 
     if (res.values == NULL) { error("Memory allocation failed for doubleVec.values."); }
 
@@ -58,17 +62,41 @@ doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidpt
     // iterate trough the entire tp vector and store the very last value.
     bool nobm = ISNAN(binmidptr[0]);
 
+    // This counter is used to keep track of the current index of 'y'
+    // we are calculating; defines in which res.value to write the result.
+    // Only used if binmidptr is not NA, used to evaluate the PDF at one
+    // or multiple positions defined by 'y'.
+    // The 'nobm' mode is used by tm() when estimating the model.
+    int yi = 0;
+
     // Start calculating
     double prod = 1.0; // Initialize product
-    for (int i = 0; i < count; i++) {
+    for (i = 0; i < count; i++) {
         if (ISNAN(tpptr[positions[i]])) {
             error("TODO(R): First element ISNAN, must be adressed in C");
             //return R_NaReal; 
         }
         // If 'nobm' is true (we have no binmidptr) we only need the PDF
-        // of the final bin; overwrite res.values[0] in each iteration.
-        res.values[(nobm) ? 0 : i] = prod * (1.0 - tpptr[positions[i]]);
-        // Updating vector product
+        // of the final bin; overwrite res.values[yi == 0] in each iteration;
+        // yi stays unchanges. Else we check if we are closer to the next binmid
+        // than to the current. If so, we must increase yi.
+        if (!nobm) {
+            printf("xxxxxxx requires some logic and distance measures and stuff");
+
+            if (i < (count - 1)) {
+                // If closer to the next bin than to the current, update yi
+                if (fabs(y[yi] - binmidptr[i + 1]) < fabs(binmidptr[i] - y[yi])) { yi++; }
+            }
+        }
+
+        // Store PDF
+        res.values[yi] = prod * (1.0 - tpptr[positions[i]]);
+
+        // If yi exceeds ny (only used if '!nobm') job done, return
+        if (yi >= ny) { break; } // Job done
+printf(" yi = %d    ny = %d\n", yi, ny);
+
+        // Updating product of transition probabilities
         prod *= tpptr[positions[i]];
     }
     return res;
