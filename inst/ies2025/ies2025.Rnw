@@ -291,6 +291,14 @@ discretization approach is a consistent method for approximating the smooth CDF 
 
 \section{Application} \label{sec:application}
 
+In this application, we analyze 30 years of precipitation data from the Tyrolean Alps to estimate a 
+climatology for precipitation. Figure~\ref{fig:Kirchberg} visualizes the raw data for the station 
+Kirchberg in Tirol. The left panel presents a histogram of the square root-transformed precipitation 
+values, overlaid with density estimates from a parametric censored normal (CN) model and a
+transition model (TM). Notably, the TM captures the inherent structure of the data more effectively, 
+particularly the spike at zero precipitation. This demonstrates the flexibility of the TM approach, 
+allowing it to directly model key features such as excess zeros.
+
 \begin{figure}[!ht]
 \centering
 %% \setkeys{Gin}{width=1\textwidth}
