@@ -1,5 +1,4 @@
 
-
 #' Creates a tm Distribution
 #'
 #' A tm distrubiton consists of a series of \code{K} transition
@@ -40,60 +39,99 @@
 #' @return Returns an object of class \code{c("tmdist", "distribution")}.
 #' @author Reto
 tmdist <- function(x) {
-    k <- tmdist_convert_input(x)
-    print(k)
-    stop()
+    # Converting input into a list of data.frames. The lengt of the list
+    # corresponds to the number of distributions, whereof each element is a
+    # data.frame with the transition probabilities and bins.
+    x <- tmdist_convert_input(x)
+    if (is.data.frame(x)) x <- list(x)
 
-    stopifnot(is.numeric(probs), is.numeric(bins), length(probs) == length(bins))
-    n <- length(probs)
-    x <- c(setNames(as.list(probs), sprintf("tp_%d", seq_len(n) - 1L)),
-           setNames(as.list(bins),  sprintf("bin_%d", seq_len(n) - 1)))
-    x <- as.data.frame(x)
-    class(x) <- c("tmdist", "distribution")
-    return(x)
+    # Sanity check on the newly created list of data.frames
+    # Sanity check my data.frames
+    check_dfs <- function(y) {
+        print(str(y))
+        stopifnot(all(y$tp >= 0 & y$tp <= 1))
+        stopifnot(all(diff(y$bins) >= 0))
+        stopifnot(all(sapply(y, is.numeric)))
+    }
+    lapply(x, check_dfs)
+
+    # Find max length of the dfs
+    nmax <- max(sapply(x, nrow))
+
+    # Helper function to create the names for the matrix (and the matrix inserts)
+    get_names <- function(n)
+        c(sprintf("tp_%d",  seq_len(n) - 1L), sprintf("bin_%d", seq_len(n) - 1L))
+
+    # Convert from long to wide matrix; scopes 'mat' and 'x'
+    df_to_mat <- function(y, m) {
+        y <- setNames(unlist(y), get_names(nrow(y))) # Create named vector
+        m[, names(y)] <- unname(y) # Inserting values into matrix
+        return(m)
+    }
+    m <- matrix(NA, 1, ncol = 2 * nmax, dimnames = list(NULL, get_names(nmax)))
+
+    # Converting to data.frame, adding custom class, and return.
+    res <- lapply(x, df_to_mat, m = m)
+    res <- as.data.frame(do.call(rbind, res))
+
+    class(res) <- c("tmdist", "distribution")
+    return(res)
 }
 
 tmdist_convert_input <- function(x) {
     # Unnamed list of length 2; where each entry in x is a vector
     if (is.list(x) && all(sapply(x, is.atomic)) && length(x) == 2L && is.null(names(x))) {
         x <- data.frame(tp = x[[1]], bins = x[[2]])
-        stopifnot(all(sapply(x, is.numeric)))
-        stopifnot(all(x$tp >= 0 & x$tp <= 1))
-        stopifnot(all(diff(x$bins) >= 0))
+    # Named list
+    } else if (is.list(x) && all(c("tp", "bins") %in% names(x))) {
+        stopifnot(length(x$bins) == length(x$tp))
+        x <- as.data.frame(x[c("tp", "bins")])
+    # Else we expect to have gotten a series of distributions,
+    # so we call this function again to convert them if possible
+    } else if (is.list(x)) {
+        # TODO(R): That is no safe idea!
+        x <- lapply(x, tmdist_convert_input)
+    # Else we don't really know what to do.
     } else {
         stop("Problem converting user input to 'tm distribution'")
     }
+    #lapply(x, check_values)
     return(x)
 }
 
 # Convert one tmdist distributions into data.frame
 as.data.frame.tmdist <- function(x, ...) {
-    stopifnot("currently only designed length 1" = length(x) == 1L)
-    x <- na.omit(unlist(x)) # Convert to named numeric vector
-    p <- x[grepl("^tp_", names(x))] # probs
-    names(p) <- gsub("^tp_", "", names(p))
-    b <- x[grepl("^bin_", names(x))] # bins
-    names(b) <- gsub("^bin_", "", names(b))
-    stopifnot(identical(names(p), names(b)))
-    x <- data.frame(bin    = as.numeric(names(p)),
-                    tp     = as.numeric(p),
-                    binmid = as.numeric(b))
-    x[order(x$bin), ]
+
+    class(x) <- "data.frame"
+    idx_tp <- grepl("^tp_", names(x))
+    idx_bm <- grepl("^bin_", names(x))
+    binid  <- names(x)[idx_tp]
+    binid  <- as.integer(regmatches(binid, regexpr("[0-9]+$", binid)))
+
+    x <- t(as.matrix(x))
+    res <- data.frame(index  = rep(seq_len(ncol(x)), each = length(binid)),
+                      bin    = rep(binid, ncol(x)),
+                      tp     = as.numeric(x[idx_tp, ]),
+                      binmid = as.numeric(x[idx_bm, ]))
+
+    return(na.omit(res))
 }
 
 # TODO(R): Currently testing for one distribution only
 format.tmdist <- function(x, digits = pmax(3L, getOption("digits") - 3L), ...) {
-    stopifnot("currently only designed length 1" = length(x) == 1L)
     if (length(x) < 1L) return(character(0))
-    n <- names(x) # Keep for later
+    xnames <- names(x) # Keep for later
 
     # Extracting probabilites and bins
-    x <- as.data.frame(x)
+    fmt <- function(i, x) {
+        y <- as.data.frame(x[i])
+        sprintf("tm distribution (%s:%d <--> %s:%d)",
+                format(min(y$binmid), digits = digits), min(y$bin),
+                format(max(y$binmid), digits = digits), max(y$bin))
+    }
 
-    f <- sprintf("tm distribution (%s:%d <--> %s:%d)",
-                 format(min(x$binmid), digits = digits), min(x$bin),
-                 format(max(x$binmid), digits = digits), max(x$bin))
-    setNames(f, n)
+    f <- sapply(seq_along(x), fmt, x = x)
+    setNames(f, xnames)
 }
 
 
@@ -233,17 +271,20 @@ cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
 }
 
 quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
-    stopifnot("currently only designed length 1" = length(x) == 1L)
-
     ## Get number of cores for OpenMP parallelization
     ncores <- tm_get_number_of_cores(ncores, FALSE)
 
     # Guessing elementwise if set NULL
     if (is.null(elementwise)) elementwise <- !length(x) == length(x)
 
+    xnames <- names(x) # Keep for later
+
+    # Number of probabilities
+    nprobs <- length(probs)
+
     # Setting up all unique combinations needed
     # (1) Use same 'x' for all distributions
-    if (length(probs) == 1 && length(x) > 1L) probs <- rep(probs, length(x))
+    if (nprobs == 1L && length(x) > 1L) probs <- rep(probs, length(x))
 
     if (!elementwise & length(probs) > length(x))
         stop("length of 'probs' can't be larger than number of distributions in 'd'",
@@ -251,32 +292,35 @@ quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = 
 
     if (elementwise) probs <- sort(probs) # Important
 
-    ui <- seq_along(x)
-    x <- as.data.frame(x)
-    x$index <- 1L # TODO(R) Only works if length(d) == 1
+    ui <- seq_along(x) # Unique index
+    x  <- as.data.frame(x) # convert distributions to data.frame
 
     ## Calling C to calculate the required quantiles
     res <- .Call("tm_predict", ui, x$index, p = x$tp, type = "quantile", prob = probs,
                  ncores = ncores, elementwise = elementwise)
 
+    cat(" .Call res\n")
+    print(res)
     # Translate quantile bins to numeric values (binmid)
-    bin2num <- function(x, d, p, ewise) {
-        idx <- if (ewise) rep(1L, length(p)) else 1L
-        x   <- data.frame(bin = res, index = idx)
+    bin2num <- function(x, d, np, ewise) {
+        idx <- rep(ui, each = if (ewise) np else 1L)
+        # 'order' is used to recreate the correct order before return
+        x   <- data.frame(order = seq_along(idx), index = idx, bin = res)
         res <- merge(d, x, by = c("bin", "index"), all.x = FALSE, all.y = TRUE)
-        return(res[order(res$index, res$bin), "binmid", drop = TRUE])
+        return(res[order(res$order), "binmid", drop = TRUE])
     }
-    res <- bin2num(res, x, probs, elementwise)
+    res <- bin2num(res, x, nprobs, elementwise)
+    print(res)
 
     # If elementwise: Return matrix of dimension length(d) x length(probs)
     if (elementwise) {
         res <- matrix(res, ncol = length(probs),
-                      dimnames = list(NULL, paste("q", format(probs, digits = 3), sep = "_")))
+                      dimnames = list(xnames, paste("q", format(probs, digits = 3), sep = "_")))
+        return(as.data.frame(res))
+    # Else return named vector
+    } else {
+        return(setNames(res, xnames))
     }
-
-    return(res)
-  #FUN <- function(at, d) qempirical(at, y = as.matrix(d), ...)
-  #apply_dpqr(d = x, FUN = FUN, at = probs, type = "quantile", drop = drop, elementwise = elementwise)
 }
 
 
