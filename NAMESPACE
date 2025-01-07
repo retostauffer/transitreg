@@ -9,7 +9,7 @@ importFrom("grDevices", "rgb")
 importFrom("graphics", "barplot", "grid", "hist", "lines", "par",
   "points", "rug")
 
-importFrom("stats", "median", "runif", "coef",
+importFrom("stats", "median", "runif", "coef", "formula",
   "as.formula", "binomial", "density", "dnorm",
   "fitted", "lm", "model.frame", "model.response", "na.omit",
   "pnorm", "ppoints", "predict", "qnorm", "qqnorm",
