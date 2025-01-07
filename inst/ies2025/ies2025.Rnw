@@ -389,7 +389,7 @@ if(!file.exists("ts_hist.png")) {
   matplot(dtest$day[j], pg2[j, ], type = "l", lty = 1, col = 5, add = TRUE)
   matplot(dtest$day[j], pm2[j, ], type = "l", lty = 1, col = 4, add = TRUE)
 
-  legend("topleft", paste(c("CN pinLoss =", "QR pinLoss =", "TM pinLoss ="),
+  legend("topleft", paste(c("CN PBL =", "QR PBL =", "TM PBL ="),
       round(c(err_b, err_g, err_m))),
     lwd = 2, col = c(2, 5, 4), bty = "n")
 
@@ -397,14 +397,48 @@ if(!file.exists("ts_hist.png")) {
 }
 @
 \includegraphics[width=0.9\textwidth]{ts_hist.png}
-\caption{\label{fig:data} Precipitation data for Kirchberg in Tirol in Austria.
-  The left panel presents a histogram of the square root-transformed precipitation values,
-  overlaid with the fitted densities of a censored normal distribution (CN, red line)
-  and a transition model (TM, blue line).
-  The right panel illustrates the seasonal variation in square root-transformed 
-  precipitation values, with empirical quantiles (1st, 10th, 50th, 90th, and 99th 
-  percentiles) plotted for each day of the year. Estimates are shown for CN, TM and
-  a quantile regression model (QR) together with the respective pin loss.}
+\caption{\label{fig:Kirchberg} Precipitation data for Kirchberg in Tirol, Austria.
+  The left panel shows a histogram of the square root-transformed daily precipitation values,
+  overlaid with fitted densities from a censored normal distribution (CN, red line) and
+  a transition model (TM, blue line). The right panel depicts the seasonal variation in
+  square root-transformed precipitation values, including empirical quantiles
+  (1st, 10th, 50th, 90th, and 99th percentiles) for each day of the year.
+  Quantile estimates (out-of-sample) are provided for CN, TM, and a quantile regression model (QR),
+  along with their respective pinball loss (PBL) values, demonstrating the models' performance
+  in capturing the distribution of precipitation.}
+\end{figure}
+
+\begin{figure}[!ht]
+\centering
+%% \setkeys{Gin}{width=1\textwidth}
+<<echo=FALSE, results=hide>>=
+if(!file.exists("premodel.png") & FALSE) {
+  d <- readRDS("../ehydTirol_Tageschniederschlagssummen.rds")
+  d <- subset(d, date >= (max(date) - 365*30))
+  d$sqrt_pre <- sqrt(d$value)
+  d$day <- as.POSIXlt(d$date)$yday
+
+  stations <- unique(d$name)
+
+  set.seed(123)
+  i <- sample(stations, size = floor(length(stations) * 0.6))
+
+  dtrain <- subset(d, name %in% i)
+  dtest <- subset(d, !(name %in% i))
+
+  breaks <- c(-0.025, seq(0.025, floor(max(d$sqrt_pre)) + 1, by = 0.05))
+
+  f <- sqrt_pre ~ theta0 + s(theta,k=20) +
+    s(day,bs="cc",k=20) + s(alt) + s(lon,lat) +
+    te(theta,day,bs=c("cr", "cc"),k=10) +
+    te(theta,alt) +
+    te(theta,lon,lat,d=c(1,2),bs=c("cr","tp"))
+
+  m1 <- tm(f, data = dtrain, breaks = breaks)
+}
+@
+\includegraphics[width=0.9\textwidth]{premodel.png}
+\caption{\label{fig:premodel} \dots}
 \end{figure}
 
 %\bibliographystyle{plainnat}
