@@ -53,11 +53,6 @@ library("TransitionModels")
 library("qgam")
 library("gamlss2")
 library("gamlss.cens")
-
-data("WeatherGermany", package = "WeatherGermany")
-
-WeatherGermany$yday <- as.POSIXlt(WeatherGermany$date)$yday
-WeatherGermany$year <- as.POSIXlt(WeatherGermany$date)$year + 1900
 @
 
 \begin{document}
@@ -296,69 +291,162 @@ discretization approach is a consistent method for approximating the smooth CDF 
 
 \section{Application} \label{sec:application}
 
+In this application, we analyze 30 years of precipitation data from the Tyrolean Alps to estimate a 
+climatology for precipitation. Figure~\ref{fig:Kirchberg} visualizes the raw data for the station 
+Kirchberg in Tirol. The left panel presents a histogram of the square root-transformed precipitation 
+values, overlaid with density estimates from a parametric censored normal (CN) model and a
+transition model (TM). Notably, the TM captures the inherent structure of the data more effectively, 
+particularly the spike at zero precipitation. This demonstrates the flexibility of the TM approach, 
+allowing it to directly model key features such as excess zeros.
+
 \begin{figure}[!ht]
 \centering
 %% \setkeys{Gin}{width=1\textwidth}
 <<echo=FALSE, results=hide>>=
 if(!file.exists("ts_hist.png")) {
+  d <- readRDS("../ehydTirol_Tageschniederschlagssummen.rds")
+  d <- subset(d, date >= (max(date) - 365*30))
+  d$sqrt_pre <- sqrt(d$value)
+  d$day <- as.POSIXlt(d$date)$yday
+
+  stations <- unique(d$name)
+
+  df <- subset(d, name == "Kirchberg in Tirol")
+
+  set.seed(123)
+  i <- sample(1:2, size = nrow(df), prob = c(0.8, 0.4), replace = TRUE)
+  dtrain <- subset(df, i < 2)
+  dtest <- subset(df, i > 1)
+  
+  breaks <- c(-0.15, seq(0.15, floor(max(df$sqrt_pre)) + 1, by = 0.3))
+
+  m <- tm(sqrt_pre ~ theta0 + s(theta,k=20), data = df, breaks = breaks)
+
+  nd <- data.frame("sqrt_pre" = 0:m$maxcounts)
+  pm <- predict(m, newdata = nd, type = "pdf")
+
+  mids <- (breaks[-1] + breaks[-length(breaks)]) / 2
+  w <- diff(breaks)
+  dm <- pm/w
+
   gen.cens("NO", type = "left")
-  fam <- NOlc
+  b <- gamlss2(Surv(sqrt_pre, sqrt_pre > 0) ~ 1, data = df, family = NOlc)
+  par <- predict(b, newdata = data.frame("sqrt_pre" = mids))
+  db <- family(b)$d(Surv(mids, mids > 0), par)
 
-  d <- subset(WeatherGermany, name == "Brocken")
+  f <- sqrt_pre ~ theta0 + s(theta,k=20) + s(day,bs="cc",k=20) +
+    te(theta,day,bs=c("cr", "cc"),k=10)
 
-  b <- gamlss2(Surv(sqrt(d$pre), d$pre > 0) ~ 1, data = d, family = fam)
-  y <- seq(0, 18, length = 100)
-  par <- predict(b, newdata = data.frame(y = y))
-  dy <- family(b)$d(Surv(y, y > 0), par)
+  breaks2 <- c(-0.1, seq(0.1, floor(max(df$sqrt_pre)) + 1, by = 0.05))
 
-  breaks <- c(-0.15, seq(0.15, 13, by = 0.3))
+  m2 <- tm(f, data = dtrain, breaks = breaks2)
 
-  d$sqrt_pre <- sqrt(d$pre)
-  m <- tm(sqrt_pre ~ theta0 + theta1 + s(theta,k=20), data = d, breaks = breaks)
+  f <- Surv(sqrt_pre, sqrt_pre > 0) ~ s(day,k=20,bs="cc") | s(day,k=20,bs="cc")
+  b2 <- gamlss2(f, data = dtrain, family = NOlc)
 
-  nd <- data.frame("sqrt_pre" = 1:m$maxcounts)
-  pm <- predict(m, newdata = nd, type = "cdf")
-  ym <- m$ym[1:m$maxcounts + 1]
-  f <- splinefun(ym, pm)
+  qu <- c(0.01, 0.1, 0.5, 0.9, 0.99)
 
-  nd0 <- data.frame("sqrt_pre" = 0:1)
-  pm0 <- sum(predict(m, newdata = nd0, type = "cdf"))
-  ym <- c(0, ym)
+  g2 <- mqgam(sqrt_pre ~ s(day,k=20,bs="cc"), data = dtrain, qu = qu)
 
-  dy2 <- c(pm0, f(y[-1], deriv = 1))
+  nd <- data.frame("day" = 0:365)
+  pm2 <- do.call("cbind",
+    lapply(qu, function(j) {
+      predict(m2, newdata = dtest, prob = j)
+  }))
 
-  png("ts_hist.png", units = "in", res = 200, width = 8, height = 3.1)
+  par <- predict(b2, newdata = dtest)
+  pb2 <- do.call("cbind",
+    lapply(qu, function(j) {
+      b2$family$q(j, par)
+  }))
 
-  par(mfrow = c(1, 2), mar = c(4, 4, 0, 1))
+  pg2 <- do.call("cbind",
+    lapply(qu, function(j) {
+      qdo(g2, j, predict, newdata = dtest)
+  }))
 
-  plot(sqrt_pre ~ yday, data = d, type = "h", col = rgb(0.1, 0.1, 0.1, alpha = 0.4),
-    xlab = "Day of the year", ylab = "sqrt(Precipitation)")
+  err_b <- err_m <- err_g <- NULL
+  for(j in 1:3) {
+    err_b <- c(err_b, qgam::pinLoss(dtest$sqrt_pre, pb2[, j], qu[j]))
+    err_m <- c(err_m, qgam::pinLoss(dtest$sqrt_pre, pm2[, j], qu[j]))
+    err_g <- c(err_g, qgam::pinLoss(dtest$sqrt_pre, pg2[, j], qu[j]))
+  }
+  err_b <- sum(err_b)
+  err_m <- sum(err_m)
+  err_g <- sum(err_g)
 
-  a <- aggregate(sqrt_pre ~ yday, data = d, FUN = function(x) {
-    quantile(x, prob = c(0.01, 0.1, 0.5, 0.9, 0.99))
-  })
+  png("ts_hist.png", units = "in", res = 200, width = 8, height = 4)
 
-  matplot(a$yday, a[, -1], type = "l", lty = 1, col = 4, add = TRUE, lwd = 0.5)
+  par(mfrow = c(1, 2), mar = c(4, 4, 1, 1))
 
-  hist(d$sqrt_pre, breaks = breaks, freq = FALSE,
+  hist(df$sqrt_pre, breaks = breaks, freq = FALSE,
     xlab = "sqrt(Precipitation)", main = "")
-  rug(d$sqrt_pre, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
-  lines(y, dy, col = 2, lwd = 2)
-  lines(y, dy2, col = 4, lwd = 2)
-  legend("center", c("Censored Normal", "Transition Model"),
+
+  lines(db ~ mids, col = 2, lwd = 2)
+  lines(dm ~ mids, col = 4, lwd = 2)
+  rug(df$sqrt_pre, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
+
+  legend("center", c("CN", "TM"),
     lwd = 2, col = c(2, 4), bty = "n")
+
+  plot(sqrt_pre ~ day, data = dtest, type = "h", col = rgb(0.1, 0.1, 0.1, alpha = 0.4),
+    xlab = "Day of the year", ylab = "sqrt(Precipitation)", ylim = c(0, 11))
+
+  j <- order(dtest$day)
+  matplot(dtest$day[j], pb2[j, ], type = "l", lty = 1, col = 2, add = TRUE)
+  matplot(dtest$day[j], pg2[j, ], type = "l", lty = 1, col = 5, add = TRUE)
+  matplot(dtest$day[j], pm2[j, ], type = "l", lty = 1, col = 4, add = TRUE)
+
+  legend("topleft", paste(c("CN PBL =", "QR PBL =", "TM PBL ="),
+      round(c(err_b, err_g, err_m))),
+    lwd = 2, col = c(2, 5, 4), bty = "n")
 
   dev.off()
 }
 @
-\includegraphics[width=1  \textwidth]{ts_hist.png}
-\caption{\label{fig:data} Precipitation data for the Brocken region in Germany.
-  The left panel illustrates the seasonal variation in square root-transformed 
-  precipitation values, with empirical quantiles (1st, 10th, 50th, 90th, and 99th 
-  percentiles) plotted for each day of the year. The right panel presents a histogram
-  of the square root-transformed precipitation values, overlaid with the fitted
-  densities of a censored normal distribution (red line) and a transition model
-  (blue line).}
+\includegraphics[width=0.9\textwidth]{ts_hist.png}
+\caption{\label{fig:Kirchberg} Precipitation data for Kirchberg in Tirol, Austria.
+  The left panel shows a histogram of the square root-transformed daily precipitation values,
+  overlaid with fitted densities from a censored normal distribution (CN, red line) and
+  a transition model (TM, blue line). The right panel depicts the seasonal variation in
+  square root-transformed precipitation values, including empirical quantiles
+  (1st, 10th, 50th, 90th, and 99th percentiles) for each day of the year.
+  Quantile estimates (out-of-sample) are provided for CN, TM, and a quantile regression model (QR),
+  along with their respective pinball loss (PBL) values, demonstrating the models' performance
+  in capturing the distribution of precipitation.}
+\end{figure}
+
+\begin{figure}[!ht]
+\centering
+%% \setkeys{Gin}{width=1\textwidth}
+<<echo=FALSE, results=hide>>=
+if(!file.exists("premodel.png") & FALSE) {
+  d <- readRDS("../ehydTirol_Tageschniederschlagssummen.rds")
+  d <- subset(d, date >= (max(date) - 365*30))
+  d$sqrt_pre <- sqrt(d$value)
+  d$day <- as.POSIXlt(d$date)$yday
+
+  stations <- unique(d$name)
+
+  set.seed(123)
+  i <- sample(stations, size = floor(length(stations) * 0.6))
+
+  dtrain <- subset(d, name %in% i)
+  dtest <- subset(d, !(name %in% i))
+
+  breaks <- c(-0.025, seq(0.025, floor(max(d$sqrt_pre)) + 1, by = 0.05))
+
+  f <- sqrt_pre ~ theta0 + s(theta,k=20) +
+    s(day,bs="cc",k=20) + s(alt) + s(lon,lat) +
+    te(theta,day,bs=c("cr", "cc"),k=10) +
+    te(theta,alt) +
+    te(theta,lon,lat,d=c(1,2),bs=c("cr","tp"))
+
+  m1 <- tm(f, data = dtrain, breaks = breaks)
+}
+@
+\includegraphics[width=0.9\textwidth]{premodel.png}
+\caption{\label{fig:premodel} \dots}
 \end{figure}
 
 %\bibliographystyle{plainnat}
