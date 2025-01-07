@@ -434,18 +434,46 @@ if(!file.exists("premodel.png") & FALSE) {
   dtrain <- subset(d, name %in% i)
   dtest <- subset(d, !(name %in% i))
 
-  breaks <- c(-0.025, seq(0.025, floor(max(d$sqrt_pre)) + 1, by = 0.05))
+  breaks <- c(-0.1, seq(0.1, floor(max(d$sqrt_pre)) + 1, by = 0.2))
 
-  f <- sqrt_pre ~ theta0 + s(theta,k=20) +
-    s(day,bs="cc",k=20) + s(alt) + s(lon,lat) +
-    te(theta,day,bs=c("cr", "cc"),k=10) +
+  f1 <- sqrt_pre ~ theta0 + s(theta,k=20) +
+    s(day,bs="cc",k=20) +
+    te(theta,day,lon,lat,d=c(1,1,2),k=c(5,5,30)) +
+    te(theta,day,bs=c("cr", "cc")) +
     te(theta,alt) +
     te(theta,lon,lat,d=c(1,2),bs=c("cr","tp"))
 
-  m1 <- tm(f, data = dtrain, breaks = breaks)
+  m1 <- tm(f1, data = dtrain, breaks = breaks, useC = TRUE)
+
+  f2 <- Surv(sqrt_pre, sqrt_pre > 0) ~ s(day,bs="cc",k=20) + s(lon,lat) +
+    te(day,lon,lat,d=c(1,2),bs=c("cr","tp"),k=c(5,30)) |
+      s(day,bs="cc",k=20) + s(lon,lat) +
+      te(day,lon,lat,d=c(1,2),bs=c("cr","tp"),k=c(5,30))
+
+  gen.cens("NO", type = "left")
+
+  m2 <- gamlss2(f2, data = dtrain, family = NOlc, binning = TRUE)
+
+  download.file("http://bamlss.org/misc/precipitation_clim.tar.gz", "clim.tar.gz")
+  untar("clim.tar.gz", exdir = ".")
+  library("raster")
+  library("stars")
+  library("sf")
+
+  dem <- st_as_stars(readRDS("dem.rds"))
+  dem <- st_transform(dem, crs = 4326)
+
+  download.file("https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_AUT_1.json.zip", "AT-gadm.zip")
+  unzip("AT-gadm.zip")
+  
+  AT <- read_sf("gadm41_AUT_1.json")
+  Tyrol <- subset(AT, NAME_1 == "Tirol")
+  Tyrol <- st_geometry(Tyrol)
+
+  a <- st_intersects(dem, Tyrol)
 }
 @
-\includegraphics[width=0.9\textwidth]{premodel.png}
+%% \includegraphics[width=0.9\textwidth]{premodel.png}
 \caption{\label{fig:premodel} \dots}
 \end{figure}
 
