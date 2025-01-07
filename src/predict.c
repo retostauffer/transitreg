@@ -45,20 +45,11 @@ tmWhich find_positions(int x, int* y, int n) {
     return which; // Return the struct with index position and length
 }
 
-/* Helper function for type = "pdf".
- *
- * Calculates (1 - p[count]) * prod(p[-count]) with p = pptr[positions]
- *
- * Note for future me: Using log-sums is slower as we need to take the
- * logarithm of each element in pptr.
- */
-
-/* VECTOR VERSION, RETURNS AN OBJECT OF CLASS doubleVec,
- * used for elementwise = FALSE */
+/* Helper function for type = "pdf" */
 doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny) {
     // Initialize return value/object
     doubleVec res;
-    res.values = (double*)malloc(count * sizeof(double));  // Allocate vector result
+    res.values = (double*)malloc(ny * sizeof(double));  // Allocate vector result
     res.length = ny;
 
     if (res.values == NULL) { error("Memory allocation failed for doubleVec.values."); }
@@ -74,48 +65,48 @@ doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidpt
             error("TODO(R): First element ISNAN, must be adressed in C");
             //return R_NaReal; 
         }
-        // In this case we are only interested in the final PDF (last bin)
-        if (nobm) {
-            res.values[0] = prod * (1.0 - tpptr[positions[i]]);
-            printf(" ---- i = %d   count = %d   res[0] = %.5f\n", i, count, res.values[0]);
-        } else {
-            res.values[i] = prod * (1.0 - tpptr[positions[i]]);
-        }
+        // If 'nobm' is true (we have no binmidptr) we only need the PDF
+        // of the final bin; overwrite res.values[0] in each iteration.
+        res.values[(nobm) ? 0 : i] = prod * (1.0 - tpptr[positions[i]]);
         // Updating vector product
         prod *= tpptr[positions[i]];
     }
     return res;
 }
 
-/* Helper function for type = "cdf".
- *
- */
-doubleVec tm_calc_cdf(int* positions, int count, double* pptr) {
+/* Helper function for type = "cdf" */
+doubleVec tm_calc_cdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny) {
     // Initialize return value/object
     doubleVec res;
-    res.values = (double*)malloc(count * sizeof(double));  // Allocate max possible size
-    res.length = count;
+    res.values = (double*)malloc(ny * sizeof(double));  // Allocate max possible size
+    res.length = ny;
 
     if (res.values == NULL) { error("Memory allocation failed for doubleVec.values."); }
 
-    if (ISNAN(pptr[positions[0]])) {
+    // Set to true if 'binmidptr' is not provided (an NA). In this case we simply
+    // iterate trough the entire tp vector and store the very last value.
+    bool nobm = ISNAN(binmidptr[0]);
+
+    if (ISNAN(tpptr[positions[0]])) {
         error("TODO(R): First element ISNAN, must be adressed in C");
         //return R_NaReal; 
     }
 
     // Else start calculation. As soon as we detect a missing
     // value, return NA as well.
-    res.values[0] = 1.0 - pptr[positions[0]]; // Initialize with (1 - p[0])
+    res.values[0] = 1.0 - tpptr[positions[0]]; // Initialize with (1 - p[0])
     if (count > 0) {
         double pprod = 1.0; // Initialize with 1.0 for product
         // Looping over all elements except first
         for (int i = 1; i < count; i++) {
-            if (ISNAN(pptr[positions[i - 1]])) {
+            if (ISNAN(tpptr[positions[i - 1]])) {
                 error("TODO(R): ISNAN must be implemented first (doubleVec; in cdf)");
                 //return R_NaReal;
             }
-            pprod *= pptr[positions[i - 1]]; // Multiply with previous element
-            res.values[i] = res.values[i - 1] + (1.0 - pptr[positions[i]]) * pprod;
+            pprod *= tpptr[positions[i - 1]]; // Multiply with previous element
+            // If 'nobm' is true (we have no binmidptr) we only need the PDF
+            // of the final bin; overwrite res.values[0] in each iteration.
+            res.values[(nobm) ? 0 : i] = res.values[(nobm) ? 0 : i - 1] + (1.0 - tpptr[positions[i]]) * pprod;
         }
     }
     return res;
@@ -307,7 +298,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
     double *resptr = REAL(res);
 
     // If binmid is NA, but yptr is not: Error (this combination is not allowed)
-    if (ISNAN(binmidptr[0]) & !ISNAN(yptr[0])) {
+    if ((do_cdf | do_pdf) & ISNAN(binmidptr[0]) & !ISNAN(yptr[0])) {
         error("Problem in C tm_predict(): binmid is NAN, but y is not.");
     }
 
@@ -334,14 +325,19 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
                 // Single PDF
                 if (!ewise) {
                     tmp = tm_calc_pdf(which.index, which.length, tpptr, binmidptr, yptr, 1);
-                    //tmp = tm_calc_pdf(which.index, which.length, tpptr, binmidptr, &yptr[i], 1);
                 // Multiple PDFs (elementwise)
                 } else {
                     tmp = tm_calc_pdf(which.index, which.length, tpptr, binmidptr, yptr, LENGTH(y));
                 }
             // --- Calculating cumulative distribution
             } else if (do_cdf) {
-                tmp = tm_calc_cdf(which.index, which.length, tpptr);
+                // Single CDF
+                if (!ewise) {
+                    tmp = tm_calc_cdf(which.index, which.length, tpptr, binmidptr, yptr, 1);
+                // Multiple CDFs (elementwise)
+                } else {
+                    tmp = tm_calc_cdf(which.index, which.length, tpptr, binmidptr, yptr, LENGTH(y));
+                }
             } else {
                 // Single quantile
                 if (!ewise) {
@@ -428,7 +424,7 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores) {
     for (i = 0; i < un; i++) {
         which = find_positions(uidxptr[i], idxptr, n);
         tmppdf = tm_calc_pdf(which.index, which.length, pptr, na, na, 1);
-        tmpcdf = tm_calc_cdf(which.index, which.length, pptr);
+        tmpcdf = tm_calc_cdf(which.index, which.length, pptr, na, na, 1);
         // Store last value, that is the last bin provided for this distribution.
         pdfptr[i] = tmppdf.values[tmppdf.length - 1];
         cdfptr[i] = tmpcdf.values[tmpcdf.length - 1];
