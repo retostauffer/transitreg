@@ -50,7 +50,7 @@ tmdist <- function(x) {
     check_dfs <- function(y) {
         print(str(y))
         stopifnot(all(y$tp >= 0 & y$tp <= 1))
-        stopifnot(all(diff(y$bins) >= 0))
+        stopifnot(all(diff(y$binmid) >= 0))
         stopifnot(all(sapply(y, is.numeric)))
     }
     lapply(x, check_dfs)
@@ -81,11 +81,11 @@ tmdist <- function(x) {
 tmdist_convert_input <- function(x) {
     # Unnamed list of length 2; where each entry in x is a vector
     if (is.list(x) && all(sapply(x, is.atomic)) && length(x) == 2L && is.null(names(x))) {
-        x <- data.frame(tp = x[[1]], bins = x[[2]])
+        x <- data.frame(tp = x[[1]], binmid = x[[2]])
     # Named list
-    } else if (is.list(x) && all(c("tp", "bins") %in% names(x))) {
-        stopifnot(length(x$bins) == length(x$tp))
-        x <- as.data.frame(x[c("tp", "bins")])
+    } else if (is.list(x) && all(c("tp", "binmid") %in% names(x))) {
+        stopifnot(length(x$binmid) == length(x$tp))
+        x <- as.data.frame(x[c("tp", "binmid")])
     # Else we expect to have gotten a series of distributions,
     # so we call this function again to convert them if possible
     } else if (is.list(x)) {
@@ -93,7 +93,7 @@ tmdist_convert_input <- function(x) {
         x <- lapply(x, tmdist_convert_input)
     # Else we don't really know what to do.
     } else {
-        stop("Problem converting user input to 'tm distribution'")
+        stop("Problems converting user input to 'tm distribution'")
     }
     #lapply(x, check_values)
     return(x)
@@ -144,29 +144,35 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
     ## Get number of cores for OpenMP parallelization
     ncores <- tm_get_number_of_cores(ncores, FALSE)
 
-    # Guessing elementwise if set NULL
-    if (is.null(elementwise)) elementwise <- !length(x) == length(d)
-
     xnames <- names(x) # Keep for later
+
+    # Number of probabilities
+    nx <- length(x)
+
+    # Setting up all unique combinations needed
+    # (1) Use same 'x' for all distributions
+    if (nx == 1L && length(d) > 1L) x <- rep(x, length(d))
+
+    ## Guessing elementwise if set NULL
+    if (is.null(elementwise)) elementwise <- !length(x) == length(d)
 
     if (!elementwise & length(x) > length(d))
         stop("length of 'x' can't be larger than number of distributions in 'd'",
              "if elementwise = FALSE");
 
-    # Setting up all unique combinations needed
-    # (1) Use same 'x' for all distributions
-    if (length(x) == 1 && length(d) > 1L) x <- rep(x, length(d))
-
     if (elementwise) x <- sort(x) # Important
 
-    ui <- seq_along(x) # Unique index
+    ui <- seq_along(d) # Unique index
     d  <- as.data.frame(d) # convert distributions to data.frame
 
     ## Calling C to calculate the required quantiles
-    res <- .Call("tm_predict", ui, d$index, p = d$tp, type = "pdf", prob = 42,
-                 ncores = ncores, elementwise = elementwise)
+    ## binmid: Required as we need to know where to stop.
+    ## y: threshold at which to evaluate the pdf.
+    print(x)
+    res <- .Call("tm_predict", uidx = ui, idx = d$index, tp = d$tp, binmid = NA_real_, y = x,
+                 type = "pdf", ncores = ncores, elementwise = elementwise)
     print(res)
-    print(d)
+    print(head(d))
     stop('xxx')
 
     # Translate quantile bins to numeric values (binmid)
@@ -332,8 +338,10 @@ quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = 
     x  <- as.data.frame(x) # convert distributions to data.frame
 
     ## Calling C to calculate the required quantiles
-    res <- .Call("tm_predict", ui, x$index, p = x$tp, type = "quantile", prob = probs,
-                 ncores = ncores, elementwise = elementwise)
+    ## binmid: Not required
+    ## y: probabilities at which to evaluate the distributions
+    res <- .Call("tm_predict", uidx = ui, index = x$index, tp = x$tp, binmid = NA_real_, y = probs,
+                 type = "quantile", ncores = ncores, elementwise = elementwise)
 
     # Translate quantile bins to numeric values (binmid)
     bin2num <- function(x, d, np, ewise) {

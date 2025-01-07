@@ -53,7 +53,7 @@ tm_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
 
 
 ## Function to set up expanded data set.
-tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
+tm_data <- function(data, response = NULL, verbose = TRUE) {
   ## Ensure data is a data frame.
   if (!is.data.frame(data))
     data <- as.data.frame(data)
@@ -75,78 +75,46 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
 
   response_values <- data[[response]]
   df_list <- vector("list", n)
-  timer("[tm_data] extracted response, allocated list", verbose)
 
   ## If any missing value in response: stop
   if (any(is.na(response_values)))
     stop("NA values in response data!")
 
-  ## TODO(R) Original implementation is used when useC == FALSE,
-  ##         though the new implementation has nothing to do with C.
-  if (!useC) {
+  ## Setting up the new data.frame with (pseudo-)bins
 
-    ## Process each row.
-    for (i in seq_len(n)) {
-      k <- response_values[i] # Count or pseudocount
-      Y <- c(rep(1, k), 0)
-      row_data <- data[i, , drop = FALSE]
+  ## Length of vectors in list; names of list elements.
+  nout <- sum(response_values) + length(response_values)
+  names_out <- c("index", "Y", "theta", names(data))
 
-      ## Create expanded data frame for the current row.
-      di <- data.frame(
-        "index" = i,
-        Y = Y,
-        theta = c(0:k),
-        row_data[rep(1, length(Y)), , drop = FALSE]
-      )
+  ## Building index vector; each observation 1:n gets its
+  ## unique index (ID).
+  result <- list()
+  result$index <- rep(seq_len(n), response_values + 1L)
 
-      ## Add to list.
-      df_list[[i]] <- di
+  ## Creating Y; always 1 except for the last entry per index.
+  result$Y     <- rep(1L, nout)
+  result$Y[cumsum(response_values + 1)] <- 0L
 
-      ## Update progress bar.
-      if (verbose && (i %% step == 0)) {
-        utils::setTxtProgressBar(pb, i)
+  ## Creating theta; a sequence from zero to the
+  ## response_value for each index. The following
+  ## Two lines create this sequence of sequences.
+  reset_to_zero <- c(0, which(diff(result$index) > 0))
+  result$theta <- seq_len(nout) - rep(reset_to_zero, response_values + 1) - 1
+
+  ## Appending the remaining data from 'data'.
+  for (n in names(data)) {
+      ## If data[[n]] is a simple vector
+      if (!is.matrix(data[[n]])) {
+        result[[n]] <- rep(data[[n]], response_values + 1)
+      ## Else create matrix
+      } else {
+        result[[n]] <- matrix(rep(data[[n]], rep(response_values + 1, ncol(data[[n]]))),
+                              ncol = ncol(data[[n]]),
+                              dimnames = list(NULL, colnames(data[[n]])))
       }
-    }
-    timer("[tm_data] loop over n - R", verbose)
-
-    if (verbose)
-      close(pb)
-
-
-    ## Combine all rows into a single data frame.
-    result <- do.call("rbind", df_list)
-    timer("[tm_data] results combined - loop", verbose)
-
-  } else {
-    ## TODO(R): This is the 'faster version' of the
-    ##          original loop. Has nothing to do with C, but for
-    ##          testing I let it run when useC = TRUE.
-
-    ## Length of vectors in list; names of list elements.
-    nout <- sum(response_values) + length(response_values)
-    names_out <- c("index", "Y", "theta", names(data))
-
-    ## Building index vector; each observation 1:n gets its
-    ## unique index (ID).
-    result <- list()
-    result$index <- rep(seq_len(n), response_values + 1L)
-
-    ## Creating Y; always 1 except for the last entry per index.
-    result$Y     <- rep(1L, nout)
-    result$Y[cumsum(response_values + 1)] <- 0L
-
-    ## Creating theta; a sequence from zero to the
-    ## response_value for each index. The following
-    ## Two lines create this sequence of sequences.
-    reset_to_zero <- c(0, which(diff(result$index) > 0))
-    result$theta <- seq_len(nout) - rep(reset_to_zero, response_values + 1) - 1
-
-    ## Appending the remaining data from 'data'
-    for (n in names(data)) result[[n]] <- rep(data[[n]], response_values + 1)
-
-    result <- as.data.frame(result)
-    timer("[tm_data] faster vectorized version", verbose)
   }
+
+  result <- as.data.frame(result)
 
   ## Attach the response column as an attribute.
   attr(result, "response") <- response
@@ -155,12 +123,11 @@ tm_data <- function(data, response = NULL, useC = FALSE, verbose = TRUE) {
 }
 
 ## Predict function.
-# TODO(R): Adding useC option for testing; must be removed in the future.
 tm_predict <- function(object, newdata,
   type = c("pdf", "cdf", "quantile", "pmax"),
   response = NULL, y = NULL, prob = 0.5, maxcounts = 1e+03,
   verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
-  factor = FALSE, ncores = NULL, useC = FALSE)
+  factor = FALSE, ncores = NULL)
 {
 
   ## Pre-processing inputs
@@ -204,7 +171,7 @@ tm_predict <- function(object, newdata,
   }
 
   ## Preparing data
-  nd <- tm_data(newdata, response = response, verbose = verbose, useC = useC)
+  nd <- tm_data(newdata, response = response, verbose = verbose)
   if (factor)
     nd$theta <- as.factor(nd$theta)
 
@@ -225,79 +192,21 @@ tm_predict <- function(object, newdata,
     "gam"  = "response",
     "nnet" = "raw"
   )
-  p <- as.numeric(predict(object, newdata = nd, type = what))
+  tp <- as.numeric(predict(object, newdata = nd, type = what))
 
   ## Extract unique indices
   ui <- unique(nd$index)
   prob <- rep(prob, length(ui))
 
-  if (useC) {
-    ## Ensure we hand over the correct thing to C
-    if (type == "quantile") {
-        stopifnot(is.numeric(prob), length(prob) == length(ui),
-                  all(!is.na(prob)), all(prob >= 0 & prob <= 1))
-    } else if (is.null(prob)) {
-        prob <- 42.0 # dummy value for C (not used if type != 'quantile')
-    }
-    probs <- .Call(C_tm_predict, ui, nd$index, p, type = type, prob = prob,
-                   ncores = ncores, elementwise = FALSE);
+  ## Ensure we hand over the correct thing to C
+  if (type == "quantile") {
+      stopifnot(is.numeric(prob), length(prob) == length(ui),
+                all(!is.na(prob)), all(prob >= 0 & prob <= 1))
+  } else if (is.null(prob)) {
+      prob <- NA_real_ # dummy value for C (not used if type != 'quantile')
   }
-
-  # -------------------
-  # Original R version, TODO(R): May be removed in the future
-  if (!useC) {
-    probs <- numeric(length(ui))
-    for (j in ui) {
-
-      pj <- p[nd$index == j]
-      k <- length(pj)
-
-      if (type == "pdf") {
-        probs[j] <- (1 - pj[k]) * prod(pj[-k])
-      }
-
-      if (type == "cdf") {
-        cj <- 1 - pj[1]
-        if (length(pj) > 1) {
-          for (jj in 2:length(pj))
-            cj <- cj + (1 - pj[jj]) * prod(pj[1:(jj - 1)])
-        }
-        probs[j] <- cj
-      }
-
-      if (type == "quantile") {
-        cj <- 1 - pj[1]
-        if (any(is.na(pj))) {
-          probs[j] <- NA_integer_
-        } else if (cj >= prob[j]) {
-          probs[j] <- 0L
-        } else {
-          if (length(pj) > 1) {
-            for (jj in 2:length(pj)) {
-              cj <- cj + (1 - pj[jj]) * prod(pj[1:(jj - 1)])
-              if (cj >= prob[j]) {
-                probs[j] <- jj - 1L
-                break
-              }
-            }
-          } else {
-            probs[j] <- 0L
-          }
-        }
-      }
-
-      if (type == "pmax") {
-        # That is my count
-        cj <- numeric(k)
-        cj[1] <- 1 - pj[1]
-        if (length(pj) > 1) {
-          for (jj in 2:length(pj))
-            cj[jj] <- (1 - pj[jj]) * prod(pj[1:(jj - 1)])
-        }
-        probs[j] <- if (all(is.na(cj))) NA_integer_  else which.max(cj) - 1L
-      }
-    }
-  } ## end !useC (R version)
+  probs <- .Call(C_tm_predict, uidx = ui, index = nd$index, tp = tp,
+                 bins = NA_real_, y = prob, type = type, ncores = ncores, elementwise = FALSE);
 
   return(probs)
 }
@@ -372,24 +281,29 @@ tm_dist <- function(y, data = NULL, ...)
   return(invisible(b))
 }
 
-timer <- function(msg = NULL, verbose = TRUE) {
-    if (is.null(msg) || !exists("ttotal")) ttotal <<- Sys.time()
-    if (!is.null(msg) && "treto" %in% ls(envir = .GlobalEnv)) {
-        t <- as.numeric(Sys.time() - treto, units = "secs")
-        tt <- as.numeric(Sys.time() - ttotal, units = "secs")
-        if (verbose)
-            message(sprintf("[timing] Elapsed  %8.1f ms  - %8.1f total     (%s)",
-                            t * 1000, tt * 1000, msg))
-    }
-    treto <<- Sys.time()
+## Function to create bins.
+make_bins <- function(y, breaks = 30, scale = FALSE , ...) {
+  if(scale) {
+    my <- min(y)
+    y <- sqrt(y - my + 0.01)
+    dy <- diff(range(y))
+    bins <- (seq(min(y) - 0.1*dy,
+      max(y) + 0.1*dy, length = breaks))^2 - 0.01 + my
+  } else {
+    dy <- diff(range(y))
+    bins <- seq(min(y) - 0.1*dy,
+      max(y) + 0.1*dy, length = breaks)
+#    bins <- c(min(y) - 0.5*dy,
+#      quantile(y, probs = seq(0, 1, length = breaks)),
+#      max(y) + 0.5*dy)
+  }
+  return(bins)
 }
-timer(NULL)
 
 ## Wrapper function to estimate CTMs.
-# TODO(R): Adding useC option for testing; must be removed in the future.
 tm <- function(formula, data, subset, na.action,
   engine = "bam", scale.x = FALSE, breaks = NULL,
-  model = TRUE, ncores = NULL, verbose = FALSE, useC = FALSE, ...)
+  model = TRUE, ncores = NULL, verbose = FALSE, ...)
 {
   if (!is.null(breaks)) breaks <- as.numeric(breaks)
 
@@ -400,7 +314,6 @@ tm <- function(formula, data, subset, na.action,
   )
   ncores <- tm_get_number_of_cores(ncores, verbose = verbose)
 
-timer(NULL)
   cl <- match.call()
 
 
@@ -425,17 +338,15 @@ timer(NULL)
   mf[[1L]] <- quote(stats::model.frame)
   mf <- eval(mf, parent.frame())
 
-  timer("building model frame", verbose)
-
   ## Response name.
   rn <- response_name(formula)
+
+  yscale <- NULL
 
   ## Discretize response?
   if (bin.y <- !is.null(breaks)) {
     if (length(breaks) < 2L) {
-      dy <- diff(range(model.response(mf)))
-      bins <- seq(min(model.response(mf)) - 0.1*dy,
-        max(model.response(mf)) + 0.1*dy, length = breaks)
+      bins <- make_bins(model.response(mf), breaks = breaks)
     } else {
       bins <- breaks
     }
@@ -457,7 +368,6 @@ timer(NULL)
 
     mf[[rn]] <- yc
   }
-  timer("discretize response", verbose)
 
   ## Scaling data.
   scaler <- NULL
@@ -470,21 +380,17 @@ timer(NULL)
       }
     }
   }
-  timer("data scaling", verbose)
 
   ## Max. counts.
   ymax <- max(mf[[rn]], na.rm = TRUE)
   k <- min(c(ymax - 1L, 20L))
-  timer("find min/max", verbose)
 
   ## Transform data.
-  tmf <- tm_data(mf, response = rn, useC = useC, verbose = verbose)
-  timer("transforming data (tm_df)", verbose)
+  tmf <- tm_data(mf, response = rn, verbose = verbose)
 
   if (!is.null(scaler)) {
     scaler$theta <- list("mean" = mean(tmf$theta), "sd" = sd(tmf$theta))
     tmf$theta <- (tmf$theta - scaler$theta$mean) / scaler$theta$sd
-    timer("scaling theta", verbose)
   }
 
   if (length(tv)) {
@@ -492,7 +398,6 @@ timer(NULL)
       i <- as.integer(gsub("theta", "", j))
       tmf[[j]] <- as.integer(tmf$theta == i)
     }
-    timer(paste("loop over tv (length ", length(tv), ")"), verbose)
   }
 
   ## Setup return value.
@@ -510,21 +415,19 @@ timer(NULL)
   } else {
     rval$new_formula <- update(formula, as.factor(Y) ~ .)
   }
-  timer("updated formula", verbose)
 
   ## Estimate model.
   warn <- getOption("warn")
   options("warn" = -1)
   if (engine == "bam") {
     rval$model <- bam(rval$new_formula, data = tmf, family = binomial, discrete = TRUE)
-  }
-  if (engine == "gam") {
+  } else if (engine == "gam") {
     rval$model <- gam(rval$new_formula, data = tmf, family = binomial, ...)
-  }
-  if (engine == "nnet") {
+  } else if (engine == "nnet") {
     rval$model <- nnet::nnet(rval$new_formula, data = tmf, ...)
+  } else if (engine == "glmnet") {
+    rval$model <- tm_glmnet(rval$new_formula, data = tmf, ...)
   }
-  timer("estimation", verbose)
   options("warn" = warn)
 
   ## Additional info.
@@ -536,11 +439,10 @@ timer(NULL)
   rval$factor <- isTRUE(list(...)$factor)
 
   if (inherits(rval$model, "nnet")) {
-    p <- predict(rval$model, type = "raw", useC = useC)
+    p <- predict(rval$model, type = "raw")
   } else {
-    p <- predict(rval$model, type = "response", useC = useC)
+    p <- predict(rval$model, type = "response")
   }
-  timer("prediction", verbose)
 
   ## Remove model frame.
   if (!model)
@@ -550,32 +452,12 @@ timer(NULL)
   ui <- unique(tmf$index)
   probs <- cprobs <- numeric(length(ui))
 
-  if (useC) {
-    ## c_tm_predict_pdfcdf returns a list with PDF and CDF, calculating
-    ## both simultanously in C to improve speed.
-cat("--- calling C_tm_predict_pdfcdf\n")
-    tmp    <- .Call(C_tm_predict_pdfcdf, uidx = ui, idx = tmf$index, p = p, ncores = ncores)
-cat("--- end of C_tm_predict_pdfcdf\n")
-    probs  <- tmp$pdf
-    cprobs <- tmp$cdf
-    rm(tmp)
-    timer("calculating CDF - C", verbose)
-  } else {
-    for (j in ui) {
-      pj <- p[tmf$index == j]
-      k <- length(pj)
-      probs[j] <- (1 - pj[k]) * prod(pj[-k])
-
-      cj <- numeric(k)
-      cj[1] <- 1 - pj[1]
-      if (length(pj) > 1) {
-        for (jj in 2:length(pj))
-          cj[jj] <- (1 - pj[jj]) * prod(pj[1:(jj - 1)])
-      }
-      cprobs[j] <- sum(cj)
-    }
-    timer("calculating CDF - R", verbose)
-  }
+  ## c_tm_predict_pdfcdf returns a list with PDF and CDF, calculating
+  ## both simultanously in C to improve speed.
+  tmp    <- .Call(C_tm_predict_pdfcdf, uidx = ui, idx = tmf$index, p = p, ncores = ncores)
+  probs  <- tmp$pdf
+  cprobs <- tmp$cdf
+  rm(tmp)
 
   eps <- abs(.Machine$double.eps)
   probs[probs  < eps]      <- eps
@@ -584,7 +466,6 @@ cat("--- end of C_tm_predict_pdfcdf\n")
   cprobs[cprobs > 1 - eps] <- 1 - eps
 
   rval$probs <- data.frame("pdf" = probs, "cdf" = cprobs)
-  timer("building rval", verbose)
 
   ## If binning.
   if (bin.y) {
@@ -592,7 +473,6 @@ cat("--- end of C_tm_predict_pdfcdf\n")
     rval$ym     <- ym
     rval$yc_tab <- table(yc)
     rval$breaks <- breaks
-    timer("ended if bin.y", verbose)
   }
 
   ## Assign class.
@@ -601,10 +481,8 @@ cat("--- end of C_tm_predict_pdfcdf\n")
   return(rval)
 }
 
-## TODO(R): Added useC option, remove once we streamlined this. Both in the
-##          method call as well as in the residuals() call further down.
 ## Plotting method.
-plot.tm <- function(x, which = "effects", spar = TRUE, k = 5, useC = FALSE, ...)
+plot.tm <- function(x, which = "effects", spar = TRUE, k = 5, ...)
 {
   ## What should be plotted?
   which.match <- c("effects", "hist-resid", "qq-resid", "wp-resid")
@@ -628,7 +506,7 @@ plot.tm <- function(x, which = "effects", spar = TRUE, k = 5, useC = FALSE, ...)
 
   resids <- NULL
   for (j in 1:k)
-    resids <- cbind(resids, residuals(x, newdata = list(...)$newdata, useC = useC))
+    resids <- cbind(resids, residuals(x, newdata = list(...)$newdata))
   resids <- apply(resids, 1, median)
 
   ## Number of plots.
@@ -811,13 +689,11 @@ residuals.tm <- function(object, newdata = NULL, y = NULL, ...)
 }
 
 
-## TODO(R): Remove useC option once we streamline that; as input to the
-##          method as well as in the predict call further down.
 ## Rootogram method.
 rootogram.tm <- function(object, newdata = NULL, plot = TRUE,
   width = 0.9, style = c("hanging", "standing", "suspended"),
   scale = c("sqrt", "raw"), expected = TRUE, confint = TRUE,
-  ref = TRUE, K = NULL, xlab = NULL, ylab = NULL, main = NULL, useC = FALSE, ...)
+  ref = TRUE, K = NULL, xlab = NULL, ylab = NULL, main = NULL, ...)
 {
   if (is.null(newdata))
     newdata <- object$model.frame
@@ -835,7 +711,7 @@ rootogram.tm <- function(object, newdata = NULL, plot = TRUE,
   for (j in counts) {
     if (isTRUE(list(...)$verbose))
       cat(j, "/", sep = "")
-    p <- cbind(p, predict(object, newdata = newdata, type = "pdf", y = j, useC = useC))
+    p <- cbind(p, predict(object, newdata = newdata, type = "pdf", y = j))
     obs <- c(obs, sum(y == j))
   }
 

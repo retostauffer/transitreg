@@ -1,0 +1,9 @@
+
+
+# Test files
+/_*
+# By default, do not store html, rds, rda, zip
+/*.html
+/*.rds
+/*.rda
+/*.zip

@@ -71,13 +71,13 @@ tmWhich find_positions(int x, int* y, int n);
 
 // TODO(R): Delete me! // void fun(double *y, double *H);
 
-doubleVec tm_calc_pdf(int* positions, int count, double* pptr);
+doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny);
 doubleVec tm_calc_cdf(int* positions, int count, double* pptr);
 doubleVec tm_calc_quantile(int* positions, int count, double* pptr, double* prob, int np);
 
 double tm_calc_pmax(int* positions, int count, double* pptr);
 
-SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob, SEXP ncores, SEXP elementwise);
+SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y, SEXP type, SEXP ncores, SEXP elementwise);
 SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores);
 SEXP tm_detect_cores();
 

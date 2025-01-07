@@ -1,0 +1,547 @@
+\documentclass[english,a4paper,11pt]{article}
+\usepackage[margin=3cm]{geometry}
+\usepackage[latin1]{inputenc}
+\usepackage{babel}
+\usepackage{bm}
+\usepackage{amsmath,amsthm}
+\usepackage{latexsym}
+\usepackage{booktabs}
+\usepackage[final]{graphicx}
+\DeclareGraphicsExtensions{.jpg,.jpeg,.pdf,.png,.mps}
+\usepackage{epsfig}
+\usepackage[round]{natbib}
+%\setcitestyle{aysep={}} 
+\setcitestyle{numbers}
+\setcitestyle{square}
+
+%\usepackage[authoryear,comma,longnamesfirst,sectionbib]{natbib} 
+\usepackage{rotating}
+%\setlength{\topmargin}{-1cm}
+\usepackage{color}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage[bitstream-charter]{mathdesign}
+\usepackage[T1]{fontenc}
+\usepackage{threeparttable}
+\usepackage{lipsum}
+\usepackage{url} 
+\usepackage{hyperref}
+\usepackage{lmodern}
+\date{}
+\hypersetup{hidelinks}
+
+\addtolength{\textwidth}{1em}
+\addtolength{\oddsidemargin}{-1em}
+
+\linespread{1.2}
+
+%% https://ies2025.sis-statistica.it/
+\title{Transition Models for Precipitation Climatology Estimation}
+
+\author{$\mathrm{Nikolaus \ Umlauf}^\mathrm{1},  
+	\  \mathrm{Reto \ Stauffer}^\mathrm{1}$\\  
+	$^\mathrm{1}$\small{\emph{Universtit\"at Innsbruck}}\\
+}
+
+% for \usepackage{Sweave}
+\SweaveOpts{engine = R, eps = FALSE, keep.source = TRUE}
+
+<<preliminaries, echo=FALSE, results=hide>>=
+options(width = 70, prompt = "R> ", continue = "+  ",
+  SweaveHooks = list(fig = function() par(mar = c(4.1, 4.1, 1, 1))))
+library("TransitionModels")
+library("qgam")
+library("gamlss2")
+library("gamlss.cens")
+@
+
+\begin{document}
+	\maketitle
+
+
+\begin{abstract}
+Transition models are widely recognized for their flexibility in count data regression and are
+commonly applied in ordinal regression, where they are also known as continuation ratio models.
+The core concept involves modeling transition probabilities, specifically the conditional
+probability of observing counts greater than a threshold. These probabilities can be estimated
+using standard binary regression methods with an augmented dataset, allowing the use of any
+software designed for binary response models. In this paper, we extend the application of
+transition models to continuous data by employing a slicing technique that transforms continuous
+observations into count-like data. This approach enables the estimation of full probabilistic
+models, including distributional and quantile regression, using simple binary regression
+methods. We show that the stepwise approximation of the cumulative distribution function (CDF)
+converges uniformly to the true CDF.
+The proposed method is highly adaptable, seamlessly handling complex data structures,
+including excess zeros and non-standard distributions. We demonstrate the robustness and utility
+of this approach through an application to precipitation climatology estimation in Germany,
+showcasing its potential for broader applications in probabilistic modeling.
+\noindent 
+\hspace{1cm}\\
+\emph{Keywords}: transition models, probabilistic models
+\end{abstract}
+
+\section{Introduction}\label{sec:intro}
+
+In many applications, the response variable of interest is a count, representing non-negative
+integers that often relate to a set of covariates. Traditional approaches to modeling such data,
+such as the Poisson and Negative Binomial regression models, rely on fixed distributional
+assumptions. While these models are widely used due to their simplicity and interpretability,
+their restrictive nature can lead to mis-specifications, particularly in the presence of
+overdispersion or excess zeros.
+
+Transition models provide a flexible alternative by focusing on the conditional probabilities
+of transitioning between counts. Rather than assuming a fixed distribution for the response
+variable, these models allow the data to dictate the form of the distribution. By modeling
+transition probabilities--representing the likelihood of observing counts greater than a
+specified threshold--transition models achieve remarkable adaptability. These probabilities
+can be estimated using binary regression techniques with augmented datasets, leveraging
+standard software for estimation \cite{Berger:2021}.
+
+A key strength of transition models lies in their ability to accommodate
+complex data structures. They handle phenomena such as excess zeros and varying
+coefficients with ease, offering both parametric and nonparametric extensions. Additionally,
+embedding transition models within the binary regression framework simplifies parameter
+estimation and enhances interpretability, as coefficients directly capture the effects of
+covariates on transition probabilities.
+
+In this paper, we extend transition models to continuous response variables by employing a
+slicing technique that transforms continuous observations into count-like data. This innovative
+approach bridges the gap between traditional count-based transition models and advanced regression
+techniques such as distributional or quantile regression. We also show that the stepwise
+approximation used in this method converges uniformly to the true cumulative distribution
+function (CDF), ensuring the method's theoretical soundness.
+
+Our proposed method is highly effective in capturing complex data structures and provides a
+computationally efficient way to estimate full probabilistic models using standard binary
+regression techniques. We illustrate the versatility and robustness of this approach through
+an application to precipitation climatology estimation in Germany, highlighting its potential
+for use in various other domains.
+
+\section{Transition Models} \label{sec:tm}
+
+\subsection{Classic Count Model} \label{sec:counts}
+
+Transition models provide a flexible framework for modeling count data by focusing on
+the conditional probabilities of transitioning between counts. Unlike traditional approaches
+that assume a fixed distribution for the response variable, transition models estimate
+transition probabilities directly, allowing the data to determine the form of the distribution.
+
+Following \cite{Berger:2021}, let $y_i \in \{0, 1, 2, \ldots\}$ denote the count response
+variable for observation $i = 1, \ldots, n$, and let $\mathbf{x}_i = (x_{i1}, \ldots, x_{ik})^\top$
+represent the covariates. The conditional transition probability, which represents the
+probability of the count being larger than $r$, is defined as
+\begin{equation} \label{eqn:tm}
+P(y_i > r \mid y_i \geq r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha})), \quad r = 0, 1, \ldots,
+\end{equation}
+where $F(\cdot)$ is a cumulative distribution function (e.g., logistic or probit),
+and $\eta_{ir}(\boldsymbol{\alpha})$ is an additive predictor given by
+$$
+\eta_{ir}(\boldsymbol{\alpha}) = \theta_r + \sum_{j=1}^k f_j(\mathbf{x}_i, r; \boldsymbol{\beta}),
+$$
+with $\boldsymbol{\alpha} = (\boldsymbol{\theta}^\top, \boldsymbol{\beta}^\top)$,
+including count-specific intercepts $\theta_r$, and $f_j(\cdot)$ as unspecified smooth
+functions of the covariates and possible count-specific interactions. These functions are
+estimated using regression splines.
+
+For independent and identically distributed (i.i.d.) observations $y_i$, the probabilities
+$\pi_{ir}$ for each count $r$ can be expressed recursively using the transition probabilities
+\begin{eqnarray*}
+\pi_{ir} = P(y_i = r \mid \mathbf{x}_i) &=& P(y_i = r \mid y_i \geq r, \mathbf{x}_i) \prod_{s=0}^{r-1} P(y_i > s \mid y_i \geq s, \mathbf{x}_i) \\
+  &=& (1 - F(\eta_{ir}(\boldsymbol{\alpha}))) \prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha})).
+\end{eqnarray*}
+
+To estimate the parameters, the underlying Markov chain $Y_{i0}, Y_{i1}, Y_{i2}, \ldots$,
+with $Y_{ir} = I(y_i = r)$, is considered, where $I(\cdot)$ is the indicator function.
+This allows the log-likelihood of the transition model \eqref{eqn:tm} to be written as
+$$
+\ell(\boldsymbol{\alpha}) = \sum_{i=1}^n \log(\pi_{ir}) =
+  \sum_{i=1}^n \sum_{s=0}^{y_i} \Big[Y_{is} \log(1 - F(\eta_{ir}(\boldsymbol{\alpha}))) + (1 - Y_{is}) \log(F(\eta_{ir}(\boldsymbol{\alpha})))\Big].
+$$
+
+This formulation is equivalent to a binary model, which can be estimated using classical
+software for generalized additive models (GAM, \cite{Wood17}). Therefore, the original dataset is
+extended by creating new binary response variables
+$(Y_{i0}, Y_{i1}, \ldots, Y_{iy_i})^\top = (0, 0, \ldots, 0, 1)$, along with a new covariate
+$\mathbf{z}_i = (0, 1, \ldots, y_i)$, which is used to estimate count-specific effects
+$f_j(\mathbf{x}_i, \mathbf{z}_i)$ or simple count-specific intercepts. All other covariates values
+are duplicated accordingly to match the extended structure.
+
+Although the extended dataset for estimation can grow significantly in size, the model can
+still be estimated efficiently using methods developed for GAMs tailored to handle very large
+datasets, as demonstrated by \cite{Wood:2014} and \cite{Wood:2017}. Similarly, instead of
+estimating GAMs, one could consider neural networks or random forests for estimation.
+
+\subsection{Continuous Responses} \label{sec:continuous}
+
+To extend the estimation of transition models to continuous response data $y_i \in \mathbb{R}$,
+we employ a discretization approach inspired by histogram construction. Specifically, the
+continuous response variable is divided into $m - 1$ intervals using predefined bin boundaries
+$\zeta_1, \zeta_2, \ldots, \zeta_m$, where each interval $(\zeta_l, \zeta_{l+1}]$ is associated
+with a discrete count $r$. For instance, the first interval $(\zeta_1, \zeta_2]$ corresponds
+to $r = 0$, the second interval $(\zeta_2, \zeta_3]$ to $r = 1$, and so on. Each observation
+$y_i$ is assigned a count $r$ based on the interval it falls into, resulting in a transformed
+count response $\tilde{y}_i$.
+
+The transformed response $\tilde{y}_i$ is then used to estimate the transition model as
+described in Section~\ref{sec:counts}. This allows us to leverage the methodology developed for
+count data while accommodating continuous responses.
+
+The described discretization approach effectively provides a stepwise approximation of
+the underlying smooth continuous distribution. For a continuous response variable $y_i$ with
+cumulative distribution function (CDF) $F(y)$, the discretization process approximates the
+probabilities of $y_i$ falling into each interval as
+$$
+P(\zeta_l < y_i \leq \zeta_{l+1}) = F(\zeta_{l+1}) - F(\zeta_l).
+$$
+These probabilities are represented by the transformed counts $\tilde{y}_i$, allowing the
+transition model to reconstruct the discrete probabilities as
+$$
+P(\tilde{y}_i = r) = P(\zeta_r < y_i \leq \zeta_{r+1}).
+$$
+The transition model estimates the probability of transitioning between counts
+$$
+P(\tilde{y}_i > r \mid \tilde{y}_i \geq r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha})),
+$$
+and recursively computes
+$$
+P(\tilde{y}_i = r, \mathbf{x}_i) = P(\tilde{y}_i = r \mid \tilde{y}_i \geq r, \mathbf{x}_i) \prod_{s=0}^{r-1} P(\tilde{y}_i > s \mid \tilde{y}_i \geq s, \mathbf{x}_i).
+$$
+For any value $y_i \in (\zeta_l, \zeta_{l+1}]$, the CDF can be approximated by
+$$
+\hat{F}(y_i) = \sum_{r=0}^{l-1} P(\tilde{y}_i = r) + \frac{y_i - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y}_i = l),
+$$
+where the first term sums probabilities for bins below $y_i$, and the second term performs linear
+interpolation within the current bin. As the number of bins $m$ increases and bin widths shrink,
+this stepwise approximation converges uniformly to the true CDF $F(y)$.
+
+Similarly, the density function can be approximated as
+$$
+\hat{f}(y_i) = \frac{P(\tilde{y}_i = l)}{\zeta_{l+1} - \zeta_l}, \quad y_i \in (\zeta_l, \zeta_{l+1}].
+$$
+
+After estimating the transition model, quantities such as the mean, cumulative distribution
+function (CDF), quantile function, and density function can be approximated using the
+reconstructed CDF and density. Predictions for the continuous response variable are obtained
+by mapping the predicted counts $\tilde{y}_i$ back to the continuous scale,
+typically using the midpoints of the corresponding intervals as approximations.
+
+\subsection{Convergence of the Stepwise Approximation} \label{sec:convergence}
+
+To prove that the stepwise approximation $\hat{F}(y)$ converges uniformly to the true
+cumulative distribution function (CDF) $F(y)$, we proceed as follows. The true CDF $F(y)$ is
+defined as
+$$
+F(y) = P(Y \leq y), \quad y \in \mathbb{R}.
+$$
+The stepwise approximation $\hat{F}(y)$ is given by
+$$
+\hat{F}(y) = \sum_{r=0}^{l-1} P(\tilde{y} = r) + \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l),
+$$
+where $y \in (\zeta_l, \zeta_{l+1}]$, $P(\tilde{y} = r)$ corresponds to the probability
+mass assigned to the discrete count $r$, and $\zeta_l, \zeta_{l+1}$ are the bin boundaries.
+To show uniform convergence, we need to show
+$$
+\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \to 0 \quad \text{as } m \to \infty,
+$$
+where $m$ is the number of bins used in the stepwise approximation. As $m \to \infty$, the
+bin boundaries $\{\zeta_l\}_{l=1}^m$ partition $\mathbb{R}$ into intervals of shrinking width
+$$
+\max_{l} (\zeta_{l+1} - \zeta_l) \to 0 \quad \text{as } m \to \infty.
+$$
+
+The error between $\hat{F}(y)$ and $F(y)$ can be decomposed as
+$$
+\left| \hat{F}(y) - F(y) \right| = \underbrace{\left| \sum_{r=0}^{l-1} P(\tilde{y} = r) - F(\zeta_l) \right|}_{\text{Discrete Bin Approximation Error}} + \underbrace{\left| \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) - \left(F(y) - F(\zeta_l)\right) \right|}_{\text{Linear Interpolation Error}}.
+$$
+
+The discrete bin approximation error is zero because the probability masses $P(\tilde{y} = r)$
+are defined to match the probabilities of the intervals $(\zeta_r, \zeta_{r+1}]$, such that
+$$
+P(\tilde{y} = r) = F(\zeta_{r+1}) - F(\zeta_r), \quad \sum_{r=0}^{l-1} P(\tilde{y} = r) = F(\zeta_l).
+$$
+
+For the linear interpolation error, within each bin $(\zeta_l, \zeta_{l+1}]$, the true CDF
+$F(y)$ can be expanded as
+$$
+F(y) = F(\zeta_l) + \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} \big(F(\zeta_{l+1}) - F(\zeta_l)\big) + \mathcal{O}((\zeta_{l+1} - \zeta_l)^2).
+$$
+By construction,
+$$
+\frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) = \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} \big(F(\zeta_{l+1}) - F(\zeta_l)\big).
+$$
+The linear interpolation error is thus bounded by the higher-order term
+$\mathcal{O}((\zeta_{l+1} - \zeta_l)^2)$
+$$
+\left| \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) - \big(F(y) - F(\zeta_l)\big) \right| \leq C (\zeta_{l+1} - \zeta_l)^2,
+$$
+where $C$ is a constant depending on the second derivative of $F(y)$. Combining these results,
+the total error is bounded as
+$$
+\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \leq C \max_{l} (\zeta_{l+1} - \zeta_l)^2.
+$$
+
+As $m \to \infty$, $\max_{l} (\zeta_{l+1} - \zeta_l) \to 0$, and hence
+$$
+\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \to 0.
+$$
+
+Thus, the stepwise approximation $\hat{F}(y)$ converges uniformly to the true CDF $F(y)$ as
+$m \to \infty$, provided that the bin widths shrink to zero, ensuring that the
+discretization approach is a consistent method for approximating the smooth CDF $F(y)$.
+
+\section{Application} \label{sec:application}
+
+In this application, we analyze 30 years of precipitation data from the Tyrolean Alps to estimate a 
+climatology for precipitation. Figure~\ref{fig:Kirchberg} visualizes the raw data for the station 
+Kirchberg in Tirol. The left panel presents a histogram of the square root-transformed precipitation 
+values, overlaid with density estimates from a parametric censored normal (CN) model and a
+transition model (TM). Notably, the TM captures the inherent structure of the data more effectively, 
+particularly the spike at zero precipitation. This demonstrates the flexibility of the TM approach, 
+allowing it to directly model key features such as excess zeros.
+
+\begin{figure}[!ht]
+\centering
+%% \setkeys{Gin}{width=1\textwidth}
+<<echo=FALSE, results=hide>>=
+if(!file.exists("ts_hist.png")) {
+  d <- readRDS("../ehydTirol_Tageschniederschlagssummen.rds")
+  d <- subset(d, date >= (max(date) - 365*30))
+  d$sqrt_pre <- sqrt(d$value)
+  d$day <- as.POSIXlt(d$date)$yday
+
+  stations <- unique(d$name)
+
+  df <- subset(d, name == "Kirchberg in Tirol")
+
+  set.seed(123)
+  i <- sample(1:2, size = nrow(df), prob = c(0.8, 0.4), replace = TRUE)
+  dtrain <- subset(df, i < 2)
+  dtest <- subset(df, i > 1)
+  
+  breaks <- c(-0.15, seq(0.15, floor(max(df$sqrt_pre)) + 1, by = 0.3))
+
+  m <- tm(sqrt_pre ~ theta0 + s(theta,k=20), data = df, breaks = breaks)
+
+  nd <- data.frame("sqrt_pre" = 0:m$maxcounts)
+  pm <- predict(m, newdata = nd, type = "pdf")
+
+  mids <- (breaks[-1] + breaks[-length(breaks)]) / 2
+  w <- diff(breaks)
+  dm <- pm/w
+
+  gen.cens("NO", type = "left")
+  b <- gamlss2(Surv(sqrt_pre, sqrt_pre > 0) ~ 1, data = df, family = NOlc)
+  par <- predict(b, newdata = data.frame("sqrt_pre" = mids))
+  db <- family(b)$d(Surv(mids, mids > 0), par)
+
+  f <- sqrt_pre ~ theta0 + s(theta,k=20) + s(day,bs="cc",k=20) +
+    te(theta,day,bs=c("cr", "cc"),k=10)
+
+  breaks2 <- c(-0.1, seq(0.1, floor(max(df$sqrt_pre)) + 1, by = 0.05))
+
+  m2 <- tm(f, data = dtrain, breaks = breaks2)
+
+  f <- Surv(sqrt_pre, sqrt_pre > 0) ~ s(day,k=20,bs="cc") | s(day,k=20,bs="cc")
+  b2 <- gamlss2(f, data = dtrain, family = NOlc)
+
+  qu <- c(0.01, 0.1, 0.5, 0.9, 0.99)
+
+  g2 <- mqgam(sqrt_pre ~ s(day,k=20,bs="cc"), data = dtrain, qu = qu)
+
+  nd <- data.frame("day" = 0:365)
+  pm2 <- do.call("cbind",
+    lapply(qu, function(j) {
+      predict(m2, newdata = dtest, prob = j)
+  }))
+
+  par <- predict(b2, newdata = dtest)
+  pb2 <- do.call("cbind",
+    lapply(qu, function(j) {
+      b2$family$q(j, par)
+  }))
+
+  pg2 <- do.call("cbind",
+    lapply(qu, function(j) {
+      qdo(g2, j, predict, newdata = dtest)
+  }))
+
+  err_b <- err_m <- err_g <- NULL
+  for(j in 1:3) {
+    err_b <- c(err_b, qgam::pinLoss(dtest$sqrt_pre, pb2[, j], qu[j]))
+    err_m <- c(err_m, qgam::pinLoss(dtest$sqrt_pre, pm2[, j], qu[j]))
+    err_g <- c(err_g, qgam::pinLoss(dtest$sqrt_pre, pg2[, j], qu[j]))
+  }
+  err_b <- sum(err_b)
+  err_m <- sum(err_m)
+  err_g <- sum(err_g)
+
+  png("ts_hist.png", units = "in", res = 200, width = 8, height = 4)
+
+  par(mfrow = c(1, 2), mar = c(4, 4, 1, 1))
+
+  hist(df$sqrt_pre, breaks = breaks, freq = FALSE,
+    xlab = "sqrt(Precipitation)", main = "")
+
+  lines(db ~ mids, col = 2, lwd = 2)
+  lines(dm ~ mids, col = 4, lwd = 2)
+  rug(df$sqrt_pre, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
+
+  legend("center", c("CN", "TM"),
+    lwd = 2, col = c(2, 4), bty = "n")
+
+  plot(sqrt_pre ~ day, data = dtest, type = "h", col = rgb(0.1, 0.1, 0.1, alpha = 0.4),
+    xlab = "Day of the year", ylab = "sqrt(Precipitation)", ylim = c(0, 11))
+
+  j <- order(dtest$day)
+  matplot(dtest$day[j], pb2[j, ], type = "l", lty = 1, col = 2, add = TRUE)
+  matplot(dtest$day[j], pg2[j, ], type = "l", lty = 1, col = 5, add = TRUE)
+  matplot(dtest$day[j], pm2[j, ], type = "l", lty = 1, col = 4, add = TRUE)
+
+  legend("topleft", paste(c("CN PBL =", "QR PBL =", "TM PBL ="),
+      round(c(err_b, err_g, err_m))),
+    lwd = 2, col = c(2, 5, 4), bty = "n")
+
+  dev.off()
+}
+@
+\includegraphics[width=0.9\textwidth]{ts_hist.png}
+\caption{\label{fig:Kirchberg} Precipitation data for Kirchberg in Tirol, Austria.
+  The left panel shows a histogram of the square root-transformed daily precipitation values,
+  overlaid with fitted densities from a censored normal distribution (CN, red line) and
+  a transition model (TM, blue line). The right panel depicts the seasonal variation in
+  square root-transformed precipitation values, including empirical quantiles
+  (1st, 10th, 50th, 90th, and 99th percentiles) for each day of the year.
+  Quantile estimates (out-of-sample) are provided for CN, TM, and a quantile regression model (QR),
+  along with their respective pinball loss (PBL) values, demonstrating the models' performance
+  in capturing the distribution of precipitation.}
+\end{figure}
+
+\begin{figure}[!ht]
+\centering
+%% \setkeys{Gin}{width=1\textwidth}
+<<echo=FALSE, results=hide>>=
+if(!file.exists("premodel.png") & FALSE) {
+  d <- readRDS("../ehydTirol_Tageschniederschlagssummen.rds")
+  d <- subset(d, date >= (max(date) - 365*30))
+  d$sqrt_pre <- sqrt(d$value)
+  d$day <- as.POSIXlt(d$date)$yday
+
+  stations <- unique(d$name)
+
+  set.seed(123)
+  i <- sample(stations, size = floor(length(stations) * 0.6))
+
+  dtrain <- subset(d, name %in% i)
+  dtest <- subset(d, !(name %in% i))
+
+  breaks <- c(-0.1, seq(0.1, floor(max(d$sqrt_pre)) + 1, by = 0.2))
+
+  f1 <- sqrt_pre ~ theta0 + s(theta,k=20) +
+    s(day,bs="cc",k=20) +
+    te(theta,day,lon,lat,d=c(1,1,2),k=c(5,5,30)) +
+    te(theta,day,bs=c("cr", "cc")) +
+    te(theta,alt) +
+    te(theta,lon,lat,d=c(1,2),bs=c("cr","tp"))
+
+  m1 <- tm(f1, data = dtrain, breaks = breaks, useC = TRUE)
+
+  f2 <- Surv(sqrt_pre, sqrt_pre > 0) ~ s(day,bs="cc",k=20) + s(lon,lat) +
+    te(day,lon,lat,d=c(1,2),bs=c("cr","tp"),k=c(5,30)) |
+      s(day,bs="cc",k=20) + s(lon,lat) +
+      te(day,lon,lat,d=c(1,2),bs=c("cr","tp"),k=c(5,30))
+
+  gen.cens("NO", type = "left")
+
+  m2 <- gamlss2(f2, data = dtrain, family = NOlc, binning = TRUE)
+
+  download.file("http://bamlss.org/misc/precipitation_clim.tar.gz", "clim.tar.gz")
+  untar("clim.tar.gz", exdir = ".")
+  library("raster")
+  library("stars")
+  library("sf")
+
+  dem <- st_as_stars(readRDS("dem.rds"))
+  dem <- st_transform(dem, crs = 4326)
+
+  download.file("https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_AUT_1.json.zip", "AT-gadm.zip")
+  unzip("AT-gadm.zip")
+  
+  AT <- read_sf("gadm41_AUT_1.json")
+  Tyrol <- subset(AT, NAME_1 == "Tirol")
+  Tyrol <- st_geometry(Tyrol)
+
+  a <- st_intersects(dem, Tyrol)
+}
+@
+%% \includegraphics[width=0.9\textwidth]{premodel.png}
+\caption{\label{fig:premodel} \dots}
+\end{figure}
+
+%\bibliographystyle{plainnat}
+%\bibliographystyle{apalike}
+\bibliographystyle{unsrt}
+\bibliography{ies2025.bib}
+
+%\listofchanges
+
+\end{document}
+
+
+set.seed(123)
+
+i <- sample(c(TRUE, FALSE), size = nrow(d), replace = TRUE, prob = c(0.5, 0.5))
+dtrain <- d[i, ]
+dtest <- d[!i, ]
+
+f <- sqrt(pre) ~ theta0 + s(theta) + s(yday,bs="cc",by=as.factor(theta0)) +
+  te(theta,yday,bs=c("cr","cc"),by=as.factor(theta0))
+
+breaks <- c(-0.01, seq(0.01, 14, length = 100))
+
+b <- tm(f, data = dtrain, breaks = breaks)
+
+qu <- c(0.01, 0.1, 0.5, 0.9, 0.999)
+
+g <- mqgam(sqrt(pre) ~ s(yday,bs="cc"), data = dtrain, qu = qu)
+
+m <- gamlss2(Surv(sqrt(pre), pre > 0) ~ s(yday,bs="cc") | s(yday,bs="cc"), data = dtrain, family = NOlc, maxit = c(100, 100))
+
+p <- do.call("cbind",
+  lapply(qu, function(j) {
+    predict(b, newdata = dtest, prob = j)^2
+}))
+
+pg <- do.call("cbind",
+  lapply(qu, function(j) {
+    qdo(g, j, predict, newdata = dtest)^2
+}))
+
+par <- predict(m, newdata = dtest)
+pm <- do.call("cbind",
+  lapply(qu, function(j) {
+    m$family$q(j, par)^2
+}))
+
+plot(pre ~ yday, data = dtest, type = "h",
+  col = rgb(0.1, 0.1, 0.1, alpha = 0.2), pch = 16)
+
+i <- order(dtest$yday)
+
+matplot(dtest$yday[i], pg[i, ], type = "l",
+  lty = 1, col = 2, lwd = 2, add = TRUE)
+
+matplot(dtest$yday[i], pm[i, ], type = "l",
+  lty = 1, col = 3, lwd = 2, add = TRUE)
+
+matplot(dtest$yday[i], p[i, ], type = "l",
+  lty = 1, col = 4, lwd = 2, add = TRUE)
+
+err_b <- err_g <- err_m <- NULL
+for(j in seq_along(qu)) {
+  err_b <- c(err_b, qgam::pinLoss(dtest$pre, p[, j], qu[j]))
+  err_g <- c(err_g, qgam::pinLoss(dtest$pre, pg[, j], qu[j]))
+  err_m <- c(err_m, qgam::pinLoss(dtest$pre, pm[, j], qu[j]))
+}
+err_b <- sum(err_b)
+err_g <- sum(err_g)
+err_m <- sum(err_m)

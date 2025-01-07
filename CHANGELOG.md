@@ -1,4 +1,10 @@
 
+## Version 0.1-9002
+
+* Removed original base-R implementation which have been replaced
+    by vectorised versions and C functions.
+* Added an experimental \code{engine = "glmnet"}.
+
 ## Version 0.1-9001
 
 * Added proper `NA` handling to `tm_calc_cdf`, `tm_calc_pdf`,

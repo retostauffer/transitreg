@@ -28,7 +28,8 @@ tm(formula, data, subset, na.action,
     fitting process.}
   \item{na.action}{A function that determines how \code{NA} values in the data should be handled.}
   \item{engine}{Character string specifying the estimation engine. Options include 
-    \code{"bam"}, \code{"gam"}, or \code{"nnet"}. Default is \code{"bam"}.}
+    \code{"bam"}, \code{"gam"}, \code{"nnet"}, or \code{"glmnet"} (experimental).
+    Default is \code{"bam"}.}
   \item{scale.x}{Logical value indicating whether covariates should be scaled before estimation.}
   \item{breaks}{Controls the splitting of continuous responses into intervals to mimic a 
     count response. If a single number is provided, equidistant intervals are used. If a 

@@ -35,6 +35,7 @@ S3method(coef, tm)
 S3method(print, tm)
 S3method(rootogram, tm)
 
+
 ## Distributions3 implementation
 export("tmdist")
 S3method(as.data.frame,  tmdist)
@@ -47,4 +48,7 @@ S3method(quantile,       tmdist)
 S3method(median,         tmdist)
 S3method(mean,           tmdist)
 S3method(random,         tmdist)
+
+## GLMNET test
+importFrom("mgcv", "interpret.gam", "smoothCon")
 

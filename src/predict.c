@@ -55,24 +55,34 @@ tmWhich find_positions(int x, int* y, int n) {
 
 /* VECTOR VERSION, RETURNS AN OBJECT OF CLASS doubleVec,
  * used for elementwise = FALSE */
-doubleVec tm_calc_pdf(int* positions, int count, double* pptr) {
+doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny) {
     // Initialize return value/object
     doubleVec res;
-    res.values = (double*)malloc(count * sizeof(double));  // Allocate max possible size
-    res.length = count;
+    res.values = (double*)malloc(count * sizeof(double));  // Allocate vector result
+    res.length = ny;
 
     if (res.values == NULL) { error("Memory allocation failed for doubleVec.values."); }
+
+    // Set to true if 'binmidptr' is not provided (an NA). In this case we simply
+    // iterate trough the entire tp vector and store the very last value.
+    bool nobm = ISNAN(binmidptr[0]);
 
     // Start calculating
     double prod = 1.0; // Initialize product
     for (int i = 0; i < count; i++) {
-        if (ISNAN(pptr[positions[i]])) {
+        if (ISNAN(tpptr[positions[i]])) {
             error("TODO(R): First element ISNAN, must be adressed in C");
             //return R_NaReal; 
         }
-        res.values[i] = prod * (1.0 - pptr[positions[i]]);
+        // In this case we are only interested in the final PDF (last bin)
+        if (nobm) {
+            res.values[0] = prod * (1.0 - tpptr[positions[i]]);
+            printf(" ---- i = %d   count = %d   res[0] = %.5f\n", i, count, res.values[0]);
+        } else {
+            res.values[i] = prod * (1.0 - tpptr[positions[i]]);
+        }
         // Updating vector product
-        prod *= pptr[positions[i]];
+        prod *= tpptr[positions[i]];
     }
     return res;
 }
@@ -125,7 +135,7 @@ doubleVec tm_calc_quantile(int* positions, int count, double* pptr, double* prob
 
     // Initialize return value/object
     doubleVec res;
-    res.values = (double*)malloc(np * sizeof(double));  // Allocate max possible size
+    res.values = (double*)malloc(np * sizeof(double));  // Allocate vector result
     res.length = np;
 
     // Temporary double vector to store calculated quantiles
@@ -211,37 +221,58 @@ double tm_calc_pmax(int* positions, int count, double* pptr) {
  *
  * @param uidx integer vector with unique indices in data.
  * @param idx integer with indices, length of idx is sample size times breaks.
- * @param p probabilities, same length as idx vector.
- * @param type character, either 'pdf', 'cdf', or 'pmax'.
- * @param prob only used if type is 'quantile'; can be NULL (as not used) if
+ * @param tp transition probabilities, same length as idx vector.
+ * @param binmid mid point of the corresponding bin, if used it must be of
+ *        the same length as \code{tp} (see Details).
+ * @param y for \code{type = "quantile"} y (numeric) specifies the probabilities
+ *        at which the quantile has to be calculated. If \code{type = "cdf"} or
+ *        \code{type = "pdf"}, \code{y} evaluates the threshold at which to
+ *        evaluate CDF/PDF. See 'Details'.
+ * @param y only used if type is 'quantile'; can be NULL (as not used) if
  *        the type is different. Else it is expected to be a vector of doubles
  *        with the same length as 'uidx'.
+ * @param type character, either 'pdf', 'cdf', or 'pmax'.
  * @param ncores integer, number of cores to be used (ignored if OMP not available).
  *
- * @details Internally loops over all unique indices in `uidx`.
- * For each index (belonging to one observation) we check the position
- * of the elements in `idx`, and call the `predict_pdf_calc` function
- * which calculates and returns the pdf (double).
+ * @details This function has a series of different 'modes' for different purposes.
+ * Allows to calculate the CDF, PDF, quantiles, as well as the expectation (pmax).
  * 
- * @return Returns SEXP double vector of length (length(uidx)).
+ * The three inputs which are always required are:
+ *
+ * * \code{uidx}: Unique 'distribution' index.
+ * * \code{idx}: Integer vector specifying which transition probability
+ *   (and binmid if used) corresponds to which \code{uidx}.
+ * * \code{type}: What to return.
+ * * \code{ncores}: Number of cores to be used when OpenMP is available.
+ *
+ * The use of the remaining arguments differ.
+ *
+ * Quantiles (\code{type = "quantile"})
+ * ------------------------------------
+ * \code{y} must be numeric, same length as \code{uidx}. Defines the probabilities
+ * at which the different distributions have to be evaluated. In case
+ * \code{elementwise} is set \code{true}, it specifies the probabilities at which
+ * each distribution is evaluaed (thus, the length must not be equal to the
+ * length of \code{uidx}).
+ *
+ *
+ * @return TODO(R): Depends on mode.
  */
-SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
-                SEXP ncores, SEXP elementwise) {
+SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
+                SEXP type, SEXP ncores, SEXP elementwise) {
 
-    double *pptr    = REAL(p);
-    int    *uidxptr = INTEGER(uidx);     // Unique indices in the dtaa
-    int    *idxptr  = INTEGER(idx);      // Index vector
-    int    nthreads = asInteger(ncores); // Number of threads for OMP
-    int    n        = LENGTH(idx);
-    int    un       = LENGTH(uidx);
-    bool   ewise    = asLogical(elementwise); // C boolean value
+    int    *uidxptr   = INTEGER(uidx);     // Unique indices in the dtaa
+    int    *idxptr    = INTEGER(idx);      // Distribution index
+    int    nthreads   = asInteger(ncores); // Number of threads for OMP
+    int    n          = LENGTH(idx);
+    int    un         = LENGTH(uidx);
     int    i, j, np;
 
-    // This is only used if type == "quantile"; on the R side it is ensured
-    // that 'prob' is a numeric vector of LENGTH(uidx) if type = 'quantile',
-    // thus we do not check it here.
-    double *probptr = REAL(prob);        // Probability used for quantiles
+    double *tpptr     = REAL(tp);          // Transition probabilities
+    double *binmidptr = REAL(binmid);      // Bin mid point, not always needed
+    double *yptr      = REAL(y);           // Where to evaluate the distribution
 
+    bool   ewise      = asLogical(elementwise); // C boolean value
 
     // Evaluate 'type' to define what to do. Store a set of
     // boolean values to only do the string comparison once.
@@ -252,17 +283,19 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
     // ... if none of them is true, it must be "do pmax"
     // bool do_pmax = strcmp(thetype, "pmax") == 0;
 
+    // Boolean flat which is set true if 'binmid' is not provided.
+    ////bool no_binmid = (LENGTH(binmid) == 1) & ISNAN(binmidptr[0]);
+    ////printf(" --------------------- no_binmid : %d    %.5f\n", no_binmid, binmidptr[0]);
+
     // Allocating return vector.
-    // If type is "pdf" or "df" and ewise is FALSE: the length of the
-    //     vector is the same as 'un', else 'un * LENGTH(p);'.
+
+    // If type is "pdf", "cdf", or "quantile" and ewise is false: the length of
+    // the vector is the same as 'un', else 'un * ny' (number of distributions
+    // times number of probabilites/thresholds at which each distribution is
+    // evaluated).
     SEXP res;
-    if (do_pdf | do_cdf) {
-        np = (!ewise) ? 1 : LENGTH(p);
-        PROTECT(res = allocVector(REALSXP, un * np));
-    // If type is "quantile" and ewise is FALSE: the length of the
-    //     vector is also the same length as 'un', else 'un' times LENGTH(prob);
-    } else if (do_q) {
-        np = (!ewise) ? 1 : LENGTH(prob);
+    if (do_pdf | do_cdf | do_q) {
+        np = (!ewise) ? 1 : LENGTH(y);
         PROTECT(res = allocVector(REALSXP, un * np));
     // Else it is type = "pmax", so length of res is equal to 'un'.
     } else {
@@ -272,6 +305,11 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
 
     // Pointer on results vector 'res'
     double *resptr = REAL(res);
+
+    // If binmid is NA, but yptr is not: Error (this combination is not allowed)
+    if (ISNAN(binmidptr[0]) & !ISNAN(yptr[0])) {
+        error("Problem in C tm_predict(): binmid is NAN, but y is not.");
+    }
 
     // If mode is not pdf, cdf, or quantile, elementwise must be false.
     // Else we throw an error here. That is for pmax where elementwise
@@ -286,24 +324,31 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
     doubleVec tmp;
 
     #if OPENMP_ON
-    #pragma omp parallel for num_threads(nthreads) private(which)
+    #pragma omp parallel for num_threads(nthreads) private(which, tmp)
     #endif
     for (i = 0; i < un; i++) {
         which = find_positions(uidxptr[i], idxptr, n);
         if (do_pdf | do_cdf | do_q) {
             // --- Calculating probability density
             if (do_pdf) {
-                tmp = tm_calc_pdf(which.index, which.length, pptr);
+                // Single PDF
+                if (!ewise) {
+                    tmp = tm_calc_pdf(which.index, which.length, tpptr, binmidptr, yptr, 1);
+                    //tmp = tm_calc_pdf(which.index, which.length, tpptr, binmidptr, &yptr[i], 1);
+                // Multiple PDFs (elementwise)
+                } else {
+                    tmp = tm_calc_pdf(which.index, which.length, tpptr, binmidptr, yptr, LENGTH(y));
+                }
             // --- Calculating cumulative distribution
             } else if (do_cdf) {
-                tmp = tm_calc_cdf(which.index, which.length, pptr);
+                tmp = tm_calc_cdf(which.index, which.length, tpptr);
             } else {
                 // Single quantile
                 if (!ewise) {
-                    tmp = tm_calc_quantile(which.index, which.length, pptr, &probptr[i], 1);
+                    tmp = tm_calc_quantile(which.index, which.length, tpptr, &yptr[i], 1);
                 // Multiple quantiles (elementwise)
                 } else {
-                    tmp = tm_calc_quantile(which.index, which.length, pptr, probptr, LENGTH(prob));
+                    tmp = tm_calc_quantile(which.index, which.length, tpptr, yptr, LENGTH(y));
                 }
             }
 
@@ -317,7 +362,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
             free(tmp.values); // Free allocated memory
         // Else it must be pmax
         } else {
-            resptr[i] = tm_calc_pmax(which.index, which.length, pptr);
+            resptr[i] = tm_calc_pmax(which.index, which.length, tpptr);
         }
         free(which.index); // Free allocated memory
     }
@@ -329,18 +374,25 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob,
 
 /* Calculating pdf and cdf (both at the same time)
  *
+ * This mode is used when estimating the Transition Model. Calculates
+ * the PDF and CDF for each observation at the last bin (i.e., the bin
+ * in which the observation falls into). Calls tm_calc_pdf and tm_calc_cdf
+ * with a missing value on 'binmidptr' and 'ny = 1' which tells tm_calc_pdf/tm_calc_cdf
+ * to use this specific "mode".
+ *
  * @param uidx integer vector with unique indices in data.
  * @param idx integer with indices, length of idx is sample size times breaks.
  * @param p probabilities, same length as idx vector.
  * @param type character, either 'pdf', 'cdf', or 'pmax'.
  * @param ncores integer, number of cores to be used (ignored if OMP not available).
  *
- * @details Does the same as tm_predict but calculates both PDF and
- * CDF simultanously, returning a named list. This is used in the
- * main `tm()` function, calculating both at the same time should
- * help to speed up the calculations.
+ * @details Does something similar to tm_predict but calculates both PDF and
+ * CDF simultanously for the very last bin in each distribution (observation),
+ * returning a named list. This is used in the main `tm()` function,
+ * calculating both at the same time should help to speed up the calculations.
  * 
- * @return Returns SEXP double vector of length (length(uidx)).
+ * @return Returns named list with two numeric vectors, each of which
+ * has length(uidx) (vector with cdf and pdf).
  */
 SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores) {
 
@@ -365,6 +417,9 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores) {
     SEXP cdf; PROTECT(cdf = allocVector(REALSXP, un)); ++nProtected;
     double *cdfptr = REAL(cdf);
 
+    // Dummy value as we need a proper object when calling tm_calc_*() below
+    double* na = malloc(sizeof(double)); // Single double pointer
+    na[0] = 0.0 / 0.0; // Assign nan (missing value)
 
     /* Warning for future me: Do not use Rprintf inside omp -> segfault */
     #if OPENMP_ON
@@ -372,9 +427,9 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores) {
     #endif
     for (i = 0; i < un; i++) {
         which = find_positions(uidxptr[i], idxptr, n);
-        tmppdf = tm_calc_pdf(which.index, which.length, pptr);
+        tmppdf = tm_calc_pdf(which.index, which.length, pptr, na, na, 1);
         tmpcdf = tm_calc_cdf(which.index, which.length, pptr);
-        // Store last value
+        // Store last value, that is the last bin provided for this distribution.
         pdfptr[i] = tmppdf.values[tmppdf.length - 1];
         cdfptr[i] = tmpcdf.values[tmpcdf.length - 1];
         // Free allocated memory
