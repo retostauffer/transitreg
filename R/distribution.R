@@ -326,7 +326,7 @@ quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = 
 
     # Setting up all unique combinations needed
     # (1) Use same 'x' for all distributions
-    if (nprobs == 1L && length(x) > 1L) probs <- rep(probs, length(x))
+    if (!elementwise & nprobs == 1L && length(x) > 1L) probs <- rep(probs, length(x))
 
     if (!elementwise & length(probs) > length(x))
         stop("length of 'probs' can't be larger than number of distributions in 'd'",
@@ -340,23 +340,13 @@ quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = 
     ## Calling C to calculate the required quantiles
     ## binmid: Not required
     ## y: probabilities at which to evaluate the distributions
-    res <- .Call("tm_predict", uidx = ui, index = x$index, tp = x$tp, binmid = NA_real_, y = probs,
+    res <- .Call("tm_predict", uidx = ui, index = x$index, tp = x$tp, binmid = x$binmid, y = probs,
                  type = "quantile", ncores = ncores, elementwise = elementwise)
-
-    # Translate quantile bins to numeric values (binmid)
-    bin2num <- function(x, d, np, ewise) {
-        idx <- rep(ui, each = if (ewise) np else 1L)
-        # 'order' is used to recreate the correct order before return
-        x   <- data.frame(order = seq_along(idx), index = idx, bin = res)
-        res <- merge(d, x, by = c("bin", "index"), all.x = FALSE, all.y = TRUE)
-        return(res[order(res$order), "binmid", drop = TRUE])
-    }
-    res <- bin2num(res, x, nprobs, elementwise)
 
     # If elementwise: Return matrix of dimension length(d) x length(probs)
     if (elementwise) {
-        res <- matrix(res, ncol = length(probs),
-                      dimnames = list(xnames, paste("q", format(probs, digits = 3), sep = "_")))
+        res <- matrix(res, ncol = length(probs), byrow = TRUE,
+                      dimnames = list(xnames, paste0(format(probs * 1e2, digits = 3), "%")))
         return(as.data.frame(res))
     # Else return named vector
     } else {

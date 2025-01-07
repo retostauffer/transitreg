@@ -112,9 +112,21 @@ doubleVec tm_calc_cdf(int* positions, int count, double* tpptr, double* binmidpt
     return res;
 }
 
+
+/* Linear interpolation for finer quantiles */
+double interpolate_linear(double x1, double y1, double x2, double y2, double p) {
+    if (ISNAN(x1) | ISNAN(y1) | ISNAN(x2) | ISNAN(y2)) {
+        return NA_REAL;
+    } else if (x1 == x2) {
+        return x1;
+    }
+    // Performing interpolation
+    return x1 + (p - y1) * (x2 - x1) / (y2 - y1);
+}
+
 /* Helper function for type = "quantile"
  */
-doubleVec tm_calc_quantile(int* positions, int count, double* pptr, double* prob, int np) {
+doubleVec tm_calc_quantile(int* positions, int count, double* tpptr, double* binmidptr, double* prob, int np) {
 
     int i, j;
 
@@ -135,29 +147,29 @@ doubleVec tm_calc_quantile(int* positions, int count, double* pptr, double* prob
 
     if (res.values == NULL) { error("Memory allocation failed for doubleVec.values."); }
 
-    if (ISNAN(pptr[positions[0]])) {
+    if (ISNAN(tpptr[positions[0]])) {
         error("TODO(R): First element ISNAN, must be adressed in C");
         //return R_NaReal; 
     }
 
-    // TODO(R): Should not be needed, just initializing quantile with 0 for safety/testing
-    for (i = 0; i < np; i++) { res.values[i] = -1; } 
+    // Initialize the results vector with -nan; just for safety reasons, should not be needed
+    for (i = 0; i < np; i++) { res.values[i] = NA_REAL; } 
 
     // Initialize with (1 - p[0])
-    tmp[0] = 1.0 - pptr[positions[0]];
+    tmp[0] = 1.0 - tpptr[positions[0]];
 
-    // Looping over 'pptr' (counts) to calculate the quantiles; store in 'tmp'.
+    // Looping over 'tpptr' (counts) to calculate the quantiles; store in 'tmp'.
     // As soon as the calculated quantile tmp[i] is larger than pmax we can stop
     // as we will not need it.
     if (count > 0) {
         double pprod = 1.0; // Initialize with 1.0 for product
         for (int i = 1; i < count; i++) {
-            if (ISNAN(pptr[positions[i - 1]])) {
+            if (ISNAN(tpptr[positions[i - 1]])) {
                 error("TODO(R): ISNAN must be implemented first (doubleVec; in cdf)");
                 //return R_NaReal;
             }
-            pprod *= pptr[positions[i - 1]]; // Multiply with previous element
-            tmp[i] = tmp[i - 1] + (1.0 - pptr[positions[i]]) * pprod;
+            pprod *= tpptr[positions[i - 1]]; // Multiply with previous element
+            tmp[i] = tmp[i - 1] + (1.0 - tpptr[positions[i]]) * pprod;
 
             // Break for loop as tmp[i] is already larger than pmax
             if (tmp[i] > pmax) { break; }
@@ -167,11 +179,34 @@ doubleVec tm_calc_quantile(int* positions, int count, double* pptr, double* prob
     // Assign correct quantile to each element in res.values.
     // i: Loops over the quantiles we are looking for
     // j: Loops over calculated quantiles
+    // Store bin mid (quantile we are looking for)
     j = 0;
     for (i = 0; i < np; i++) {
         for (j = j; j < count; j++) {
-            if (prob[i] < tmp[j]) { res.values[i] = j; break; }
+            if ((prob[i] >= tmp[j - 1]) & (prob[i] < tmp[j])) {
+                // TODO(R): Should/could we perform linear extrapolation for quantiles
+                //          below/above the lowest/highest point? At least as long as
+                //          'in bin range'? Question for Niki.
+                // If j = 0, or j = (count - 1): Take bin mid as is
+                if ((j == 0) | (j == (count - 1))) {
+                    res.values[i] = binmidptr[positions[j]];
+                } else {
+                    // Perform linear interpolation between the two neighboring bin mids.
+                    res.values[i] = interpolate_linear(binmidptr[positions[j - 1]], tmp[j - 1],
+                                                       binmidptr[positions[j]],     tmp[j],
+                                                       prob[i]);
+                }
+                break; // Found what we were looking for, break inner loop
+            }
         }
+        // If we reach this point we are above the highest bin, store
+        // last available bin mid point.
+        if (j == count) {
+            res.values[i] = binmidptr[positions[count - 1]];
+        }
+        // TODO(R): WARNING, currently the approach using the lowest/highest
+        //          value if the quantile lays outside, this collapses all
+        //          quantiles to the supported range. Good? Question for Niki.
     }
     free(tmp); // Freeing allocated memory
 
@@ -341,10 +376,10 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
             } else {
                 // Single quantile
                 if (!ewise) {
-                    tmp = tm_calc_quantile(which.index, which.length, tpptr, &yptr[i], 1);
+                    tmp = tm_calc_quantile(which.index, which.length, tpptr, binmidptr, &yptr[i], 1);
                 // Multiple quantiles (elementwise)
                 } else {
-                    tmp = tm_calc_quantile(which.index, which.length, tpptr, yptr, LENGTH(y));
+                    tmp = tm_calc_quantile(which.index, which.length, tpptr, binmidptr, yptr, LENGTH(y));
                 }
             }
 
@@ -415,19 +450,24 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores) {
 
     // Dummy value as we need a proper object when calling tm_calc_*() below
     double* na = malloc(sizeof(double)); // Single double pointer
-    na[0] = 0.0 / 0.0; // Assign nan (missing value)
+    na[0] = NA_REAL; // Assign missing value
 
     /* Warning for future me: Do not use Rprintf inside omp -> segfault */
     #if OPENMP_ON
     #pragma omp parallel for num_threads(nthreads) private(which, tmppdf, tmpcdf)
     #endif
     for (i = 0; i < un; i++) {
+        // Search position of uidxptr[i] in vector idxptr
         which = find_positions(uidxptr[i], idxptr, n);
+
+        // Calculate pdf and cdf (for the last bin)
         tmppdf = tm_calc_pdf(which.index, which.length, pptr, na, na, 1);
         tmpcdf = tm_calc_cdf(which.index, which.length, pptr, na, na, 1);
+
         // Store last value, that is the last bin provided for this distribution.
         pdfptr[i] = tmppdf.values[tmppdf.length - 1];
         cdfptr[i] = tmpcdf.values[tmpcdf.length - 1];
+
         // Free allocated memory
         free(which.index);
         free(tmppdf.values);

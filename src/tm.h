@@ -71,9 +71,10 @@ tmWhich find_positions(int x, int* y, int n);
 
 // TODO(R): Delete me! // void fun(double *y, double *H);
 
+double interpolate_linear(double x1, double y1, double x2, double y2, double p);
 doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny);
 doubleVec tm_calc_cdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny);
-doubleVec tm_calc_quantile(int* positions, int count, double* pptr, double* prob, int np);
+doubleVec tm_calc_quantile(int* positions, int count, double* tpptr, double* binmidptr, double* prob, int np);
 
 double tm_calc_pmax(int* positions, int count, double* pptr);
 
