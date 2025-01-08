@@ -443,7 +443,7 @@ if(!file.exists("premodel.png") & FALSE) {
     te(theta,alt) +
     te(theta,lon,lat,d=c(1,2),bs=c("cr","tp"))
 
-  m1 <- tm(f1, data = dtrain, breaks = breaks, useC = TRUE)
+  m1 <- tm(f1, data = dtrain, breaks = breaks)
 
   f2 <- Surv(sqrt_pre, sqrt_pre > 0) ~ s(day,bs="cc",k=20) + s(lon,lat) +
     te(day,lon,lat,d=c(1,2),bs=c("cr","tp"),k=c(5,30)) |
