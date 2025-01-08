@@ -429,12 +429,12 @@ if(!file.exists("premodel.png") & FALSE) {
   stations <- unique(d$name)
 
   set.seed(123)
-  i <- sample(stations, size = floor(length(stations) * 0.6))
+  i <- sample(stations, size = floor(length(stations) * 0.8))
 
   dtrain <- subset(d, name %in% i)
   dtest <- subset(d, !(name %in% i))
 
-  breaks <- c(-0.1, seq(0.1, floor(max(d$sqrt_pre)) + 1, by = 0.2))
+  breaks <- c(-0.05, seq(0.05, floor(max(d$sqrt_pre)) + 1, by = 0.1))
 
   f1 <- sqrt_pre ~ theta0 + s(theta,k=20) +
     s(day,bs="cc",k=20) +
@@ -483,6 +483,11 @@ if(!file.exists("premodel.png") & FALSE) {
   nd$day <- 182
 
   nd$m1_p99 <- predict(m1, newdata = nd, prob = 0.99)
+
+  nr <- raster(dem)
+  values(nr) <- nd$m1_p99
+
+  plot(nr, main = "Predicted 99th Percentile (m1_p99)")
 }
 @
 %% \includegraphics[width=0.9\textwidth]{premodel.png}
