@@ -47,58 +47,70 @@ tmWhich find_positions(int x, int* y, int n) {
 
 /* Helper function for type = "pdf" */
 doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny) {
-    int i;
 
-    // Initialize return value/object
+    int i, j;
+    double delta;
+
+    // Initialize return value/object.
     doubleVec res;
     res.values = (double*)malloc(ny * sizeof(double));  // Allocate vector result
     res.length = ny;
 
-    for (i = 0; i < ny; i++) { res.values[i] = NA_REAL; }
-
-    if (res.values == NULL) { error("Memory allocation failed for doubleVec.values."); }
+    // Temporary double vector to calculate PDF along i = 0, ..., count - 1
+    double* tmp = malloc(count * sizeof(double)); // Single double pointer
 
     // Set to true if 'binmidptr' is not provided (an NA). In this case we simply
     // iterate trough the entire tp vector and store the very last value.
     bool nobm = ISNAN(binmidptr[0]);
 
-    // This counter is used to keep track of the current index of 'y'
-    // we are calculating; defines in which res.value to write the result.
-    // Only used if binmidptr is not NA, used to evaluate the PDF at one
-    // or multiple positions defined by 'y'.
-    // The 'nobm' mode is used by tm() when estimating the model.
-    int yi = 0;
-
-    // Start calculating
+    // This is the nobm mode; length of return vector 'res' is 1,
+    // we are updating res.values[0] until reaching end of tp (i = 1, ..., (count - 1)).
     double prod = 1.0; // Initialize product
     for (i = 0; i < count; i++) {
         if (ISNAN(tpptr[positions[i]])) {
             error("TODO(R): First element ISNAN, must be adressed in C");
             //return R_NaReal; 
         }
-        // If 'nobm' is true (we have no binmidptr) we only need the PDF
-        // of the final bin; overwrite res.values[yi == 0] in each iteration;
-        // yi stays unchanges. Else we check if we are closer to the next binmid
-        // than to the current. If so, we must increase yi.
-        if (!nobm) {
-            printf("xxxxxxx requires some logic and distance measures and stuff");
-
-            if (i < (count - 1)) {
-                // If closer to the next bin than to the current, update yi
-                if (fabs(y[yi] - binmidptr[i + 1]) < fabs(binmidptr[i] - y[yi])) { yi++; }
-            }
-        }
-
-        // Store PDF
-        res.values[yi] = prod * (1.0 - tpptr[positions[i]]);
-
-        // If yi exceeds ny (only used if '!nobm') job done, return
-        if (yi >= ny) { break; } // Job done
-printf(" yi = %d    ny = %d\n", yi, ny);
-
+        // Updating temporary PDF vector
+        tmp[i] = prod * (1.0 - tpptr[positions[i]]);
         // Updating product of transition probabilities
         prod *= tpptr[positions[i]];
     }
+
+    // If nobm (no bin mids given) the result is simply the last value in tmp;
+    // the PDF evaluated at the end of the entire distribution.
+    if (nobm) {
+        res.values[0] = tmp[count - 1];
+    // Else we need to loop over i,j and find the correct 'bin' (the correct
+    // pdf belonging to the bin y[j] falls into. We first initialize
+    // res.values with NAs; they will stay NA if any y is outside the
+    // defined range (i.e., below the lowest or above the highest bin).
+    } else {
+        if (count == 1) {
+            error("TODO(R): Length of binmidptr == 1, case not yet implemented!");
+        }
+        // Guesstimate/calculate bin width
+        delta = binmidptr[1] - binmidptr[0];
+
+        i = 0;
+        for (j = 0; j < ny; j++) {
+            res.values[j] = NA_REAL; // Initial value
+            for (i = i; i < count; i++) {
+                // Current 'y' below lowest bin or above largest: break
+                if ((y[j] <= binmidptr[i] - delta) | (y[j] > binmidptr[count - 1] + delta)) {
+                    break;
+                }
+                // If y[j] in current bin: Store PDF, break loop and continue search
+                if ((y[j] > (binmidptr[i] - delta)) & (y[j] <= (binmidptr[i] + delta))) {
+                    res.values[j] = tmp[i];
+                    break;
+                }
+            }
+        }
+    }
+
+    // Free allocated memory, return result
+    free(tmp);
     return res;
 }
 

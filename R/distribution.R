@@ -173,7 +173,8 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
                  type = "pdf", ncores = ncores, elementwise = elementwise)
     print(res)
     print(head(d))
-    stop('xxx')
+
+    return(res)
 
     # Translate quantile bins to numeric values (binmid)
     bin2num <- function(x, d, np, ewise) {
