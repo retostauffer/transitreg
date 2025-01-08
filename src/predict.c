@@ -45,6 +45,33 @@ tmWhich find_positions(int x, int* y, int n) {
     return which; // Return the struct with index position and length
 }
 
+
+/* Helper function for type = "mean".
+ * Calculates elementwise pdf and multiplies it with the binmidptr. The sum of 
+ * the two is the mean which is returned (doubleVec of length 1) */
+double tm_calc_mean(int* positions, int count, double* tpptr, double* binmidptr) {
+
+    // Initialize return value, initialize sum with 0
+    double res = 0.0;
+    double pdf = 0.0;
+
+    // Calculate PDF for each bin given by the distribution for i = 0, ..., count - 1.
+    // Store in double 'tmp', the required values will be extracted after this loop.
+    double prod = 1.0; // Initialize product
+    for (int i = 0; i < count; i++) {
+        if (ISNAN(tpptr[positions[i]])) {
+            error("TODO(R): First element ISNAN, must be adressed in C");
+            //return R_NaReal; 
+        }
+        // Updating product of transition probabilities
+        prod *= tpptr[positions[i]];
+        // Updating weighted sum, simply "binmid * pdf(bin)" summed up
+        res += binmidptr[i] * prod * (1.0 - tpptr[positions[i]]);
+    }
+    return res;
+}
+
+
 /* Helper function for type = "pdf" */
 doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny) {
 
@@ -68,10 +95,10 @@ doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidpt
             error("TODO(R): First element ISNAN, must be adressed in C");
             //return R_NaReal; 
         }
-        // Updating temporary PDF vector
-        tmp[i] = prod * (1.0 - tpptr[positions[i]]);
         // Updating product of transition probabilities
         prod *= tpptr[positions[i]];
+        // Updating temporary PDF vector
+        tmp[i] = prod * (1.0 - tpptr[positions[i]]);
     }
 
     // If nobm (no bin mids given) the result is simply the last value in tmp;
@@ -96,11 +123,7 @@ void eval_bins_pdf_cdf(double* res, double* tmp, int count, double* binmidptr, d
     }
     // Guesstimate/calculate bin width
     int i, j;
-    double delta;
-
-    delta = binmidptr[1] - binmidptr[0];
-    printf(" count = %d, ny = %d\n", count, ny);
-    printf("DELTA = %.5f\n", delta);
+    double delta = (binmidptr[1] - binmidptr[0]) / 2.; // Half bin width
 
     i = 0;
     for (j = 0; j < ny; j++) {
@@ -112,6 +135,9 @@ void eval_bins_pdf_cdf(double* res, double* tmp, int count, double* binmidptr, d
             }
             // If y[j] in current bin: Store PDF, break loop and continue search
             if ((y[j] > (binmidptr[i] - delta)) & (y[j] <= (binmidptr[i] + delta))) {
+                ///////printf("  [setting]   res[%d] = tmp[%d] = %.5f\n", j, i, tmp[i]);
+                ///////printf("              as y = %.5f > %.5f & y = %.5f <= %.5f\n",
+                ///////        y[j], binmidptr[i] - delta, y[j], binmidptr[i] + delta);
                 res[j] = tmp[i];
                 break;
             }
@@ -362,18 +388,19 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
     bool do_pdf  = strcmp(thetype, "pdf")  == 0;
     bool do_cdf  = strcmp(thetype, "cdf")  == 0;
     bool do_q    = strcmp(thetype, "quantile") == 0;
+    bool do_mean = strcmp(thetype, "mean") == 0;
     // ... if none of them is true, it must be "do pmax"
     // bool do_pmax = strcmp(thetype, "pmax") == 0;
 
     // Allocating return vector.
 
-    // If type is "pdf", "cdf", or "quantile" and ewise is false: the length of
+    // If type is "pdf", "cdf", or "quantile" and ewise is true: the length of
     // the vector is the same as 'un', else 'un * ny' (number of distributions
     // times number of probabilites/thresholds at which each distribution is
     // evaluated).
     SEXP res;
     if (do_pdf | do_cdf | do_q) {
-        np = (!ewise) ? 1 : LENGTH(y);
+        np = (ewise) ? 1 : LENGTH(y);
         PROTECT(res = allocVector(REALSXP, un * np));
     // Else it is type = "pmax", so length of res is equal to 'un'.
     } else {
@@ -386,14 +413,14 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
 
     // If binmid is NA, but yptr is not: Error (this combination is not allowed)
     if ((do_cdf | do_pdf) & ISNAN(binmidptr[0]) & !ISNAN(yptr[0])) {
-        error("Problem in C tm_predict(): binmid is NAN, but y is not.");
+        error("Problem in C tm_predict(): binmid is NA, but y is not.");
     }
 
-    // If mode is not pdf, cdf, or quantile, elementwise must be false.
+    // If mode is not pdf, cdf, or quantile, elementwise must be true.
     // Else we throw an error here. That is for pmax where elementwise
     // makes no sense.
-    if (!do_pdf & !do_cdf & !do_q & ewise) {
-        printf("Using \"%s\" with elementwise = true not allowed.\n", CHAR(STRING_ELT(type, 0)));
+    if (!do_pdf & !do_cdf & !do_q & !ewise) {
+        printf("Using \"%s\" with elementwise = false not allowed.\n", CHAR(STRING_ELT(type, 0)));
         exit(99);
     }
 
@@ -410,7 +437,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
             // --- Calculating probability density
             if (do_pdf) {
                 // Single PDF
-                if (!ewise) {
+                if (ewise) {
                     tmp = tm_calc_pdf(which.index, which.length, tpptr, binmidptr, yptr, 1);
                 // Multiple PDFs (elementwise)
                 } else {
@@ -419,7 +446,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
             // --- Calculating cumulative distribution
             } else if (do_cdf) {
                 // Single CDF
-                if (!ewise) {
+                if (ewise) {
                     tmp = tm_calc_cdf(which.index, which.length, tpptr, binmidptr, yptr, 1);
                 // Multiple CDFs (elementwise)
                 } else {
@@ -427,7 +454,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
                 }
             } else {
                 // Single quantile
-                if (!ewise) {
+                if (ewise) {
                     tmp = tm_calc_quantile(which.index, which.length, tpptr, binmidptr, &yptr[i], 1);
                 // Multiple quantiles (elementwise)
                 } else {
@@ -436,13 +463,23 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
             }
 
             // Store results. If !elementwise, store last value
-            if (!ewise) {
+            if (ewise) {
                 resptr[i] = tmp.values[tmp.length - 1];
             // Else store the entire vector
             } else {
                 for (j = 0; j < tmp.length; j++) { resptr[i * np + j] = tmp.values[j]; }
             }
-            free(tmp.values); // Free allocated memory
+
+            // Free allocated memory
+            free(tmp.values);
+
+        // -----------------------------------------------------------
+        // These are the types where the result is always a single
+        // value (one per distribution)
+        // -----------------------------------------------------------
+        // Calculate mean
+        } else if (do_mean) {
+            resptr[i] = tm_calc_mean(which.index, which.length, tpptr, binmidptr);
         // Else it must be pmax
         } else {
             resptr[i] = tm_calc_pmax(which.index, which.length, tpptr);

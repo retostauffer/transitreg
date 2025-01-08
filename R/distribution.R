@@ -144,73 +144,79 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
     ## Get number of cores for OpenMP parallelization
     ncores <- tm_get_number_of_cores(ncores, FALSE)
 
-    xnames <- names(x) # Keep for later
+    # Guessing elementwise if set NULL
+    if (is.null(elementwise)) {
+        if (length(x) == 1L) x <- rep(x, length(d))
+        elementwise <- length(d) == length(x)
+    }
+    if (elementwise & length(d) != length(x))
+        stop("'elementwise = TRUE' but length of x does not match the number of distributions")
 
-    # Number of thresholds to evaluate
-    nx <- length(x)
+    # Store element names for return
+    xnames <- names(x)
 
-    # Setting up all unique combinations needed
-    # (1) Use same 'x' for all distributions
-    if (nx == 1L && length(d) > 1L) x <- rep(x, length(d))
-
-    ## Guessing elementwise if set NULL
-    if (is.null(elementwise)) elementwise <- !length(x) == length(d)
-
-    if (!elementwise & length(x) > length(d))
-        stop("length of 'x' can't be larger than number of distributions in 'd'",
-             "if elementwise = FALSE");
-
-    if (elementwise) x <- sort(x) # Important
-
+    if (!elementwise) x <- sort(x) # Important
     ui <- seq_along(d) # Unique index
     d  <- as.data.frame(d) # convert distributions to data.frame
 
     ## Calling C to calculate the required quantiles
     ## binmid: Required as we need to know where to stop.
     ## y: threshold at which to evaluate the pdf.
-    print(x)
     res <- .Call("tm_predict", uidx = ui, idx = d$index, tp = d$tp, binmid = d$binmid, y = x,
                  type = "pdf", ncores = ncores, elementwise = elementwise)
 
-    warning("RETO: Must add the elementwise part below")
-    return(res)
-
-    # If elementwise: Return matrix of dimension length(d) x length(probs)
+    # If elementwise: Return named vector
     if (elementwise) {
-        res <- matrix(res, ncol = length(probs),
-                      dimnames = list(xnames, paste("q", format(probs, digits = 3), sep = "_")))
-        return(as.data.frame(res))
-    # Else return named vector
-    } else {
         return(setNames(res, xnames))
+    # Else return a matrix with dimension length(ui) x length(x)
+    } else {
+        # Create and return matrix
+        return(matrix(res, byrow = TRUE, ncol = length(x),
+                      dimnames = list(xnames, get_mat_colnames(x, "d"))))
     }
-
-  #FUN <- function(at, d) dempirical(x = at, y = as.matrix(d), ...)
-  #apply_dpqr(d = d, FUN = FUN, at = x, type = "density", drop = drop, elementwise = elementwise)
 }
 
+#' Create Column Names for Return Matrix
+#'
+#' Used in the S3 methods pdf, cdf, and quantile. If `elementwise = FALSE`
+#' the return is a matrix; this helper function creates the names based
+#' on the thresholds/probabilities used.
+#'
+#' @param x numeric, thresholds (pdf, cdf) or probabilities (quantile).
+#' @param prefix If \code{NULL} (quantiles) the result is in percent,
+#'        else this prefix is used for each 'x'.
+get_mat_colnames <- function(x, prefix = NULL, digits = 3) {
+    if (is.null(prefix)) {
+        x <- paste0(format(1e2 * x), "%")
+    } else {
+        x <- paste(prefix, trimws(format(x, digits = digits)), sep = "_")
+    }
+    if (anyDuplicated(x)) {
+        for (d in unique(x[duplicated(x)])) {
+            idx <- which(x == d)
+            x[idx] <- paste0(x[idx], c("", paste0("_", seq_len(length(idx) - 1))))
+        }
+    }
+    return(x)
+}
 
 cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
 
     ## Get number of cores for OpenMP parallelization
     ncores <- tm_get_number_of_cores(ncores, FALSE)
 
-    xnames <- names(x) # Keep for later
-
-    # Number of thresholds to evaluate
-    nx <- length(x)
-
-    # Setting up all unique combinations needed
-    # (1) Use same 'x' for all distributions
-    if (nx == 1 && length(d) > 1L) x <- rep(x, length(d))
-
     # Guessing elementwise if set NULL
-    if (is.null(elementwise)) elementwise <- !length(x) == length(d)
+    if (is.null(elementwise)) {
+        if (length(x) == 1L) x <- rep(x, length(d))
+        elementwise <- length(d) == length(x)
+    }
+    if (elementwise & length(d) != length(x))
+        stop("'elementwise = TRUE' but length of x does not match the number of distributions")
 
-    if (!elementwise & length(x) > length(d))
-        stop("length of 'x' can't be larger than number of distributions in 'd'",
-             "if elementwise = FALSE");
+    # Store element names for return
+    xnames <- names(x)
 
+    if (!elementwise) x <- sort(x) # Important
     ui <- seq_along(d) # Unique index
     d  <- as.data.frame(d) # convert distributions to data.frame
 
@@ -218,17 +224,26 @@ cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
     res <- .Call("tm_predict", uidx = ui, idx = d$index, tp = d$tp, binmid = d$binmid, y = x,
                  type = "cdf", ncores = ncores, elementwise = elementwise)
 
-    warning("RETO: Must add the elementwise part below")
-    return(res)
 
+    # If elementwise: Return named vector
     if (elementwise) {
-        res <- matrix(res, ncol = length(x),
-                      dimnames = list(NULL, paste("x", format(x, digits = 3), sep = "_")))
+        return(setNames(res, xnames))
+    # Else return a data.frame with dimension length(ui) x length(x)
+    } else {
+        get_colnames <- function(x) {
+            x <- paste("p", trimws(format(x, digits = 3)), sep = "_")
+            if (anyDuplicated(x)) {
+                for (d in unique(x[duplicated(x)])) {
+                    idx <- which(x == d)
+                    x[idx] <- paste0(x[idx], c("", paste0("_", seq_len(length(idx) - 1))))
+                }
+            }
+            return(x)
+        }
+        # Create and return matrix
+        return(matrix(res, byrow = TRUE, ncol = length(x),
+                      dimnames = list(xnames, get_mat_colnames(x, "p"))))
     }
-    return(res)
-
-  #FUN <- function(at, d) dempirical(x = at, y = as.matrix(d), ...)
-  #apply_dpqr(d = d, FUN = FUN, at = x, type = "density", drop = drop, elementwise = elementwise)
 }
 
 quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
@@ -236,40 +251,34 @@ quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = 
     ncores <- tm_get_number_of_cores(ncores, FALSE)
 
     # Guessing elementwise if set NULL
-    if (is.null(elementwise)) elementwise <- !length(x) == length(x)
+    if (is.null(elementwise)) {
+        if (length(probs) == 1L) probs <- rep(probs, length(x))
+        elementwise <- length(x) == length(probs)
+    }
+    if (elementwise & length(probs) != length(x))
+        stop("'elementwise = TRUE' but number of probs does not match the number of distributions")
 
-    xnames <- names(x) # Keep for later
+    # Store element names for return
+    xnames <- names(x)
 
     # Number of probabilities
     nprobs <- length(probs)
 
-    # Setting up all unique combinations needed
-    # (1) Use same 'x' for all distributions
-    if (!elementwise & nprobs == 1L && length(x) > 1L) probs <- rep(probs, length(x))
-
-    if (!elementwise & length(probs) > length(x))
-        stop("length of 'probs' can't be larger than number of distributions in 'd'",
-             "if elementwise = FALSE");
-
     if (elementwise) probs <- sort(probs) # Important
-
     ui <- seq_along(x) # Unique index
     x  <- as.data.frame(x) # convert distributions to data.frame
 
     ## Calling C to calculate the required quantiles
-    ## binmid: Not required
-    ## y: probabilities at which to evaluate the distributions
     res <- .Call("tm_predict", uidx = ui, index = x$index, tp = x$tp, binmid = x$binmid, y = probs,
                  type = "quantile", ncores = ncores, elementwise = elementwise)
 
-    # If elementwise: Return matrix of dimension length(d) x length(probs)
+    # If elementwise: Return named vector
     if (elementwise) {
-        res <- matrix(res, ncol = length(probs), byrow = TRUE,
-                      dimnames = list(xnames, paste0(format(probs * 1e2, digits = 3), "%")))
-        return(as.data.frame(res))
-    # Else return named vector
-    } else {
         return(setNames(res, xnames))
+    # Else return matrix
+    } else {
+        return(matrix(res, byrow = TRUE, ncol = length(probs),
+                      dimnames = list(xnames, get_mat_colnames(probs, NULL))))
     }
 }
 
@@ -279,27 +288,45 @@ median.tmdist <- function(x, ...) {
 }
 
 
+mean.tmdist <- function(x, ncores = NULL, ...) {
+    ## Get number of cores for OpenMP parallelization
+    ncores <- tm_get_number_of_cores(ncores, FALSE)
+
+    ui <- seq_along(x) # Number of distributions
+    x  <- as.data.frame(x) # Convert to data.frame
+
+    ## Calling C to calculate the required quantiles
+    return(.Call("tm_predict", uidx = ui, index = x$index, tp = x$tp, binmid = x$binmid, y = NA_real_,
+                 type = "mean", ncores = ncores, elementwise = TRUE))
+}
+
+
 ## Draw random values
 random.tmdist <- function(x, n = 1L, drop = TRUE, ...) {
-    stopifnot("currently only designed length 1" = length(x) == 1L)
-
-    ## Helper function, draw weighted sample of length 'n'.
-    ## Scoping 'x' and 'n'
+    # Helper function, draw weighted sample of length 'n'.
+    # Scoping 'x' and 'n'
     fn <- function(i) {
         tmp     <- as.data.frame(x[i])
         tmp$pdf <- as.numeric(pdf(x[i], tmp$binmid))
-        sample(tmp$binmid, size = n, prob = tmp$pdf, replace = TRUE)
+        delta   <- diff(tmp$binmid[1:2]) / 2 # bin width/2
+        sample(tmp$binmid, size = n, prob = tmp$pdf, replace = TRUE) +
+            runif(n, -delta, delta)
+        # TODO(R): Currently adding +/- uniform random error
     }
     res <- lapply(seq_along(x), fn)
 
-    res <- if (length(res) > 1) rbind(res) else res[[1]]
-    return(res)
+    # Only one distribution: Return numeric vector
+    if (length(res) == 1) {
+        return(res[[1]])
+    # Only one random value per distribution: Return vector as well
+    } else if (n == 1) {
+        return(unlist(res))
+    # Else return matrix
+    } else {
+        res <- do.call(rbind, res)
+        dimnames(res) <- list(names(x), paste("r", seq_len(ncol(res)), sep = "_"))
+        return(res)
+    }
 }
 
-mean.tmdist <- function(x, ...) {
-    stopifnot("currently only designed length 1" = length(x) == 1L)
-    d <- as.data.frame(x)
-    d$pdf <- as.numeric(pdf(x, d$binmid))
-    print(d)
-    return(sum(d$pdf * d$binmid))
-}
+
