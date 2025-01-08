@@ -456,6 +456,10 @@ if(!file.exists("premodel.png") & FALSE) {
 
   download.file("http://bamlss.org/misc/precipitation_clim.tar.gz", "clim.tar.gz")
   untar("clim.tar.gz", exdir = ".")
+
+  download.file("https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_AUT_1.json.zip", "AT-gadm.zip")
+  unzip("AT-gadm.zip")
+
   library("raster")
   library("stars")
   library("sf")
@@ -463,14 +467,22 @@ if(!file.exists("premodel.png") & FALSE) {
   dem <- st_as_stars(readRDS("dem.rds"))
   dem <- st_transform(dem, crs = 4326)
 
-  download.file("https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_AUT_1.json.zip", "AT-gadm.zip")
-  unzip("AT-gadm.zip")
-  
-  AT <- read_sf("gadm41_AUT_1.json")
-  Tyrol <- subset(AT, NAME_1 == "Tirol")
-  Tyrol <- st_geometry(Tyrol)
+  Tyrol <- "gadm41_AUT_1.json" |>
+    read_sf() |>
+    subset(NAME_1 == "Tirol") |>
+    st_geometry()
 
-  a <- st_intersects(dem, Tyrol)
+  dem <- mask(readRDS("dem.rds"), as(Tyrol, "Spatial"))
+  dem <- crop(dem, as(Tyrol, "Spatial"))
+
+  writeRaster(dem, "dem.tif", format = "GTiff", overwrite = TRUE)
+
+  nd <- as.data.frame(coordinates(dem))
+  names(nd) <- c("lon", "lat")
+  nd$alt <- extract(dem, coordinates(dem))
+  nd$day <- 182
+
+  nd$m1_p99 <- predict(m1, newdata = nd, prob = 0.99)
 }
 @
 %% \includegraphics[width=0.9\textwidth]{premodel.png}
