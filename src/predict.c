@@ -53,7 +53,6 @@ double tm_calc_mean(int* positions, int count, double* tpptr, double* binmidptr)
 
     // Initialize return value, initialize sum with 0
     double res = 0.0;
-    double pdf = 0.0;
 
     // Calculate PDF for each bin given by the distribution for i = 0, ..., count - 1.
     // Store in double 'tmp', the required values will be extracted after this loop.
@@ -429,7 +428,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
     doubleVec tmp;
 
     #if OPENMP_ON
-    #pragma omp parallel for num_threads(nthreads) private(which, tmp)
+    #pragma omp parallel for num_threads(nthreads) private(which, tmp, j)
     #endif
     for (i = 0; i < un; i++) {
         which = find_positions(uidxptr[i], idxptr, n);

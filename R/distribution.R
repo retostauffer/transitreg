@@ -42,13 +42,34 @@ tmdist <- function(x) {
     # Converting input into a list of data.frames. The lengt of the list
     # corresponds to the number of distributions, whereof each element is a
     # data.frame with the transition probabilities and bins.
-    x <- tmdist_convert_input(x)
-    if (is.data.frame(x)) x <- list(x)
+
+    # If the input is a Transition Model object, create distributions
+    # based on the data used for training.
+    if (inherits(x, "tm")) {
+        vars <- attr(terms(TransitionModels:::fake_formula(formula(b))), "term.labels")
+        vars <- vars[!vars == "theta"]
+        d    <- x$model.frame
+        nb   <- length(x$bins)
+        tmp  <- lapply(d[, vars, drop = FALSE], function(x, nb) rep(x, each = nb), nb = nb)
+        print(str(tmp))
+        print(nb)
+        tmp  <- data.frame(c(list(theta = rep(seq_len(nb) - 1, times = nrow(d))), tmp))
+
+        tmp  <- data.frame(tp   = predict(x$model, newdata = tmp, type = "response"),
+                           bins = rep(x$bins, times = nrow(d)))
+        # Split into individual data.frames
+        x <- split(tmp, rep(seq_len(nrow(d)), each = nb))
+        rm(d, tmp)
+    # Else try to convert the input (different formats are possible)
+    # into a distributions object.
+    } else {
+        x <- tmdist_convert_input(x)
+        if (is.data.frame(x)) x <- list(x)
+    }
 
     # Sanity check on the newly created list of data.frames
     # Sanity check my data.frames
     check_dfs <- function(y) {
-        print(str(y))
         stopifnot(all(y$tp >= 0 & y$tp <= 1))
         stopifnot(all(diff(y$binmid) >= 0))
         stopifnot(all(sapply(y, is.numeric)))
