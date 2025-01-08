@@ -48,9 +48,6 @@ tmWhich find_positions(int x, int* y, int n) {
 /* Helper function for type = "pdf" */
 doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny) {
 
-    int i, j;
-    double delta;
-
     // Initialize return value/object.
     doubleVec res;
     res.values = (double*)malloc(ny * sizeof(double));  // Allocate vector result
@@ -63,10 +60,10 @@ doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidpt
     // iterate trough the entire tp vector and store the very last value.
     bool nobm = ISNAN(binmidptr[0]);
 
-    // This is the nobm mode; length of return vector 'res' is 1,
-    // we are updating res.values[0] until reaching end of tp (i = 1, ..., (count - 1)).
+    // Calculate PDF for each bin given by the distribution for i = 0, ..., count - 1.
+    // Store in double 'tmp', the required values will be extracted after this loop.
     double prod = 1.0; // Initialize product
-    for (i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++) {
         if (ISNAN(tpptr[positions[i]])) {
             error("TODO(R): First element ISNAN, must be adressed in C");
             //return R_NaReal; 
@@ -81,32 +78,11 @@ doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidpt
     // the PDF evaluated at the end of the entire distribution.
     if (nobm) {
         res.values[0] = tmp[count - 1];
-    // Else we need to loop over i,j and find the correct 'bin' (the correct
-    // pdf belonging to the bin y[j] falls into. We first initialize
-    // res.values with NAs; they will stay NA if any y is outside the
-    // defined range (i.e., below the lowest or above the highest bin).
+    // Else we are calling eval_bins_pdf_cdf which evaluates
+    // into which bin each of the thresholds/values in y fall into,
+    // and assign the corresponding PDF to res.values | y.
     } else {
-        if (count == 1) {
-            error("TODO(R): Length of binmidptr == 1, case not yet implemented!");
-        }
-        // Guesstimate/calculate bin width
-        delta = binmidptr[1] - binmidptr[0];
-
-        i = 0;
-        for (j = 0; j < ny; j++) {
-            res.values[j] = NA_REAL; // Initial value
-            for (i = i; i < count; i++) {
-                // Current 'y' below lowest bin or above largest: break
-                if ((y[j] <= binmidptr[i] - delta) | (y[j] > binmidptr[count - 1] + delta)) {
-                    break;
-                }
-                // If y[j] in current bin: Store PDF, break loop and continue search
-                if ((y[j] > (binmidptr[i] - delta)) & (y[j] <= (binmidptr[i] + delta))) {
-                    res.values[j] = tmp[i];
-                    break;
-                }
-            }
-        }
+        eval_bins_pdf_cdf(res.values, tmp, count, binmidptr, y, ny);
     }
 
     // Free allocated memory, return result
@@ -114,27 +90,53 @@ doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidpt
     return res;
 }
 
+void eval_bins_pdf_cdf(double* res, double* tmp, int count, double* binmidptr, double* y, int ny) {
+    if (count == 1) {
+        error("TODO(R): Length of binmidptr == 1, case not yet implemented!");
+    }
+    // Guesstimate/calculate bin width
+    int i, j;
+    double delta;
+
+    delta = binmidptr[1] - binmidptr[0];
+    printf(" count = %d, ny = %d\n", count, ny);
+    printf("DELTA = %.5f\n", delta);
+
+    i = 0;
+    for (j = 0; j < ny; j++) {
+        res[j] = NA_REAL; // Initial value
+        for (i = i; i < count; i++) {
+            // Current 'y' below lowest bin or above largest: break
+            if ((y[j] <= binmidptr[i] - delta) | (y[j] > binmidptr[count - 1] + delta)) {
+                break;
+            }
+            // If y[j] in current bin: Store PDF, break loop and continue search
+            if ((y[j] > (binmidptr[i] - delta)) & (y[j] <= (binmidptr[i] + delta))) {
+                res[j] = tmp[i];
+                break;
+            }
+        }
+    }
+}
+
 /* Helper function for type = "cdf" */
 doubleVec tm_calc_cdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny) {
-    // Initialize return value/object
+
+    // Initialize return value/object.
     doubleVec res;
-    res.values = (double*)malloc(ny * sizeof(double));  // Allocate max possible size
+    res.values = (double*)malloc(ny * sizeof(double));  // Allocate vector result
     res.length = ny;
 
-    if (res.values == NULL) { error("Memory allocation failed for doubleVec.values."); }
+    // Temporary double vector to calculate PDF along i = 0, ..., count - 1
+    double* tmp = malloc(count * sizeof(double)); // Single double pointer
 
     // Set to true if 'binmidptr' is not provided (an NA). In this case we simply
     // iterate trough the entire tp vector and store the very last value.
     bool nobm = ISNAN(binmidptr[0]);
 
-    if (ISNAN(tpptr[positions[0]])) {
-        error("TODO(R): First element ISNAN, must be adressed in C");
-        //return R_NaReal; 
-    }
-
-    // Else start calculation. As soon as we detect a missing
-    // value, return NA as well.
-    res.values[0] = 1.0 - tpptr[positions[0]]; // Initialize with (1 - p[0])
+    // Calculate CDF for each bin given by the distribution for i = 0, ..., count - 1
+    // Store in double 'tmp', the required values will be extracted after this loop.
+    tmp[0] = 1.0 - tpptr[positions[0]]; // Initialize with (1 - p[0])
     if (count > 0) {
         double pprod = 1.0; // Initialize with 1.0 for product
         // Looping over all elements except first
@@ -146,9 +148,23 @@ doubleVec tm_calc_cdf(int* positions, int count, double* tpptr, double* binmidpt
             pprod *= tpptr[positions[i - 1]]; // Multiply with previous element
             // If 'nobm' is true (we have no binmidptr) we only need the PDF
             // of the final bin; overwrite res.values[0] in each iteration.
-            res.values[(nobm) ? 0 : i] = res.values[(nobm) ? 0 : i - 1] + (1.0 - tpptr[positions[i]]) * pprod;
+            tmp[i] = tmp[i - 1] + (1.0 - tpptr[positions[i]]) * pprod;
         }
     }
+
+    // If nobm (no bin mids given) the result is simply the last value in tmp;
+    // the PDF evaluated at the end of the entire distribution.
+    if (nobm) {
+        res.values[0] = tmp[count - 1];
+    // Else we are calling eval_bins_pdf_cdf which evaluates
+    // into which bin each of the thresholds/values in y fall into,
+    // and assign the corresponding PDF to res.values | y.
+    } else {
+        eval_bins_pdf_cdf(res.values, tmp, count, binmidptr, y, ny);
+    }
+
+    // Free allocated memory, return result
+    free(tmp);
     return res;
 }
 
@@ -348,10 +364,6 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
     bool do_q    = strcmp(thetype, "quantile") == 0;
     // ... if none of them is true, it must be "do pmax"
     // bool do_pmax = strcmp(thetype, "pmax") == 0;
-
-    // Boolean flat which is set true if 'binmid' is not provided.
-    ////bool no_binmid = (LENGTH(binmid) == 1) & ISNAN(binmidptr[0]);
-    ////printf(" --------------------- no_binmid : %d    %.5f\n", no_binmid, binmidptr[0]);
 
     // Allocating return vector.
 

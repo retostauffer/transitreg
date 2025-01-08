@@ -146,7 +146,7 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
 
     xnames <- names(x) # Keep for later
 
-    # Number of probabilities
+    # Number of thresholds to evaluate
     nx <- length(x)
 
     # Setting up all unique combinations needed
@@ -171,20 +171,9 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
     print(x)
     res <- .Call("tm_predict", uidx = ui, idx = d$index, tp = d$tp, binmid = d$binmid, y = x,
                  type = "pdf", ncores = ncores, elementwise = elementwise)
-    print(res)
-    print(head(d))
 
+    warning("RETO: Must add the elementwise part below")
     return(res)
-
-    # Translate quantile bins to numeric values (binmid)
-    bin2num <- function(x, d, np, ewise) {
-        idx <- rep(ui, each = if (ewise) np else 1L)
-        # 'order' is used to recreate the correct order before return
-        x   <- data.frame(order = seq_along(idx), index = idx, bin = res)
-        res <- merge(d, x, by = c("bin", "index"), all.x = FALSE, all.y = TRUE)
-        return(res[order(res$order), "binmid", drop = TRUE])
-    }
-    res <- bin2num(res, x, nprobs, elementwise)
 
     # If elementwise: Return matrix of dimension length(d) x length(probs)
     if (elementwise) {
@@ -196,67 +185,24 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
         return(setNames(res, xnames))
     }
 
-#####    # Scopes 'd' and 'grd'
-#####    fn <- function(i) {
-#####        grd <- as.list(grd[i, ])
-#####        tmp <- as.data.frame(d[grd$d])
-#####        cutoff <- tmp$bin[which.min(abs(tmp$binmid - grd$p))]
-#####        tmp$index <- grd$index
-#####        tmp[tmp$bin <= cutoff, ]
-#####    }
-#####
-#####    # If there is one distribution and one point at which to evaluate this
-#####    # distribution, or 'elementwise' is FALSE we can proceed setting up the
-#####    # data.frame used to call the C function performing the calculations.
-#####    # Note: If length(d) != length(x) the vectors will be recycled.
-#####    if ((length(d) == 1L && length(x) == 1L) || isFALSE(elementwise)) {
-#####
-#####        # Create 'grid' for evaluation
-#####        if (length(d) > length(x)) {
-#####            grd <- data.frame(d = seq_along(d), p = rep(x, length(d)))
-#####        } else {
-#####            grd <- data.frame(d = rep(seq_along(d), length(x)), p = x)
-#####        }
-#####        print(grd)
-#####        grd$index <- seq_len(nrow(grd)) # Pseudo-index
-#####
-#####        ui <- seq_len(nrow(grd))
-#####        d <- do.call(rbind, lapply(ui, fn))
-#####    # If elementwise we build the data.frame differently, simply
-#####    # Keeping the full distribution.
-#####    } else if (elementwise) {
-#####        ui <- seq_along(d) # Number of distributions
-#####        d  <- as.data.frame(d)
-#####    } else {
-#####        stop(" --- TODO(R): Can we end up here, and if so, why? Work needed --- ")
-#####    }
-#####    print(d)
-#####    stop(3)
-#####
-#####    ## Calling C to calculate the required PDFs
-#####    res <- .Call("tm_predict", ui, d$index, p = d$tp, type = "pdf", prob = 42,
-#####                 ncores = ncores, elementwise = elementwise)
-#####
-#####    if (elementwise) {
-#####        res <- matrix(res, ncol = length(x),
-#####                      dimnames = list(NULL, paste("x", format(x, digits = 3), sep = "_")))
-#####    }
-#####    return(res)
-
   #FUN <- function(at, d) dempirical(x = at, y = as.matrix(d), ...)
   #apply_dpqr(d = d, FUN = FUN, at = x, type = "density", drop = drop, elementwise = elementwise)
 }
 
 
 cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
-    stopifnot("currently only designed length 1" = length(d) == 1L)
 
     ## Get number of cores for OpenMP parallelization
     ncores <- tm_get_number_of_cores(ncores, FALSE)
 
+    xnames <- names(x) # Keep for later
+
+    # Number of thresholds to evaluate
+    nx <- length(x)
+
     # Setting up all unique combinations needed
     # (1) Use same 'x' for all distributions
-    if (length(x) == 1 && length(d) > 1L) x <- rep(x, length(d))
+    if (nx == 1 && length(d) > 1L) x <- rep(x, length(d))
 
     # Guessing elementwise if set NULL
     if (is.null(elementwise)) elementwise <- !length(x) == length(d)
@@ -265,43 +211,15 @@ cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
         stop("length of 'x' can't be larger than number of distributions in 'd'",
              "if elementwise = FALSE");
 
-    # Scopes 'd' and 'grd'
-    fn <- function(i) {
-        grd <- as.list(grd[i, ])
-        tmp <- as.data.frame(d[grd$d])
-        cutoff <- tmp$bin[which.min(abs(tmp$binmid - grd$p))]
-        tmp$index <- grd$index
-        subset(tmp, bin <= cutoff)
-    }
-
-    # If there is one distribution and one point at which to evaluate this
-    # distribution, or 'elementwise' is FALSE we can proceed setting up the
-    # data.frame used to call the C function performing the calculations.
-    # Note: If length(d) != length(x) the vectors will be recycled.
-    if ((length(d) == 1L && length(x) == 1L) || isFALSE(elementwise)) {
-
-        # Create 'grid' for evaluation
-        if (length(d) > length(x)) {
-            grd <- data.frame(d = seq_along(d), p = rep(x, length(d)))
-        } else {
-            grd <- data.frame(d = rep(seq_along(d), length(x)), p = x)
-        }
-        grd$index <- seq_len(nrow(grd)) # Pseudo-index
-
-        ui <- seq_len(nrow(grd))
-        d <- do.call(rbind, lapply(ui, fn))
-    } else if (elementwise) {
-        # We're 
-        ui <- seq_along(d) # Number of distributions
-        d  <- as.data.frame(d)
-        d$index <- 1L ## TODO(R): Only works if length(d) == 1
-    } else {
-        stop(" --- TODO(R): Can we end up here, and if so, why? Work needed --- ")
-    }
+    ui <- seq_along(d) # Unique index
+    d  <- as.data.frame(d) # convert distributions to data.frame
 
     ## Calling C to calculate the required CDFs
-    res <- .Call("tm_predict", ui, d$index, p = d$tp, type = "cdf", prob = 42,
-                 ncores = ncores, elementwise = elementwise)
+    res <- .Call("tm_predict", uidx = ui, idx = d$index, tp = d$tp, binmid = d$binmid, y = x,
+                 type = "cdf", ncores = ncores, elementwise = elementwise)
+
+    warning("RETO: Must add the elementwise part below")
+    return(res)
 
     if (elementwise) {
         res <- matrix(res, ncol = length(x),
