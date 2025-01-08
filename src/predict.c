@@ -207,7 +207,8 @@ double interpolate_linear(double x1, double y1, double x2, double y2, double p) 
 
 /* Helper function for type = "quantile"
  */
-doubleVec tm_calc_quantile(int* positions, int count, double* tpptr, double* binmidptr, double* prob, int np) {
+doubleVec tm_calc_quantile(int* positions, int count, double* tpptr,
+                           double* binmidptr, double* prob, int np, bool disc) {
 
     int i, j;
 
@@ -270,6 +271,9 @@ doubleVec tm_calc_quantile(int* positions, int count, double* tpptr, double* bin
                 //          'in bin range'? Question for Niki.
                 // If j = 0, or j = (count - 1): Take bin mid as is
                 if ((j == 0) | (j == (count - 1))) {
+                    res.values[i] = binmidptr[positions[j]];
+                // Discrete distribution? Simply take mid-point
+                } else if (disc) {
                     res.values[i] = binmidptr[positions[j]];
                 } else {
                     // Perform linear interpolation between the two neighboring bin mids.
@@ -366,7 +370,7 @@ double tm_calc_pmax(int* positions, int count, double* pptr) {
  * @return TODO(R): Depends on mode.
  */
 SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
-                SEXP type, SEXP ncores, SEXP elementwise) {
+                SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete) {
 
     int    *uidxptr   = INTEGER(uidx);     // Unique indices in the dtaa
     int    *idxptr    = INTEGER(idx);      // Distribution index
@@ -379,7 +383,8 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
     double *binmidptr = REAL(binmid);      // Bin mid point, not always needed
     double *yptr      = REAL(y);           // Where to evaluate the distribution
 
-    bool   ewise      = asLogical(elementwise); // C boolean value
+    bool   ewise      = asLogical(elementwise); // Elementwise calculation?
+    bool   disc       = asLogical(discrete);    // Discrete distribution? For quantile
 
     // Evaluate 'type' to define what to do. Store a set of
     // boolean values to only do the string comparison once.
@@ -454,10 +459,10 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
             } else {
                 // Single quantile
                 if (ewise) {
-                    tmp = tm_calc_quantile(which.index, which.length, tpptr, binmidptr, &yptr[i], 1);
+                    tmp = tm_calc_quantile(which.index, which.length, tpptr, binmidptr, &yptr[i], 1, disc);
                 // Multiple quantiles (elementwise)
                 } else {
-                    tmp = tm_calc_quantile(which.index, which.length, tpptr, binmidptr, yptr, LENGTH(y));
+                    tmp = tm_calc_quantile(which.index, which.length, tpptr, binmidptr, yptr, LENGTH(y), disc);
                 }
             }
 

@@ -35,6 +35,8 @@ S3method(coef, tm)
 S3method(print, tm)
 S3method(rootogram, tm)
 
+S3method(newresponse, tm)
+
 
 ## Distributions3 implementation
 export("tmdist")
@@ -48,6 +50,10 @@ S3method(quantile,       tmdist)
 S3method(median,         tmdist)
 S3method(mean,           tmdist)
 S3method(random,         tmdist)
+
+S3method(is_discrete,    tmdist)
+S3method(is_continuous,  tmdist)
+S3method(support,        tmdist)
 
 ## GLMNET test
 importFrom("mgcv", "interpret.gam", "smoothCon")

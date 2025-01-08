@@ -16,7 +16,7 @@
 #include "tm.h"
 
 static const R_CallMethodDef callMethods[] = {
-  {"tm_predict",             (DL_FUNC) &tm_predict,           8},
+  {"tm_predict",             (DL_FUNC) &tm_predict,           9},
   {"tm_predict_pdfcdf",      (DL_FUNC) &tm_predict_pdfcdf,    4},
   {"tm_detect_cores",        (DL_FUNC) &tm_detect_cores,      0},
   {NULL, NULL, 0} // Termination entry

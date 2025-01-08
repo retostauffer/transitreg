@@ -76,12 +76,12 @@ void eval_bins_pdf_cdf(double* res, double* tmp, int count, double* binmidptr, d
 double interpolate_linear(double x1, double y1, double x2, double y2, double p);
 doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny);
 doubleVec tm_calc_cdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny);
-doubleVec tm_calc_quantile(int* positions, int count, double* tpptr, double* binmidptr, double* prob, int np);
+doubleVec tm_calc_quantile(int* positions, int count, double* tpptr, double* binmidptr, double* prob, int np, bool disc);
 
 double tm_calc_pmax(int* positions, int count, double* pptr);
 double tm_calc_mean(int* positions, int count, double* tpptr, double* binmidptr);
 
-SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y, SEXP type, SEXP ncores, SEXP elementwise);
+SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y, SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete);
 SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores);
 SEXP tm_detect_cores();
 

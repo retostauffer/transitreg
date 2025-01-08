@@ -183,8 +183,9 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
     ## Calling C to calculate the required quantiles
     ## binmid: Required as we need to know where to stop.
     ## y: threshold at which to evaluate the pdf.
-    res <- .Call("tm_predict", uidx = ui, idx = d$index, tp = d$tp, binmid = d$binmid, y = x,
-                 type = "pdf", ncores = ncores, elementwise = elementwise)
+    res <- .Call("tm_predict", uidx = ui, idx = d$index, tp = d$tp,
+                 binmid = d$binmid, y = x, type = "pdf", ncores = ncores,
+                 elementwise = elementwise, discrete = FALSE)
 
     # If elementwise: Return named vector
     if (elementwise) {
@@ -242,8 +243,9 @@ cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
     d  <- as.data.frame(d) # convert distributions to data.frame
 
     ## Calling C to calculate the required CDFs
-    res <- .Call("tm_predict", uidx = ui, idx = d$index, tp = d$tp, binmid = d$binmid, y = x,
-                 type = "cdf", ncores = ncores, elementwise = elementwise)
+    res <- .Call("tm_predict", uidx = ui, idx = d$index, tp = d$tp,
+                 binmid = d$binmid, y = x, type = "cdf", ncores = ncores,
+                 elementwise = elementwise, discrete = FALSE)
 
 
     # If elementwise: Return named vector
@@ -282,6 +284,11 @@ quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = 
     # Store element names for return
     xnames <- names(x)
 
+    # Discrete distributions?
+    discrete <- is_discrete(x)
+    discrete <- TRUE
+    discrete <- FALSE
+
     # Number of probabilities
     nprobs <- length(probs)
 
@@ -290,8 +297,9 @@ quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = 
     x  <- as.data.frame(x) # convert distributions to data.frame
 
     ## Calling C to calculate the required quantiles
-    res <- .Call("tm_predict", uidx = ui, index = x$index, tp = x$tp, binmid = x$binmid, y = probs,
-                 type = "quantile", ncores = ncores, elementwise = elementwise)
+    res <- .Call("tm_predict", uidx = ui, index = x$index, tp = x$tp,
+                 binmid = x$binmid, y = probs, type = "quantile", ncores = ncores,
+                 elementwise = elementwise, discrete = discrete)
 
     # If elementwise: Return named vector
     if (elementwise) {
@@ -350,4 +358,49 @@ random.tmdist <- function(x, n = 1L, drop = TRUE, ...) {
     }
 }
 
+## Check if distribution is discrete
+is_discrete.tmdist <- function(x, ...) {
+    ## Guessing from 'bins'. If all bins are integers,
+    ## we assume the original distribution has been discrete.
+    ## Else continuous.
+    class(x) <- "data.frame"
+    x <- as.matrix(x[, grep("^bin_[0-9]+$", names(x))])
+    x <- na.omit(unique(as.numeric(x)))
+    ## Fraction of non-integer values
+    tmp <- mean(x %% 1 > sqrt(.Machine$double.eps))
+    ## If fraction of non-perfect integers is < 1 promille, we assume
+    ## this is/was a discrete distribution (or all of them).
+    return(tmp < 1e-3)
+}
+is_continuous.tmdist <- function(x, ...) {
+    return(!is_discrete(x))
+}
+
+## TODO(R): Currently adding 'max difference' of any distribution
+##          as delta to add on top of the support. This works
+##          fine if all the distributions have the same bins (or
+##          same diff(bins), any better solution? Question for Niki
+support.tmdist <- function(x, ...) {
+    class(x) <- "data.frame"
+    x <- as.matrix(x[, grep("^bin_[0-9]+$", names(x))])
+    delta <- max(apply(x, MARGIN = 1, function(y) max(diff(y), na.rm = TRUE)))
+    return(range(na.omit(unique(as.numeric(x)))) + c(-0.5, 0.5) * delta)
+}
+
+
+newresponse.tm <- function(object, newdata = NULL, ...) {
+    ## Response name
+    yn <- object$response
+
+    if (is.null(newdata)) {
+        newdata <- object$model.frame
+        newdata[[yn]] <- object$bins[newdata[[yn]]]
+    }
+
+    if (is.null(newdata[[object$response]]))
+        stop("response missing in newdata!")
+
+    y <- newdata[[object$response]]
+    return(y)
+}
 
