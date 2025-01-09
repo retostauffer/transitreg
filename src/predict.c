@@ -47,8 +47,9 @@ tmWhich find_positions(int x, int* y, int n) {
 
 
 /* Helper function for type = "mean".
- * Calculates elementwise pdf and multiplies it with the binmidptr. The sum of 
- * the two is the mean which is returned (doubleVec of length 1) */
+ * Calculates elementwise pdf and multiplies it with center of the bin
+ * ((lowerptr[i] + upperptr[i]) * 0.5) to get the weighted average.
+ * Returns a (doubleVec of length 1) */
 double tm_calc_mean(int* positions, int count, double* tpptr, double* lowerptr, double* upperptr) {
 
     // Initialize return value, initialize sum with 0
@@ -85,8 +86,11 @@ doubleVec tm_calc_pdf(int* positions, int count,
     // Temporary double vector to calculate PDF along i = 0, ..., count - 1
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
 
-    // Set to true if 'binmidptr' is not provided (an NA). In this case we simply
-    // iterate trough the entire tp vector and store the very last value.
+    // Set to true if 'lowerptr[0]' or 'upperptr[0]' not given, this is used
+    // when calling 'tm_predict_pdfcdf' as we do not need the bins there (i.e.,
+    // 'lowerptr' and 'upperptr' are of length 1 and contain NA.
+    // In this case we simply iterate trough the entire tp vector and store the
+    // very last value.
     bool nobm = ISNAN(lowerptr[0]) | ISNAN(upperptr[0]);
 
     // Calculate PDF for each bin given by the distribution for i = 0, ..., count - 1.
@@ -122,9 +126,6 @@ doubleVec tm_calc_pdf(int* positions, int count,
 void eval_bins_pdf_cdf(double* res, double* tmp, int* positions, int count,
                        double* lowerptr, double* upperptr, double* y, int ny) {
 
-    if (count == 1) {
-        error("TODO(R): Length of binmidptr == 1, case not yet implemented!");
-    }
     // Guesstimate/calculate bin width
     int i, j;
 

@@ -38,7 +38,7 @@
 #'
 #' @return Returns an object of class \code{c("tmdist", "distribution")}.
 #' @author Reto
-tmdist <- function(x) {
+tmdist <- function(x, newdata = NULL, newresponse = NULL) {
     # Converting input into a list of data.frames. The lengt of the list
     # corresponds to the number of distributions, whereof each element is a
     # data.frame with the transition probabilities and bins.
@@ -46,14 +46,12 @@ tmdist <- function(x) {
     # If the input is a Transition Model object, create distributions
     # based on the data used for training.
     if (inherits(x, "tm")) {
-        stop(" --- here call procast --- ")
+        warning("TODO(R): Here I sould call procast?")
         vars <- attr(terms(TransitionModels:::fake_formula(formula(b))), "term.labels")
         vars <- vars[!vars == "theta"]
         d    <- x$model.frame
         nb   <- length(x$bins)
         tmp  <- lapply(d[, vars, drop = FALSE], function(x, nb) rep(x, each = nb), nb = nb)
-        print(str(tmp))
-        print(nb)
         tmp  <- data.frame(c(list(theta = rep(seq_len(nb) - 1, times = nrow(d))), tmp))
 
         tmp  <- data.frame(tp   = predict(x$model, newdata = tmp, type = "response"),
@@ -134,8 +132,8 @@ prodist.tm <- function(object, newdata = NULL, ...) {
     }
 
     # Creating res
-    nb <- length(object$bins) # Number of bins
-    nd <- nrow(res)           # Number of observations
+    nb <- length(object$ym) # Number of bins
+    nd <- nrow(res)         # Number of observations
 
     expand_covar <- function(x, nb) rep(x, each = nb)
     res  <- lapply(res[, covars, drop = FALSE], expand_covar, nb = nb)
@@ -143,8 +141,9 @@ prodist.tm <- function(object, newdata = NULL, ...) {
 
     # TODO(R): Currently 'type = response' which differs
     # for different engines (see tm()).
-    res  <- data.frame(tp     = predict(object$model, newdata = res, type = "response"),
-                       binmid = rep(object$bins, times = nd))
+    res  <- data.frame(tp = predict(object$model, newdata = res, type = "response"),
+                       lo = rep(head(object$bins, -1), times = nd),
+                       up = rep(tail(object$bins, -1), times = nd))
     # Split into individual data.frames
     res <- split(res, rep(seq_len(nd), each = nb))
 
