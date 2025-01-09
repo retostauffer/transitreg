@@ -46,6 +46,7 @@ tmdist <- function(x) {
     # If the input is a Transition Model object, create distributions
     # based on the data used for training.
     if (inherits(x, "tm")) {
+        stop(" --- here call procast --- ")
         vars <- attr(terms(TransitionModels:::fake_formula(formula(b))), "term.labels")
         vars <- vars[!vars == "theta"]
         d    <- x$model.frame
@@ -93,11 +94,56 @@ tmdist <- function(x) {
 
     # Converting to data.frame, adding custom class, and return.
     res <- lapply(x, df_to_mat, m = m)
-    res <- as.data.frame(do.call(rbind, res))
+    res <- as.data.frame(do.call(rbind, res), expand = TRUE)
 
     class(res) <- c("tmdist", "distribution")
     return(res)
 }
+
+
+prodist.tm <- function(object, newdata = NULL, ...) {
+    # Extracting covariable names to create newdata
+    covars <- attr(terms(fake_formula(formula(object))), "term.labels")
+    covars <- covars[!covars == "theta"]
+
+    # In-sample data
+    if (is.null(newdata)) {
+        res <- object$model.frame
+    } else {
+        res <- newdata; rm(newdata)
+    }
+
+    # Creating res
+    nb <- length(object$bins) # Number of bins
+    nd <- nrow(res)           # Number of observations
+
+    expand_covar <- function(x, nb) rep(x, each = nb)
+    res  <- lapply(res[, covars, drop = FALSE], expand_covar, nb = nb)
+    res  <- data.frame(c(list(theta = rep(seq_len(nb) - 1, times = nd)), res))
+
+    # TODO(R): Currently 'type = response' which differs
+    # for different engines (see tm()).
+    res  <- data.frame(tp     = predict(object$model, newdata = res, type = "response"),
+                       binmid = rep(object$bins, times = nd))
+    # Split into individual data.frames
+    res <- split(res, rep(seq_len(nd), each = nb))
+
+    # Convert into distributions object, pack into a data.frame
+    return(setNames(as.data.frame(tmdist(res)), as.character(substitute(object))))
+}
+
+procast.tm <- function(object, newdata = NULL, na.action = na.pass,
+                       type = "distribution", at = 0.5, drop = FALSE, ...) {
+    object <- if (is.null(newdata)) {
+        prodist(object)
+    } else {
+        # TODO(R): na.action passed to 'procast.tm' but not yet implemented (no effect)
+        prodist(object, newdata = newdata, na.action = na.action)
+    }
+
+    return(if (drop) object[[1]] else object)
+}
+
 
 tmdist_convert_input <- function(x) {
     # Unnamed list of length 2; where each entry in x is a vector
@@ -106,7 +152,7 @@ tmdist_convert_input <- function(x) {
     # Named list
     } else if (is.list(x) && all(c("tp", "binmid") %in% names(x))) {
         stopifnot(length(x$binmid) == length(x$tp))
-        x <- as.data.frame(x[c("tp", "binmid")])
+        x <- as.data.frame(x[c("tp", "binmid")], expand = TRUE)
     # Else we expect to have gotten a series of distributions,
     # so we call this function again to convert them if possible
     } else if (is.list(x)) {
@@ -121,21 +167,24 @@ tmdist_convert_input <- function(x) {
 }
 
 # Convert one tmdist distributions into data.frame
-as.data.frame.tmdist <- function(x, ...) {
+as.data.frame.tmdist <- function(x, expand = FALSE, ...) {
 
-    class(x) <- "data.frame"
-    idx_tp <- grepl("^tp_", names(x))
-    idx_bm <- grepl("^bin_", names(x))
-    binid  <- names(x)[idx_tp]
-    binid  <- as.integer(regmatches(binid, regexpr("[0-9]+$", binid)))
+    if (expand) {
+        class(x) <- "data.frame"
+        idx_tp <- grepl("^tp_", names(x))
+        idx_bm <- grepl("^bin_", names(x))
+        binid  <- names(x)[idx_tp]
+        binid  <- as.integer(regmatches(binid, regexpr("[0-9]+$", binid)))
 
-    x <- t(as.matrix(x))
-    res <- data.frame(index  = rep(seq_len(ncol(x)), each = length(binid)),
-                      bin    = rep(binid, ncol(x)),
-                      tp     = as.numeric(x[idx_tp, ]),
-                      binmid = as.numeric(x[idx_bm, ]))
-
-    return(na.omit(res))
+        x <- t(as.matrix(x))
+        res <- data.frame(index  = rep(seq_len(ncol(x)), each = length(binid)),
+                          bin    = rep(binid, ncol(x)),
+                          tp     = as.numeric(x[idx_tp, ]),
+                          binmid = as.numeric(x[idx_bm, ]))
+        return(na.omit(res))
+    } else {
+        return(NextMethod())
+    }
 }
 
 # TODO(R): Currently testing for one distribution only
@@ -145,7 +194,7 @@ format.tmdist <- function(x, digits = pmax(3L, getOption("digits") - 3L), ...) {
 
     # Extracting probabilites and bins
     fmt <- function(i, x) {
-        y <- as.data.frame(x[i])
+        y <- as.data.frame(x[i], expand = TRUE)
         sprintf("tm distribution (%s:%d <--> %s:%d)",
                 format(min(y$binmid), digits = digits), min(y$bin),
                 format(max(y$binmid), digits = digits), max(y$bin))
@@ -178,7 +227,7 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
 
     if (!elementwise) x <- sort(x) # Important
     ui <- seq_along(d) # Unique index
-    d  <- as.data.frame(d) # convert distributions to data.frame
+    d  <- as.data.frame(d, expand = TRUE) # convert distributions to data.frame
 
     ## Calling C to calculate the required quantiles
     ## binmid: Required as we need to know where to stop.
@@ -240,7 +289,7 @@ cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
 
     if (!elementwise) x <- sort(x) # Important
     ui <- seq_along(d) # Unique index
-    d  <- as.data.frame(d) # convert distributions to data.frame
+    d  <- as.data.frame(d, expand = TRUE) # convert distributions to data.frame
 
     ## Calling C to calculate the required CDFs
     res <- .Call("tm_predict", uidx = ui, idx = d$index, tp = d$tp,
@@ -294,7 +343,7 @@ quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = 
 
     if (elementwise) probs <- sort(probs) # Important
     ui <- seq_along(x) # Unique index
-    x  <- as.data.frame(x) # convert distributions to data.frame
+    x  <- as.data.frame(x, expand = TRUE) # convert distributions to data.frame
 
     ## Calling C to calculate the required quantiles
     res <- .Call("tm_predict", uidx = ui, index = x$index, tp = x$tp,
@@ -322,7 +371,7 @@ mean.tmdist <- function(x, ncores = NULL, ...) {
     ncores <- tm_get_number_of_cores(ncores, FALSE)
 
     ui <- seq_along(x) # Number of distributions
-    x  <- as.data.frame(x) # Convert to data.frame
+    x  <- as.data.frame(x, expand = TRUE) # Convert to data.frame
 
     ## Calling C to calculate the required quantiles
     return(.Call("tm_predict", uidx = ui, index = x$index, tp = x$tp, binmid = x$binmid, y = NA_real_,
@@ -335,7 +384,7 @@ random.tmdist <- function(x, n = 1L, drop = TRUE, ...) {
     # Helper function, draw weighted sample of length 'n'.
     # Scoping 'x' and 'n'
     fn <- function(i) {
-        tmp     <- as.data.frame(x[i])
+        tmp     <- as.data.frame(x[i], expand = TRUE)
         tmp$pdf <- as.numeric(pdf(x[i], tmp$binmid))
         delta   <- diff(tmp$binmid[1:2]) / 2 # bin width/2
         sample(tmp$binmid, size = n, prob = tmp$pdf, replace = TRUE) +
