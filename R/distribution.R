@@ -165,27 +165,6 @@ procast.tm <- function(object, newdata = NULL, na.action = na.pass,
 }
 
 
-# Convert one tmdist distributions into data.frame
-as.data.frame.tmdist <- function(x, expand = FALSE, ...) {
-
-    if (expand) {
-        class(x) <- "data.frame"
-        idx_tp <- grepl("^tp_", names(x))
-        idx_bm <- grepl("^bin_", names(x))
-        binid  <- names(x)[idx_tp]
-        binid  <- as.integer(regmatches(binid, regexpr("[0-9]+$", binid)))
-
-        x <- t(as.matrix(x))
-        res <- data.frame(index  = rep(seq_len(ncol(x)), each = length(binid)),
-                          bin    = rep(binid, ncol(x)),
-                          tp     = as.numeric(x[idx_tp, ]),
-                          binmid = as.numeric(x[idx_bm, ]))
-        return(na.omit(res))
-    } else {
-        return(NextMethod())
-    }
-}
-
 #' Convert tmdist Distributions to Matrix
 #'
 #' @param x object of class \code{c("tmdist", ...)}.
@@ -214,13 +193,15 @@ as.matrix.tmdist <- function(x, expand = FALSE) {
     # convert to data.frame -> matrix
     x <- as.matrix(structure(x, class = "data.frame"))
     if (expand) {
+        # Keep original dimension as we transpose(x) in a second
         nd <- nrow(x)      # Number of distributions
         nb <- ncol(x) / 3L # Number of bins
 
         x <- t(x) # Transpose 'x' to properly extract data
+
         res <- list(index = rep(seq_len(nd), each = nb))
         for (n in c("tp", "lo", "up")) {
-            res[[n]] <- as.vector(x[grep("^tp_[0-9]+$", rownames(x)), ])
+            res[[n]] <- as.vector(x[grep(sprintf("^%s_[0-9]+$", n), rownames(x)), ])
         }
         # Create new rownames if there were any
         if (!is.null(xnames))
@@ -243,14 +224,18 @@ format.tmdist <- function(x, digits = pmax(3L, getOption("digits") - 3L), ...) {
     xnames <- names(x) # Keep for later
 
     # Extracting probabilites and bins
-    fmt <- function(i, x) {
-        y <- as.data.frame(x[i], expand = TRUE)
-        sprintf("tm distribution (%s:%d <--> %s:%d)",
-                format(min(y$binmid), digits = digits), min(y$bin),
-                format(max(y$binmid), digits = digits), max(y$bin))
+    fmtfun <- function(i) {
+        y <- as.matrix(x[i], expand = TRUE)
+        sprintf("%d; %s [%s,%s], ... , %s [%s,%s]", nrow(y),
+                format(y[1,       "tp"], digits = digits),
+                format(y[1,       "lo"], digits = digits),
+                format(y[1,       "up"], digits = digits),
+                format(y[nrow(y), "tp"], digits = digits),
+                format(y[nrow(y), "lo"], digits = digits),
+                format(y[nrow(y), "up"], digits = digits))
     }
-
-    f <- sapply(seq_along(x), fmt, x = x)
+    f <- sapply(seq_along(x), fmtfun)
+    f <- sprintf("Transition Dist (%s)", f)
     setNames(f, xnames)
 }
 
@@ -434,8 +419,10 @@ random.tmdist <- function(x, n = 1L, drop = TRUE, ...) {
     # Helper function, draw weighted sample of length 'n'.
     # Scoping 'x' and 'n'
     fn <- function(i) {
-        tmp     <- as.data.frame(x[i], expand = TRUE)
-        tmp$pdf <- as.numeric(pdf(x[i], tmp$binmid))
+        y      <- as.matrix(x[i], expand = TRUE)
+        binmid <- mean(rowSums(y[, c("lo", "up")]) / 2)
+        p      <- as.numeric(pdf(x[i], binmid))
+        stop("TODO(R): Need to implement 'pdf' first")
         delta   <- diff(tmp$binmid[1:2]) / 2 # bin width/2
         sample(tmp$binmid, size = n, prob = tmp$pdf, replace = TRUE) +
             runif(n, -delta, delta)
@@ -459,31 +446,26 @@ random.tmdist <- function(x, n = 1L, drop = TRUE, ...) {
 
 ## Check if distribution is discrete
 is_discrete.tmdist <- function(x, ...) {
-    ## Guessing from 'bins'. If all bins are integers,
-    ## we assume the original distribution has been discrete.
-    ## Else continuous.
-    class(x) <- "data.frame"
-    x <- as.matrix(x[, grep("^bin_[0-9]+$", names(x))])
-    x <- na.omit(unique(as.numeric(x)))
-    ## Fraction of non-integer values
-    tmp <- mean(x %% 1 > sqrt(.Machine$double.eps))
-    ## If fraction of non-perfect integers is < 1 promille, we assume
-    ## this is/was a discrete distribution (or all of them).
-    return(tmp < 1e-3)
+    # Calculating 'bin mid', if all bin mid points
+    # are integer we assume it is a discrete dist.
+    fn <- function(i) {
+        y <- as.matrix(x[i], expand = TRUE)
+        binmid <- (y[, "lo"] + y[, "up"]) / 2
+        all(abs(binmid %% 1) < sqrt(.Machine$double.eps))
+    }
+    sapply(seq_along(x), fn)
 }
 is_continuous.tmdist <- function(x, ...) {
     return(!is_discrete(x))
 }
 
-## TODO(R): Currently adding 'max difference' of any distribution
-##          as delta to add on top of the support. This works
-##          fine if all the distributions have the same bins (or
-##          same diff(bins), any better solution? Question for Niki
+# Support for ALL distributions together
 support.tmdist <- function(x, ...) {
-    class(x) <- "data.frame"
-    x <- as.matrix(x[, grep("^bin_[0-9]+$", names(x))])
-    delta <- max(apply(x, MARGIN = 1, function(y) max(diff(y), na.rm = TRUE)))
-    return(range(na.omit(unique(as.numeric(x)))) + c(-0.5, 0.5) * delta)
+    fn <- function(i) {
+        y <- as.matrix(x[i], expand = TRUE)
+        c(min = min(y[, "lo"]), max = max(y[, "up"]))
+    }
+    t(sapply(seq_along(x), fn))
 }
 
 

@@ -7,24 +7,13 @@ rm(list = objects())
 suppressPackageStartupMessages(library("TransitionModels"))
 if (interactive()) library("tinytest")
 
-library("devtools")
-
 
 # -------------------------------------------------------------------
 # For testing, faking transition probabilities by drawing from
 # a binomial distribution
 # -------------------------------------------------------------------
 # Converting CDF to transition probabilities
-p2tp <- function(x) {
-    tp <- numeric(length(x))
-    tp[1] = 1 - x[1]
-    prod <- 1
-    for (i in seq.int(2, length(x))) {
-        prod <- prod * tp[i - 1]
-        tp[i] = (x[i - 1] - x[i] + prod) / prod
-    }
-    return(tp)
-}
+p2tp <- TransitionModels:::cdf_to_tp
 
 # First fake distribution. A data.frame, though
 # the order of the columns is 'off'.
@@ -36,8 +25,8 @@ fake1 <- fake1[, c(3, 1, 2)] # Mixing
 # Second fake distribution, different binning, different length.
 # Just an unnamed list.
 fake2 <- list(p2tp(pbinom(1:15, size = 15, prob = 0.20)), # transition prob
-              1:15 * 2 - 3 - 1, # lower bound of bin
-              1:15 * 2 - 3 + 1) # upper bound of bin
+              1:15 * 2 - 2.9 - 1, # lower bound of bin; -2.9 -> not discrete (not integer)
+              1:15 * 2 - 2.9 + 1) # upper bound of bin; -2.9 (see above)
 
 
 
@@ -69,6 +58,11 @@ expect_identical(dim(m1e), c(nrow(fake1), 4L),               info = "Testing ext
 expect_true(identical(exp_colnames, colnames(m1e)),          info = "Matrix extended column names")
 expect_true(is.null(rownames(m1e)),                          info = "Extended matrix row names (unnamed)")
 
+expect_true(all(m1e[, "index"] == 1L),                       info = "Checking matrix content (index)")
+expect_equal(m1e[, "tp"], fake1$tp,                          info = "Checking matrix content (tp)")
+expect_equal(m1e[, "lo"], fake1$lo,                          info = "Checking matrix content (lo)")
+expect_equal(m1e[, "up"], fake1$up,                          info = "Checking matrix content (up)")
+
 rm(m1e)
 rm(d1)
 
@@ -98,6 +92,11 @@ expect_true(is.matrix(m2e) && is.numeric(m2e),               info = "Testing ext
 expect_identical(dim(m2e), c(nrow(fake1), 4L),               info = "Testing extended matrix dimension")
 expect_true(identical(exp_colnames, colnames(m2e)),          info = "Matrix extended column names")
 expect_true(all(grepl("^A_[0-9]+$", rownames(m2e))),         info = "Extended matrix row names")
+
+expect_true(all(m2e[, "index"] == 1L),                       info = "Checking matrix content (index)")
+expect_equivalent(m2e[, "tp"], fake2[[1]],                   info = "Checking matrix content (tp)")
+expect_equivalent(m2e[, "lo"], fake2[[2]],                   info = "Checking matrix content (lo)")
+expect_equivalent(m2e[, "up"], fake2[[3]],                   info = "Checking matrix content (up)")
 
 rm(m2e)
 rm(d2)
@@ -139,6 +138,15 @@ expect_identical(dim(m3e), c(nrow(fake1) + length(fake2[[1]]), 4L), info = "Test
 expect_true(identical(exp_colnames, colnames(m3e)),          info = "Matrix extended column names")
 expect_true(all(grepl("^(FOO|BAR)_[0-9]+$", rownames(m3e))), info = "Extended matrix row names (unnamed)")
 
+tmp_index <- rep(1:2, c(nrow(fake1), length(fake2[[1]])))
+tmp_tp    <- c(fake1$tp, fake2[[1]])
+tmp_lo    <- c(fake1$lo, fake2[[2]])
+tmp_up    <- c(fake1$up, fake2[[3]])
+expect_equivalent(m3e[, "index"], tmp_index,                 info = "Checking matrix content (tp)")
+expect_equivalent(m3e[, "tp"],    tmp_tp,                    info = "Checking matrix content (tp)")
+expect_equivalent(m3e[, "lo"],    tmp_lo,                    info = "Checking matrix content (lo)")
+expect_equivalent(m3e[, "up"],    tmp_up,                    info = "Checking matrix content (up)")
+
 rm(m3e)
 rm(d3)
 
@@ -157,18 +165,43 @@ expect_inherits(d1, "tmdist"); expect_identical(length(d1), 1L)
 expect_inherits(d3, "tmdist"); expect_identical(length(d3), 2L)
 expect_identical(names(d3), c("A", "B"))
 
+# Print
+p = "Transition Dist \\(.*\\)"
+expect_stdout(print(d1),
+              pattern = p,
+              info = "Testing standard representation (format)")
+expect_stdout(print(d3),
+              pattern = paste(p, p, sep = ".*"), # <- twice
+              info = "Testing standard representation (format)")
+
 # Converting to data.frame
-expect_silent(df1 <- as.data.frame(d1))
-expect_inherits(df1, "data.frame")
-expect_identical(names(df1), "d1")
-expect_identical(dim(df1), c(1L, 1L))
-expect_identical(rownames(df1), "1")
+expect_silent(df1 <- as.data.frame(d1),                  info = "Convert distributions to data.frame")
+expect_inherits(df1, "data.frame",                       info = "distributions data.frame")
+expect_identical(names(df1), "d1",                       info = "Testing name on distributions data.frame")
+expect_identical(dim(df1), c(1L, 1L),                    info = "Testing dimension of distributions data.frame")
+expect_identical(rownames(df1), "1",                     info = "Testing rownames of distributions data.frame")
+
+expect_silent(df3 <- as.data.frame(d3),                  info = "Convert distributions to data.frame")
+expect_inherits(df3, "data.frame",                       info = "distributions data.frame")
+expect_identical(names(df3), "d3",                       info = "Testing name on distributions data.frame")
+expect_identical(dim(df3), c(2L, 1L),                    info = "Testing dimension of distributions data.frame")
+expect_identical(rownames(df3), names(d3),               info = "Testing rownames of distributions data.frame")
 
 
-expect_silent(df3 <- as.data.frame(d3))
-expect_inherits(df3, "data.frame")
-expect_identical(names(df3), "d3")
-expect_identical(dim(df3), c(2L, 1L))
-expect_identical(rownames(df3), names(d3))
+
+# Checking support as well as is_discrete, is_continuous
+exp_support <- rbind(c(min = min(fake1$lo),   max = max(fake1$up)),
+                     c(min = min(fake2[[2]]), max = max(fake2[[3]])))
+expect_silent(support(d3),                               info = "support() should be silent")
+expect_equal(support(d3), exp_support,                   info = "Checking support (return class, names, and values")
+
+expect_silent(is_discrete(d3),                           info = "is_discrete() should be silent")
+expect_silent(is_continuous(d3),                         info = "is_continuous() should be silent")
+expect_identical(is_discrete(d3), c(TRUE, FALSE),        info = "Testing return of is_discrete")
+expect_identical(is_discrete(d3), !c(TRUE, FALSE),       info = "Testing return of is_continuous")
+expect_identical(is_discrete(d3), !is_continuous(d3),    info = "Must be complementary")
+
+
+
 
 
