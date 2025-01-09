@@ -5,30 +5,36 @@
 \alias{log_pdf.tmdist}
 \alias{cdf.tmdist}
 \alias{quantile.tmdist}
+\alias{median.tmdist}
+\alias{mean.tmdist}
+\alias{as.matrix.tmdist}
+\alias{support.tmdist}
+\alias{is_discrete.tmdist}
+\alias{is_continuous.tmdist}
 \title{Create an tmdist Distribution}
 \usage{
-tmdist(z, newdata = NULL, newresponse = NULL)
-\method{random}{tmdist}(x, n = 1L, drop = TRUE, ...)
-\method{pdf}{tmdist}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
-\method{log_pdf}{tmdist}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
-\method{cdf}{tmdist}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
-\method{quantile}{tmdist}(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
-\method{median}{tmdist}{x, ncores = NULL, ...}
-\method{mean}{tmdist}{x, na.rm = NULL, ncores = NULL, ...}
-\method{random}{tmdist}{x, n = 1L, drop = TRUE, ...}
-\method{is_discrete}{tmdist}{d, ...}
-\method{is_continuous}{tmdist}{d, ...}
-\method{support}{tmdist}{x, drop = NULL, ...}
-\method{as.matrix}{tmdist}(x, expand = FALSE, ...)
+    tmdist(z, newdata = NULL, newresponse = NULL)
+
+    \method{pdf}{tmdist}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
+    \method{log_pdf}{tmdist}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
+    \method{cdf}{tmdist}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
+    \method{quantile}{tmdist}(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
+    \method{median}{tmdist}(x, na.rm = NULL, ncores = NULL, ...)
+    \method{mean}{tmdist}(x, ncores = NULL, ...)
+    \method{random}{tmdist}(x, n = 1L, drop = TRUE, ...)
+
+    \method{is_discrete}{tmdist}(d, ...)
+    \method{is_continuous}{tmdist}(d, ...)
+    \method{support}{tmdist}(d, drop = NULL, ...)
+
+    \method{as.matrix}{tmdist}(x, expand = FALSE, ...)
 }
 \arguments{
     \item{z}{an object that can be converted into a \code{c("tmdist", "distributions")}
         object. See section 'Details' for more information.}
     \item{x}{object of class \code{tmdist} (if main argument), else a numeric
         vector at which the CDF, PDF, or quantile should be evaluated.}
-    \item{probs}{Numeric vector of transition probabilities}
-    \item{bins}{Center of the (pseudo-)bins corresponding to the transition
-        probabilites. Numeric, same length as \code{probs}.}
+    \item{probs}{Probabilities at which to evaluate the function.}
     \item{...}{Currently not used.}
     \item{n}{The number of samples to draw. Defaults to `1L`.}
     \item{drop}{logical. Should the result be simplified to a vector if possible?}
@@ -44,6 +50,10 @@ tmdist(z, newdata = NULL, newresponse = NULL)
     \item{expand}{Logical, if \code{FALSE} the result is a 'wide' matrix,
         if \code{TRUE} a 'long' format is returned.}
     \item{na.rm}{\code{NULL}, currently has no effect.}
+    \item{newdata}{An optional data frame in which to look for variables with
+          which to predict. If omitted, the fitted values are used.}
+    \item{newresponse}{Numeric vector with new response, must be provided
+        if \code{newdata} is specified, same length as \code{nrow(newdata)}.}
 }
 \value{
 A `tmdist` object.
@@ -59,33 +69,43 @@ TODO(R): Missing
 Explain what 'z' can take.
 }
 \examples{
-## TODO(R): Outdated.
-data <- structure(list(bin = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-    12, 13, 14, 15, 16, 17, 18, 19), tp = c(0.998987937051858, 0.997723761984778,
-    0.994959741987477, 0.989144986733817, 0.977718308296039, 0.958030163744388,
-    0.929870939128467, 0.895691370872762, 0.856730189019159, 0.812772393792261,
-    0.767294535298433, 0.727450916579927, 0.695208938905971, 0.662724982750024,
-    0.619413076608789, 0.561464014434395, 0.493907965967658, 0.424410082007259,
-    0.357570963995397, 0.295847728009519), binmid = c(-3.16187734522192,
-    -2.83533036950331, -2.5087833937847, -2.18223641806609, -1.85568944234748,
-    -1.52914246662887, -1.20259549091026, -0.876048515191646, -0.549501539473035,
-    -0.222954563754424, 0.103592411964187, 0.430139387682798, 0.75668636340141,
-    1.08323333912002, 1.40978031483863, 1.73632729055724, 2.06287426627585,
-    2.38942124199446, 2.71596821771308, 3.04251519343169)), row.names = c(NA,
-    20L), class = "data.frame")
+## Creating 'fake' Transition dist using Poisson distribution, converted to
+## transition models using ## cdf_to_tp function.
+p  <- ppois(0:30, lambda = 5) # CDF
+tp <- TransitionModels:::cdf_to_tp(p) # Transition probabilities
 
-X <- tmdist(data$tp, data$binmid)
-X
+## Create named list; one form to create a 'tmdist' object.
+## Requires 'tp' (transition probabilities), as well as lower and
+## upper boundaries of the bins.
+tmp <- list(tp = tp,
+            lo = seq(-1.25, by = 0.5, length.out = length(tp)),
+            up = seq(-1.25, by = 0.5, length.out = length(tp)) + 0.5)
+str(tmp)
 
-mean(X)
+## Convert to 'tmdist' distributions object
+d <- tmdist(tmp)
+print(d)
 
-random(X, 10)
+## Calculate PDF and CDF (on the center of the bins used to create the distribution)
+x <- seq(-1, by = 0.5, length.out = length(tp)) # between 'lo' and 'hi'
+d_cdf <- cdf(d, x)
+d_pdf <- pdf(d, x)
 
-pdf(X, 2)
-log_pdf(X, 2)
+barplot(rbind(d_cdf, d_pdf), beside = TRUE, col = c("tomato", "gray30"),
+        las = 2, main = "CDF and PDF of tmdist")
 
-cdf(X, 4)
-quantile(X, 0.7)
+## Mean and median
+c("mean" = mean(d), "median" = median(d))
+
+## Draw 1000 random values; compare empirical mean/median
+## TODO(R): mean(d) and mean(r) differ quite a bit; is mean(d) correctly implemented?
+r <- random(d, n = 1000L)
+c("empirical mean" = mean(r), "empirical median" = median(r))
+
+## Support and type of distribution
+is_discrete(d)
+is_continuous(d)
+support(d)
 }
 \concept{tmdist distribution}
 \concept{Normal distribution}

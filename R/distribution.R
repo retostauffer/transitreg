@@ -38,16 +38,16 @@
 #'
 #' @return Returns an object of class \code{c("tmdist", "distribution")}.
 #' @author Reto
-tmdist <- function(x, newdata = NULL, newresponse = NULL) {
+tmdist <- function(z, newdata = NULL, newresponse = NULL) {
     # Converting input into a list of data.frames. The lengt of the list
     # corresponds to the number of distributions, whereof each element is a
     # data.frame with the transition probabilities and bins.
 
     # If the input is a Transition Model object, create distributions
     # based on the data used for training.
-    if (inherits(x, "tm")) {
+    if (inherits(z, "tm")) {
         warning("TODO(R): Here I sould call procast?")
-        vars <- attr(terms(fake_formula(formula(b))), "term.labels")
+        vars <- attr(terms(fake_formula(formula(x))), "term.labels")
         vars <- vars[!vars == "theta"]
         d    <- x$model.frame
         nb   <- length(x$bins)
@@ -62,8 +62,8 @@ tmdist <- function(x, newdata = NULL, newresponse = NULL) {
     # Else try to convert the input (different formats are possible)
     # into a distributions object.
     } else {
-        x <- tmdist_convert_input(x)
-        if (is.matrix(x)) x <- list(x)
+        z <- tmdist_convert_input(z)
+        if (is.matrix(z)) z <- list(z)
     }
 
     # Sanity check on the newly created list of data.frames
@@ -74,10 +74,10 @@ tmdist <- function(x, newdata = NULL, newresponse = NULL) {
         stopifnot(all(y[, "lo"] < y[, "up"]))
         stopifnot(all(y[, "up"] - y[, "lo"] > 0))
     }
-    lapply(x, check_matrices)
+    lapply(z, check_matrices)
 
     # Find max length of the dfs
-    nmax <- max(sapply(x, nrow))
+    nmax <- max(sapply(z, nrow))
 
     # Helper function to create the names for the matrix (and the matrix inserts)
     get_names <- function(n)
@@ -89,7 +89,7 @@ tmdist <- function(x, newdata = NULL, newresponse = NULL) {
         m[seq_along(y)] <- as.vector(t(y))
         return(m)
     }
-    res <- lapply(x, to_matrix, n = nmax)
+    res <- lapply(z, to_matrix, n = nmax)
     res <- as.data.frame(structure(do.call(rbind, res),
                                    dimnames = list(NULL, get_names(nmax))))
 
