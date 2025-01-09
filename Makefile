@@ -6,7 +6,7 @@ VERSION := $(shell grep '^Version:' DESCRIPTION | awk '{print $$2}')
 
 .PHONY: test
 test:
-	Rscript -e "tinytest::test_all()"
+	Rscript -e "library(\"tinytest\"); test_all()"
 	##Rscript -e "library(TransitionModels); tinytest::test_all()"
 
 .PHONY: install
