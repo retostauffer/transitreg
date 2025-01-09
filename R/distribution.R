@@ -65,41 +65,61 @@ tmdist <- function(x) {
     # into a distributions object.
     } else {
         x <- tmdist_convert_input(x)
-        if (is.data.frame(x)) x <- list(x)
+        if (is.matrix(x)) x <- list(x)
     }
 
     # Sanity check on the newly created list of data.frames
     # Sanity check my data.frames
-    check_dfs <- function(y) {
-        stopifnot(all(y$tp >= 0 & y$tp <= 1))
-        stopifnot(all(diff(y$binmid) >= 0))
-        stopifnot(all(sapply(y, is.numeric)))
+    check_matrices <- function(y) {
+        stopifnot(is.matrix(y), is.numeric(y))
+        stopifnot(all(y[, "tp"] >= 0 & y[, "tp"] <= 1))
+        stopifnot(all(y[, "lo"] < y[, "up"]))
+        stopifnot(all(y[, "up"] - y[, "lo"] > 0))
     }
-    lapply(x, check_dfs)
+    lapply(x, check_matrices)
 
     # Find max length of the dfs
     nmax <- max(sapply(x, nrow))
 
     # Helper function to create the names for the matrix (and the matrix inserts)
     get_names <- function(n)
-        c(sprintf("tp_%d",  seq_len(n) - 1L), sprintf("bin_%d", seq_len(n) - 1L))
-
-    # Convert from long to wide matrix; scopes 'mat' and 'x'
-    df_to_mat <- function(y, m) {
-        y <- setNames(unlist(y), get_names(nrow(y))) # Create named vector
-        m[, names(y)] <- unname(y) # Inserting values into matrix
-        return(m)
-    }
-    m <- matrix(NA, 1, ncol = 2 * nmax, dimnames = list(NULL, get_names(nmax)))
+        as.vector(outer(c("tp", "lo", "up"), seq_len(n) - 1, paste, sep = "_"))
 
     # Converting to data.frame, adding custom class, and return.
-    res <- lapply(x, df_to_mat, m = m)
-    res <- as.data.frame(do.call(rbind, res), expand = TRUE)
+    to_matrix <- function(y, n) {
+        m <- matrix(NA_real_, nrow = 1, ncol = 3L * n)
+        m[seq_along(y)] <- as.vector(t(y))
+        return(m)
+    }
+    res <- lapply(x, to_matrix, n = nmax)
+    res <- as.data.frame(structure(do.call(rbind, res),
+                                   dimnames = list(NULL, get_names(nmax))))
 
     class(res) <- c("tmdist", "distribution")
     return(res)
 }
 
+
+tmdist_convert_input <- function(x) {
+    # Unnamed list of length 2; where each entry in x is a vector
+    if (is.list(x) && all(sapply(x, is.atomic)) && length(x) == 3L && is.null(names(x))) {
+        x <- cbind(tp = x[[1]], lo = x[[2]], up = x[[3]])
+    # Named list
+    } else if (is.list(x) && all(c("tp", "lo", "up") %in% names(x))) {
+        stopifnot("length of input vectrs differ" = length(unique(sapply(x, length))) == 1L)
+        x <- cbind(tp = x$tp, lo = x$lo, up = x$up)
+    # Else we expect to have gotten a series of distributions,
+    # so we call this function again to convert them if possible
+    } else if (is.list(x)) {
+        # TODO(R): Recursive call on level 1; safe option?
+        x <- lapply(x, tmdist_convert_input)
+    # Else we don't really know what to do.
+    } else {
+        stop("Problems converting user input to 'tm distribution'")
+    }
+    #lapply(x, check_values)
+    return(x)
+}
 
 prodist.tm <- function(object, newdata = NULL, ...) {
     # Extracting covariable names to create newdata
@@ -145,27 +165,6 @@ procast.tm <- function(object, newdata = NULL, na.action = na.pass,
 }
 
 
-tmdist_convert_input <- function(x) {
-    # Unnamed list of length 2; where each entry in x is a vector
-    if (is.list(x) && all(sapply(x, is.atomic)) && length(x) == 2L && is.null(names(x))) {
-        x <- data.frame(tp = x[[1]], binmid = x[[2]])
-    # Named list
-    } else if (is.list(x) && all(c("tp", "binmid") %in% names(x))) {
-        stopifnot(length(x$binmid) == length(x$tp))
-        x <- as.data.frame(x[c("tp", "binmid")], expand = TRUE)
-    # Else we expect to have gotten a series of distributions,
-    # so we call this function again to convert them if possible
-    } else if (is.list(x)) {
-        # TODO(R): That is no safe idea!
-        x <- lapply(x, tmdist_convert_input)
-    # Else we don't really know what to do.
-    } else {
-        stop("Problems converting user input to 'tm distribution'")
-    }
-    #lapply(x, check_values)
-    return(x)
-}
-
 # Convert one tmdist distributions into data.frame
 as.data.frame.tmdist <- function(x, expand = FALSE, ...) {
 
@@ -187,7 +186,58 @@ as.data.frame.tmdist <- function(x, expand = FALSE, ...) {
     }
 }
 
-# TODO(R): Currently testing for one distribution only
+#' Convert tmdist Distributions to Matrix
+#'
+#' @param x object of class \code{c("tmdist", ...)}.
+#' @param expand logical, if FALSE (default) the wide format is
+#'        returned, where the columns contain transition probabilities (\code{tp_})
+#'        as well as the lower (\code{lo_}) and upper (\code{up}) bound of the
+#'        corresponding bin.
+#'
+#' @return Numeric matrix. If \code{expand = FALSE} the return is of dimension
+#' \code{c(length(x), <ncol>)}.
+#'
+#' If \code{expand = TRUE} the returned matrix is of dimension
+#' \code{c(length(x) * <ncol>, 4L)} where the four columns contain 
+#' \code{index} (1, ..., length(x)) where each index corresponds to the
+#' row-index of the original input \code{x} (distribution identifier),
+#' the transition probabilities \code{tp}, as well as two columns containing
+#' the lower and upper bound of the bin (\code{lo}, \code{up}).
+#' This expanded version is used when calling the .C functions.
+#'
+#' @author Reto
+as.matrix.tmdist <- function(x, expand = FALSE) {
+    stopifnot("'expand' must be logical TRUE or FALSE" = isTRUE(expand) || isFALSE(expand))
+
+    xnames <- names(x) # Keep for later
+
+    # convert to data.frame -> matrix
+    x <- as.matrix(structure(x, class = "data.frame"))
+    if (expand) {
+        nd <- nrow(x)      # Number of distributions
+        nb <- ncol(x) / 3L # Number of bins
+
+        x <- t(x) # Transpose 'x' to properly extract data
+        res <- list(index = rep(seq_len(nd), each = nb))
+        for (n in c("tp", "lo", "up")) {
+            res[[n]] <- as.vector(x[grep("^tp_[0-9]+$", rownames(x)), ])
+        }
+        # Create new rownames if there were any
+        if (!is.null(xnames))
+            xnames <- paste(rep(xnames, each = nb),
+                            rep(seq_len(nb), times = nd), sep = "_")
+
+        # Convert to matrix
+        x <- as.matrix(do.call(cbind, res))
+        if (!is.null(xnames)) rownames(x) <- xnames
+
+        # Remove missing values
+        x <- x[apply(is.na(x), MARGIN = 1, sum) == 0, ]
+    }
+    return(x)
+}
+
+# Format
 format.tmdist <- function(x, digits = pmax(3L, getOption("digits") - 3L), ...) {
     if (length(x) < 1L) return(character(0))
     xnames <- names(x) # Keep for later

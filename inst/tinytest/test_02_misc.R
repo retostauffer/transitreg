@@ -2,6 +2,8 @@
 # Testing the functions in R/misc.R
 # -------------------------------------------------------------------
 
+rm(list = objects())
+
 suppressPackageStartupMessages(library("TransitionModels"))
 if (interactive()) library("tinytest")
 

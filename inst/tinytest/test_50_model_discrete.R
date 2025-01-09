@@ -4,6 +4,8 @@
 #          once we removed that.
 # -------------------------------------------------------------------
 
+rm(list = objects())
+
 suppressPackageStartupMessages(library("TransitionModels"))
 if (interactive()) library("tinytest")
 

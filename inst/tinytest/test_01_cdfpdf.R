@@ -2,6 +2,8 @@
 # Testing implementation of CDF, PDF, pmax
 # -------------------------------------------------------------------
 
+rm(list = objects())
+
 suppressPackageStartupMessages(library("TransitionModels"))
 if (interactive()) library("tinytest")
 
@@ -70,7 +72,6 @@ expect_silent(res_tm <- do.call(rbind, lapply(Y + 1, tm_fun, p = pp)),
 expect_inherits(res_tm, "data.frame")
 expect_identical(dim(res_tm), c(11L, 3L))
 expect_identical(names(res_tm), c("pdf", "cdf", "y"))
-rm(tm_fun)
 
 # -------------------------------------------------------------------
 # When everything works as expected, res_manual and res_tm

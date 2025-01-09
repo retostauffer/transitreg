@@ -41,7 +41,7 @@ S3method(procast,     tm)
 S3method(newresponse, tm)
 
 export("tmdist")
-S3method(as.data.frame,  tmdist)
+S3method(as.matrix,      tmdist)
 S3method(format,         tmdist)
 S3method(quantile,       tmdist)
 S3method(pdf,            tmdist)

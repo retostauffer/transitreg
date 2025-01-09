@@ -16,7 +16,6 @@ x <- runif(n, -3, 3)
 y <- sin(x) + rnorm(n, sd = exp(-1 + cos(x)))
 
 ## Fit model with continuous response.
-devtools::load_all("../")
 mod <- tm(y ~ s(theta) + s(x) + te(x, theta), breaks = 20, verbose = FALSE)
 expect_inherits(mod, "tm", info = "Check model class")
 
