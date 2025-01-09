@@ -49,7 +49,7 @@ tmWhich find_positions(int x, int* y, int n) {
 /* Helper function for type = "mean".
  * Calculates elementwise pdf and multiplies it with the binmidptr. The sum of 
  * the two is the mean which is returned (doubleVec of length 1) */
-double tm_calc_mean(int* positions, int count, double* tpptr, double* binmidptr) {
+double tm_calc_mean(int* positions, int count, double* tpptr, double* lowerptr, double* upperptr) {
 
     // Initialize return value, initialize sum with 0
     double res = 0.0;
@@ -65,14 +65,17 @@ double tm_calc_mean(int* positions, int count, double* tpptr, double* binmidptr)
         // Updating product of transition probabilities
         prod *= tpptr[positions[i]];
         // Updating weighted sum, simply "binmid * pdf(bin)" summed up
-        res += binmidptr[i] * prod * (1.0 - tpptr[positions[i]]);
+        // (lowerptr[i] + upperptr[i]) * 0.5 -> center of the bin
+        res += (lowerptr[i] + upperptr[i]) * 0.5 * prod * (1.0 - tpptr[positions[i]]);
     }
     return res;
 }
 
 
 /* Helper function for type = "pdf" */
-doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny) {
+doubleVec tm_calc_pdf(int* positions, int count,
+                      double* tpptr, double* lowerptr, double* upperptr,
+                      double* y, int ny) {
 
     // Initialize return value/object.
     doubleVec res;
@@ -84,7 +87,7 @@ doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidpt
 
     // Set to true if 'binmidptr' is not provided (an NA). In this case we simply
     // iterate trough the entire tp vector and store the very last value.
-    bool nobm = ISNAN(binmidptr[0]);
+    bool nobm = ISNAN(lowerptr[0]) | ISNAN(upperptr[0]);
 
     // Calculate PDF for each bin given by the distribution for i = 0, ..., count - 1.
     // Store in double 'tmp', the required values will be extracted after this loop.
@@ -108,7 +111,7 @@ doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidpt
     // into which bin each of the thresholds/values in y fall into,
     // and assign the corresponding PDF to res.values | y.
     } else {
-        eval_bins_pdf_cdf(res.values, tmp, count, binmidptr, y, ny);
+        eval_bins_pdf_cdf(res.values, tmp, positions, count, lowerptr, upperptr, y, ny);
     }
 
     // Free allocated memory, return result
@@ -116,27 +119,26 @@ doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* binmidpt
     return res;
 }
 
-void eval_bins_pdf_cdf(double* res, double* tmp, int count, double* binmidptr, double* y, int ny) {
+void eval_bins_pdf_cdf(double* res, double* tmp, int* positions, int count,
+                       double* lowerptr, double* upperptr, double* y, int ny) {
+
     if (count == 1) {
         error("TODO(R): Length of binmidptr == 1, case not yet implemented!");
     }
     // Guesstimate/calculate bin width
     int i, j;
-    double delta = (binmidptr[1] - binmidptr[0]) / 2.; // Half bin width
 
     i = 0;
     for (j = 0; j < ny; j++) {
         res[j] = NA_REAL; // Initial value
         for (i = i; i < count; i++) {
-            // Current 'y' below lowest bin or above largest: break
-            if ((y[j] <= binmidptr[i] - delta) | (y[j] > binmidptr[count - 1] + delta)) {
+            // Current 'y' below current bin OR above highest bin (outside
+            // upper support) we break the inner loop.
+            if ((y[j] <= lowerptr[positions[i]]) | (y[j] > upperptr[positions[count - 1]])) {
                 break;
             }
             // If y[j] in current bin: Store PDF, break loop and continue search
-            if ((y[j] > (binmidptr[i] - delta)) & (y[j] <= (binmidptr[i] + delta))) {
-                ///////printf("  [setting]   res[%d] = tmp[%d] = %.5f\n", j, i, tmp[i]);
-                ///////printf("              as y = %.5f > %.5f & y = %.5f <= %.5f\n",
-                ///////        y[j], binmidptr[i] - delta, y[j], binmidptr[i] + delta);
+            if ((y[j] > lowerptr[positions[i]]) & (y[j] <= upperptr[positions[i]])) {
                 res[j] = tmp[i];
                 break;
             }
@@ -145,7 +147,9 @@ void eval_bins_pdf_cdf(double* res, double* tmp, int count, double* binmidptr, d
 }
 
 /* Helper function for type = "cdf" */
-doubleVec tm_calc_cdf(int* positions, int count, double* tpptr, double* binmidptr, double* y, int ny) {
+doubleVec tm_calc_cdf(int* positions, int count,
+                      double* tpptr, double* lowerptr, double* upperptr,
+                      double* y, int ny) {
 
     // Initialize return value/object.
     doubleVec res;
@@ -157,7 +161,7 @@ doubleVec tm_calc_cdf(int* positions, int count, double* tpptr, double* binmidpt
 
     // Set to true if 'binmidptr' is not provided (an NA). In this case we simply
     // iterate trough the entire tp vector and store the very last value.
-    bool nobm = ISNAN(binmidptr[0]);
+    bool nobm = ISNAN(lowerptr[0]) | ISNAN(upperptr[0]);
 
     // Calculate CDF for each bin given by the distribution for i = 0, ..., count - 1
     // Store in double 'tmp', the required values will be extracted after this loop.
@@ -185,7 +189,7 @@ doubleVec tm_calc_cdf(int* positions, int count, double* tpptr, double* binmidpt
     // into which bin each of the thresholds/values in y fall into,
     // and assign the corresponding PDF to res.values | y.
     } else {
-        eval_bins_pdf_cdf(res.values, tmp, count, binmidptr, y, ny);
+        eval_bins_pdf_cdf(res.values, tmp, positions, count, lowerptr, upperptr, y, ny);
     }
 
     // Free allocated memory, return result
@@ -205,10 +209,10 @@ double interpolate_linear(double x1, double y1, double x2, double y2, double p) 
     return x1 + (p - y1) * (x2 - x1) / (y2 - y1);
 }
 
-/* Helper function for type = "quantile"
- */
-doubleVec tm_calc_quantile(int* positions, int count, double* tpptr,
-                           double* binmidptr, double* prob, int np, bool disc) {
+/* Helper function for type = "quantile" */
+doubleVec tm_calc_quantile(int* positions, int count,
+                           double* tpptr, double* lowerptr, double* upperptr,
+                           double* prob, int np, bool disc) {
 
     int i, j;
 
@@ -262,36 +266,39 @@ doubleVec tm_calc_quantile(int* positions, int count, double* tpptr,
     // i: Loops over the quantiles we are looking for
     // j: Loops over calculated quantiles
     // Store bin mid (quantile we are looking for)
-    j = 0;
+    j = disc ? 1 : 0; // Discrete distributions: start at j = 1, else j = 0
     for (i = 0; i < np; i++) {
         for (j = j; j < count; j++) {
-            if ((prob[i] >= tmp[j - 1]) & (prob[i] < tmp[j])) {
-                // TODO(R): Should/could we perform linear extrapolation for quantiles
-                //          below/above the lowest/highest point? At least as long as
-                //          'in bin range'? Question for Niki.
-                // If j = 0, or j = (count - 1): Take bin mid as is
-                if ((j == 0) | (j == (count - 1))) {
-                    res.values[i] = binmidptr[positions[j]];
-                // Discrete distribution? Simply take mid-point
-                } else if (disc) {
-                    res.values[i] = binmidptr[positions[j]];
-                } else {
-                    // Perform linear interpolation between the two neighboring bin mids.
-                    res.values[i] = interpolate_linear(binmidptr[positions[j - 1]], tmp[j - 1],
-                                                       binmidptr[positions[j]],     tmp[j],
-                                                       prob[i]);
+            // Here we distinguish between discrete and non-discrete distributions.
+            // If discrete, the quantile _must_ lie within a bin, and we take the
+            // center of the bin.
+            if (disc) {
+                if ((prob[i] >= tmp[j - 1]) & (prob[i] < tmp[j])) {
+                    res.values[i] = (lowerptr[positions[j]] + upperptr[positions[j]]) * 0.5;
                 }
-                break; // Found what we were looking for, break inner loop
+            // If not discrete we do the following:
+            // (1) If j == 0 we set the quantile to the lower support of the distribution at first.
+            // (2) If j == (count - 1), the last iteration, we store the upper end of the support.
+            // (3) Else we check if we fall into the current bin. If so, we use linear interpolation
+            //     within the bin (lower-upper); this overwrites rules (1) and (2).
+            } else {
+                // If j = 0 take lowest possible value
+                if (j == 0) {
+                    res.values[i] = lowerptr[positions[j]];
+                // If j == (count - 1), last iteration, take highest possible value
+                } else if (j == (count - 1)) {
+                    res.values[i] = upperptr[positions[j]];
+                } 
+                // Check if we fall into this bin
+                if ((prob[i] >= tmp[j - 1]) & (prob[i] < tmp[j])) {
+                    // Perform linear interpolation between the two neighboring bin mids.
+                    res.values[i] = interpolate_linear(lowerptr[positions[j]], tmp[j - 1],
+                                                       upperptr[positions[j]], tmp[j],
+                                                       prob[i]);
+                    break; // Found what we were looking for, break inner loop
+                }
             }
         }
-        // If we reach this point we are above the highest bin, store
-        // last available bin mid point.
-        if (j == count) {
-            res.values[i] = binmidptr[positions[count - 1]];
-        }
-        // TODO(R): WARNING, currently the approach using the lowest/highest
-        //          value if the quantile lays outside, this collapses all
-        //          quantiles to the supported range. Good? Question for Niki.
     }
     free(tmp); // Freeing allocated memory
 
@@ -351,10 +358,19 @@ double tm_calc_pmax(int* positions, int count, double* pptr) {
  * The three inputs which are always required are:
  *
  * * \code{uidx}: Unique 'distribution' index.
- * * \code{idx}: Integer vector specifying which transition probability
- *   (and binmid if used) corresponds to which \code{uidx}.
+ * * \code{idx}: Integer vector specifying which transition probability.
+ * * \code{lower}: Lower edge of the bin.
+ * * \code{upper}: Upper edge of the bin.
+ * * \code{y}: Where to evaluate the CDF, PDF, quantile. Unused for 
+ *             type = "pmax" and type = "mean".
  * * \code{type}: What to return.
  * * \code{ncores}: Number of cores to be used when OpenMP is available.
+ * * \code{elementwise}: Logical, should the 'type' be evaluated elementwise?
+ *             Only used for PDF, CDF, quantile. If elementwise, y must have
+ *             the same length as ui. Else each distribution is evaluated
+ *             at all 'y's.
+ * * \code{discrete}: Logical, if true the quantile will be fixed to the
+ *             center of the bin, else we perform linear interpolation.
  *
  * The use of the remaining arguments differ.
  *
@@ -369,7 +385,7 @@ double tm_calc_pmax(int* positions, int count, double* pptr) {
  *
  * @return TODO(R): Depends on mode.
  */
-SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
+SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
                 SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete) {
 
     int    *uidxptr   = INTEGER(uidx);     // Unique indices in the dtaa
@@ -380,11 +396,12 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
     int    i, j, np;
 
     double *tpptr     = REAL(tp);          // Transition probabilities
-    double *binmidptr = REAL(binmid);      // Bin mid point, not always needed
+    double *lowerptr  = REAL(lower);       // Lower bound of bin
+    double *upperptr  = REAL(upper);       // Upper bound of bin
     double *yptr      = REAL(y);           // Where to evaluate the distribution
 
     bool   ewise      = asLogical(elementwise); // Elementwise calculation?
-    bool   disc       = asLogical(discrete);    // Discrete distribution? For quantile
+    int*   discptr    = LOGICAL(discrete);      // Discrete distribution? For quantile
 
     // Evaluate 'type' to define what to do. Store a set of
     // boolean values to only do the string comparison once.
@@ -416,8 +433,8 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
     double *resptr = REAL(res);
 
     // If binmid is NA, but yptr is not: Error (this combination is not allowed)
-    if ((do_cdf | do_pdf) & ISNAN(binmidptr[0]) & !ISNAN(yptr[0])) {
-        error("Problem in C tm_predict(): binmid is NA, but y is not.");
+    if ((do_cdf | do_pdf) & (ISNAN(lowerptr[0]) | ISNAN(upperptr[0])) & !ISNAN(yptr[0])) {
+        error("Problem in C tm_predict(): lower or upper is NA, but y is not.");
     }
 
     // If mode is not pdf, cdf, or quantile, elementwise must be true.
@@ -442,27 +459,27 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
             if (do_pdf) {
                 // Single PDF
                 if (ewise) {
-                    tmp = tm_calc_pdf(which.index, which.length, tpptr, binmidptr, yptr, 1);
+                    tmp = tm_calc_pdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, 1);
                 // Multiple PDFs (elementwise)
                 } else {
-                    tmp = tm_calc_pdf(which.index, which.length, tpptr, binmidptr, yptr, LENGTH(y));
+                    tmp = tm_calc_pdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, LENGTH(y));
                 }
             // --- Calculating cumulative distribution
             } else if (do_cdf) {
                 // Single CDF
                 if (ewise) {
-                    tmp = tm_calc_cdf(which.index, which.length, tpptr, binmidptr, yptr, 1);
+                    tmp = tm_calc_cdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, 1);
                 // Multiple CDFs (elementwise)
                 } else {
-                    tmp = tm_calc_cdf(which.index, which.length, tpptr, binmidptr, yptr, LENGTH(y));
+                    tmp = tm_calc_cdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, LENGTH(y));
                 }
             } else {
                 // Single quantile
                 if (ewise) {
-                    tmp = tm_calc_quantile(which.index, which.length, tpptr, binmidptr, &yptr[i], 1, disc);
+                    tmp = tm_calc_quantile(which.index, which.length, tpptr, lowerptr, upperptr, &yptr[i], 1, discptr[i] == 1);
                 // Multiple quantiles (elementwise)
                 } else {
-                    tmp = tm_calc_quantile(which.index, which.length, tpptr, binmidptr, yptr, LENGTH(y), disc);
+                    tmp = tm_calc_quantile(which.index, which.length, tpptr, lowerptr, upperptr, yptr, LENGTH(y), discptr[i] == 1);
                 }
             }
 
@@ -483,7 +500,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
         // -----------------------------------------------------------
         // Calculate mean
         } else if (do_mean) {
-            resptr[i] = tm_calc_mean(which.index, which.length, tpptr, binmidptr);
+            resptr[i] = tm_calc_mean(which.index, which.length, tpptr, lowerptr, upperptr);
         // Else it must be pmax
         } else {
             resptr[i] = tm_calc_pmax(which.index, which.length, tpptr);
@@ -518,9 +535,9 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP binmid, SEXP y,
  * @return Returns named list with two numeric vectors, each of which
  * has length(uidx) (vector with cdf and pdf).
  */
-SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores) {
+SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP ncores) {
 
-    double *pptr    = REAL(p);
+    double *tpptr   = REAL(tp);
     int    *uidxptr = INTEGER(uidx);  // Unique indices in the dtaa
     int    *idxptr  = INTEGER(idx);   // Index vector
     int    nthreads = asInteger(ncores); // Number of threads for OMP
@@ -554,8 +571,11 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores) {
         which = find_positions(uidxptr[i], idxptr, n);
 
         // Calculate pdf and cdf (for the last bin)
-        tmppdf = tm_calc_pdf(which.index, which.length, pptr, na, na, 1);
-        tmpcdf = tm_calc_cdf(which.index, which.length, pptr, na, na, 1);
+        // Input arguments are (in this order)
+        //     positions, count, tpptr, lowerptr, upperptr, y, ny
+        // Here lowerptr, upperptr, y, (and ny) are just dummy values!
+        tmppdf = tm_calc_pdf(which.index, which.length, tpptr, na, na, na, 1);
+        tmpcdf = tm_calc_cdf(which.index, which.length, tpptr, na, na, na, 1);
 
         // Store last value, that is the last bin provided for this distribution.
         pdfptr[i] = tmppdf.values[tmppdf.length - 1];

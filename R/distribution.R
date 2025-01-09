@@ -240,10 +240,6 @@ format.tmdist <- function(x, digits = pmax(3L, getOption("digits") - 3L), ...) {
 }
 
 
-log_pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
-    return(log(pdf(d, x, drop = drop, elementwise = elementwise, ncores = ncores, ...)))
-}
-
 pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
 
     ## Get number of cores for OpenMP parallelization
@@ -258,18 +254,22 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
         stop("'elementwise = TRUE' but length of x does not match the number of distributions")
 
     # Store element names for return
-    xnames <- names(x)
+    xnames <- names(d)
 
     if (!elementwise) x <- sort(x) # Important
-    ui <- seq_along(d) # Unique index
-    d  <- as.data.frame(d, expand = TRUE) # convert distributions to data.frame
+    d  <- as.matrix(d, expand = TRUE) # convert distributions to matrix
+    ui <- unique(d[, "index"])
 
-    ## Calling C to calculate the required quantiles
-    ## binmid: Required as we need to know where to stop.
-    ## y: threshold at which to evaluate the pdf.
-    res <- .Call("tm_predict", uidx = ui, idx = d$index, tp = d$tp,
-                 binmid = d$binmid, y = x, type = "pdf", ncores = ncores,
-                 elementwise = elementwise, discrete = FALSE)
+    ## Calling C to calculate the required values.
+    res <- .Call("tm_predict",
+                 uidx  = as.integer(ui),           # Unique distribution index (int)
+                 idx   = as.integer(d[, "index"]), # Index vector (int)
+                 tp    = d[, "tp"],                # Transition probabilities
+                 lower = d[, "lo"],                # Lower edge of the bin
+                 upper = d[, "up"],                # Upper edge of the bin
+                 y     = as.numeric(x),            # Where to evaluate the pdf
+                 type  = "pdf", ncores = ncores, elementwise = elementwise,
+                 discrete = FALSE) # <- dummy value
 
     # If elementwise: Return named vector
     if (elementwise) {
@@ -280,6 +280,11 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
         return(matrix(res, byrow = TRUE, ncol = length(x),
                       dimnames = list(xnames, get_mat_colnames(x, "d"))))
     }
+}
+
+## Just returns log(pdf(...))
+log_pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
+    return(log(pdf(d, x, drop = drop, elementwise = elementwise, ncores = ncores, ...)))
 }
 
 #' Create Column Names for Return Matrix
@@ -323,13 +328,19 @@ cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
     xnames <- names(x)
 
     if (!elementwise) x <- sort(x) # Important
-    ui <- seq_along(d) # Unique index
-    d  <- as.data.frame(d, expand = TRUE) # convert distributions to data.frame
+    d  <- as.matrix(d, expand = TRUE) # convert distributions to matrix
+    ui <- unique(d[, "index"])
 
-    ## Calling C to calculate the required CDFs
-    res <- .Call("tm_predict", uidx = ui, idx = d$index, tp = d$tp,
-                 binmid = d$binmid, y = x, type = "cdf", ncores = ncores,
-                 elementwise = elementwise, discrete = FALSE)
+    ## Calling C to calculate the required values.
+    res <- .Call("tm_predict",
+                 uidx  = as.integer(ui),           # Unique distribution index (int)
+                 idx   = as.integer(d[, "index"]), # Index vector (int)
+                 tp    = d[, "tp"],                # Transition probabilities
+                 lower = d[, "lo"],                # Lower edge of the bin
+                 upper = d[, "up"],                # Upper edge of the bin
+                 y     = as.numeric(x),            # Where to evaluate the pdf
+                 type  = "cdf", ncores = ncores, elementwise = elementwise,
+                 discrete = FALSE) # <- dummy value
 
 
     # If elementwise: Return named vector
@@ -370,20 +381,24 @@ quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = 
 
     # Discrete distributions?
     discrete <- is_discrete(x)
-    discrete <- TRUE
-    discrete <- FALSE
 
     # Number of probabilities
     nprobs <- length(probs)
 
     if (elementwise) probs <- sort(probs) # Important
-    ui <- seq_along(x) # Unique index
-    x  <- as.data.frame(x, expand = TRUE) # convert distributions to data.frame
+    x  <- as.matrix(x, expand = TRUE) # convert distributions to matrix
+    ui <- unique(x[, "index"])
 
-    ## Calling C to calculate the required quantiles
-    res <- .Call("tm_predict", uidx = ui, index = x$index, tp = x$tp,
-                 binmid = x$binmid, y = probs, type = "quantile", ncores = ncores,
-                 elementwise = elementwise, discrete = discrete)
+    ## Calling C to calculate the required values.
+    res <- .Call("tm_predict",
+                 uidx  = as.integer(ui),           # Unique distribution index (int)
+                 idx   = as.integer(x[, "index"]), # Index vector (int)
+                 tp    = x[, "tp"],                # Transition probabilities
+                 lower = x[, "lo"],                # Lower edge of the bin
+                 upper = x[, "up"],                # Upper edge of the bin
+                 y     = as.numeric(probs),        # Where to evaluate the pdf
+                 type  = "quantile", ncores = ncores, elementwise = elementwise,
+                 discrete = as.logical(discrete))
 
     # If elementwise: Return named vector
     if (elementwise) {
@@ -405,12 +420,19 @@ mean.tmdist <- function(x, ncores = NULL, ...) {
     ## Get number of cores for OpenMP parallelization
     ncores <- tm_get_number_of_cores(ncores, FALSE)
 
-    ui <- seq_along(x) # Number of distributions
-    x  <- as.data.frame(x, expand = TRUE) # Convert to data.frame
+    x  <- as.matrix(x, expand = TRUE) # convert distributions to matrix
+    ui <- unique(x[, "index"])
 
-    ## Calling C to calculate the required quantiles
-    return(.Call("tm_predict", uidx = ui, index = x$index, tp = x$tp, binmid = x$binmid, y = NA_real_,
-                 type = "mean", ncores = ncores, elementwise = TRUE))
+    ## Calling C to calculate the required values.
+    return(.Call("tm_predict",
+                 uidx  = as.integer(ui),           # Unique distribution index (int)
+                 idx   = as.integer(x[, "index"]), # Index vector (int)
+                 tp    = x[, "tp"],                # Transition probabilities
+                 lower = x[, "lo"],                # Lower edge of the bin
+                 upper = x[, "up"],                # Upper edge of the bin
+                 y     = NA_real_,                 # <- Dummy value
+                 type  = "mean", ncores = ncores,
+                 elementwise = TRUE, discrete = FALSE)) # <- Dummy values
 }
 
 
@@ -419,13 +441,12 @@ random.tmdist <- function(x, n = 1L, drop = TRUE, ...) {
     # Helper function, draw weighted sample of length 'n'.
     # Scoping 'x' and 'n'
     fn <- function(i) {
-        y      <- as.matrix(x[i], expand = TRUE)
-        binmid <- mean(rowSums(y[, c("lo", "up")]) / 2)
-        p      <- as.numeric(pdf(x[i], binmid))
-        stop("TODO(R): Need to implement 'pdf' first")
-        delta   <- diff(tmp$binmid[1:2]) / 2 # bin width/2
-        sample(tmp$binmid, size = n, prob = tmp$pdf, replace = TRUE) +
-            runif(n, -delta, delta)
+        y        <- as.matrix(x[i], expand = TRUE)
+        binmid   <- rowMeans(y[, c("lo", "up")])
+        p        <- as.numeric(pdf(x[i], binmid))
+        binwidth <- y[, "up"] - y[, "lo"]
+        sample(binmid, size = n, prob = p, replace = TRUE) +
+            runif(n, -binwidth / 2, binwidth / 2)
         # TODO(R): Currently adding +/- uniform random error
     }
     res <- lapply(seq_along(x), fn)
@@ -455,11 +476,13 @@ is_discrete.tmdist <- function(x, ...) {
     }
     sapply(seq_along(x), fn)
 }
+
+## Check if distribution is continuous
 is_continuous.tmdist <- function(x, ...) {
     return(!is_discrete(x))
 }
 
-# Support for ALL distributions together
+## Support (bin range) of the distributions
 support.tmdist <- function(x, ...) {
     fn <- function(i) {
         y <- as.matrix(x[i], expand = TRUE)

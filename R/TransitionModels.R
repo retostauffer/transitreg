@@ -15,7 +15,7 @@
 #' @author Reto
 tm_detect_cores <- function(verbose = TRUE) {
     stopifnot("'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose))
-    ncores <- .Call(C_tm_detect_cores)
+    ncores <- .Call("tm_detect_cores")
     if (verbose && ncores) {
         message("OMP available, number of cores detected: ", ncores)
     } else if (verbose) {
@@ -456,7 +456,7 @@ tm <- function(formula, data, subset, na.action,
 
   ## c_tm_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.
-  tmp    <- .Call(C_tm_predict_pdfcdf, uidx = ui, idx = tmf$index, p = p, ncores = ncores)
+  tmp    <- .Call("tm_predict_pdfcdf", uidx = ui, idx = tmf$index, p = p, ncores = ncores)
   probs  <- tmp$pdf
   cprobs <- tmp$cdf
   rm(tmp)
