@@ -445,14 +445,24 @@ if(!file.exists("premodel.png") & FALSE) {
 
   m1 <- tm(f1, data = dtrain, breaks = breaks)
 
-  f2 <- Surv(sqrt_pre, sqrt_pre > 0) ~ s(day,bs="cc",k=20) + s(lon,lat) +
+  f2 <- Surv(sqrt_pre, sqrt_pre > 0) ~ s(day,bs="cc",k=20) + s(alt) + s(lon,lat) +
     te(day,lon,lat,d=c(1,2),bs=c("cr","tp"),k=c(5,30)) |
-      s(day,bs="cc",k=20) + s(lon,lat) +
+      s(day,bs="cc",k=20) + s(alt) + s(lon,lat) +
       te(day,lon,lat,d=c(1,2),bs=c("cr","tp"),k=c(5,30))
 
   gen.cens("NO", type = "left")
 
   m2 <- gamlss2(f2, data = dtrain, family = NOlc, binning = TRUE)
+
+  qu <- c(0.01, 0.1, 0.5, 0.9, 0.99)
+  err1 <- err2 <- NULL
+  par <- predict(m2, newdata = dtest)
+  for(j in qu) {
+    pj1 <- predict(m1, newdata = dtest, prob = j)
+    pj2 <- family(m2)$q(j, par)
+    err1 <- c(err1, sum(qgam::pinLoss(dtest$sqrt_pre, pj1, j)))
+    err2 <- c(err2, sum(qgam::pinLoss(dtest$sqrt_pre, pj2, j)))
+  }
 
   download.file("http://bamlss.org/misc/precipitation_clim.tar.gz", "clim.tar.gz")
   untar("clim.tar.gz", exdir = ".")
@@ -488,6 +498,14 @@ if(!file.exists("premodel.png") & FALSE) {
   values(nr) <- nd$m1_p99
 
   plot(nr, main = "Predicted 99th Percentile (m1_p99)")
+
+  par <- predict(m2, newdata = nd)
+  nd$m2_p99 <- NA
+  nd$m2_p99[!is.na(nd$alt)] <- family(m2)$q(0.99, par)
+  nr2 <- raster(dem)
+  values(nr2) <- nd$m2_p99
+
+  plot(nr2, main = "Predicted 99th Percentile (m1_p99)")
 }
 @
 %% \includegraphics[width=0.9\textwidth]{premodel.png}
