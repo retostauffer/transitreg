@@ -33,13 +33,12 @@
 p <- pbinom(0:10, size = 10, prob = 0.1)
 
 ## Calculate transition probabilities
-tp <- cdf_to_tp(p)
+tp <- TransitionModels:::cdf_to_tp(p)
 
 ## Quick visual representation
 barplot(p, main = "CDF")
 barplot(tp, col = "steelblue", main = "Transition Probabilities")
 }
 
-\keyword{cdf, probabilities, transition probabilities}
 \concept{transition modeling}
 

@@ -72,6 +72,7 @@ tmWhich find_positions(int x, int* y, int n);
 // TODO(R): Delete me! // void fun(double *y, double *H);
 
 void eval_bins_pdf_cdf(double* res, double* tmp, int* positions, int count, double* lowerptr, double* upperptr, double* y, int ny);
+void eval_bins_quantile(double* res, double* tmp, int* positions, int count, double* lowerptr, double* upperptr, double* prob, int np, bool disc);
 
 double interpolate_linear(double x1, double y1, double x2, double y2, double p);
 doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* lowerptr, double* upperptr, double* y, int ny);

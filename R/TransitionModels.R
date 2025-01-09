@@ -196,7 +196,6 @@ tm_predict <- function(object, bins, newdata,
   ## Extract unique indices
   ui <- unique(nd$index)
   prob <- rep(prob, length(ui))
-  print(cbind(nd, tp = tp))
 
   ## Ensure we hand over the correct thing to C
   if (type == "quantile") {
@@ -206,31 +205,16 @@ tm_predict <- function(object, bins, newdata,
       prob <- NA_real_ # dummy value for C (not used if type != 'quantile')
   }
 
-  ## Evaluate lower and upper bound of the bins the observations fall into.
-  idx <- ave(nd$index, nd$index, FUN = seq_along) - 1L # c(0, 0, 1, 2, 0, 1, 2, 3, ....); bin index
-  lower <- as.numeric(bins)[idx + 1L]
-  upper <- as.numeric(bins)[idx + 2L]
-
-
-  ## Guess if distribution is discrete
-  ## TODO(R): Niki, do we have this information on the object?
-  binmid <- (head(bins, -1) + tail(bins, -1)) / 2;
-  discrete <- all(abs(binmid %% 1) < sqrt(.Machine$double.eps)) # Check if all bin mids are integer
-  if (type == "quantile") discrete <- rep(discrete, length(ui))
-
-  warning("RETO: This is not correct I assume. I have issues with where my response is",
-        "looks like the old mode was to evaluate on bin mid (as during estimation) but don't",
-        "we want to evaluate at a numeric value of y now?")
-  y <- binmid[newdata[[response]]]
   probs <- .Call("tm_predict",
                  uidx  = ui,                       # Unique distribution index (int)
                  idx   = nd$index,                 # Index vector (int)
                  tp    = tp,                       # Transition probabilities
-                 lower = lower,                    # Lower edge of the bin
-                 upper = upper,                    # Upper edge of the bin
-                 y     = as.numeric(y),            # Where to evaluate the pdf
+                 lower = NA_real_,                 # Lower edge of the bin
+                 upper = NA_real_,                 # Upper edge of the bin
+                 y     = prob,                     # Where to evaluate the pdf
                  type  = type, ncores = ncores, elementwise = TRUE,
                  discrete = FALSE) # <- dummy value
+  if (type == "quantile") print(summary(probs))
 
   return(probs)
 }
@@ -642,6 +626,8 @@ predict.tm <- function(object, newdata = NULL,
                      theta_vars   = object$theta_vars,
                      factor       = object$factor,
                      ...)
+
+  if (type == "quantile") print(summary(pred))
 
   ## If binning is used (pseudo-counts), convert predicted
   ## bin to numeric (center of the bin)

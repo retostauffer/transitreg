@@ -7,16 +7,23 @@
 \alias{quantile.tmdist}
 \title{Create an tmdist Distribution}
 \usage{
-tmdist(probs, bins)
-
-\method{as.data.frame}{tmdist}(x, ...)
+tmdist(z, newdata = NULL, newresponse = NULL)
 \method{random}{tmdist}(x, n = 1L, drop = TRUE, ...)
 \method{pdf}{tmdist}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
 \method{log_pdf}{tmdist}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
 \method{cdf}{tmdist}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
 \method{quantile}{tmdist}(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
+\method{median}{tmdist}{x, ncores = NULL, ...}
+\method{mean}{tmdist}{x, na.rm = NULL, ncores = NULL, ...}
+\method{random}{tmdist}{x, n = 1L, drop = TRUE, ...}
+\method{is_discrete}{tmdist}{d, ...}
+\method{is_continuous}{tmdist}{d, ...}
+\method{support}{tmdist}{x, drop = NULL, ...}
+\method{as.matrix}{tmdist}(x, expand = FALSE, ...)
 }
 \arguments{
+    \item{z}{an object that can be converted into a \code{c("tmdist", "distributions")}
+        object. See section 'Details' for more information.}
     \item{x}{object of class \code{tmdist} (if main argument), else a numeric
         vector at which the CDF, PDF, or quantile should be evaluated.}
     \item{probs}{Numeric vector of transition probabilities}
@@ -34,6 +41,9 @@ tmdist(probs, bins)
         lengths match and otherwise \code{elementwise = FALSE} is used.}
     \item{ncores}{number of cores to use with OpenMP. If \code{NULL} (default)
         all but two available cores will be used if OpenMP is supported.}
+    \item{expand}{Logical, if \code{FALSE} the result is a 'wide' matrix,
+        if \code{TRUE} a 'long' format is returned.}
+    \item{na.rm}{\code{NULL}, currently has no effect.}
 }
 \value{
 A `tmdist` object.
@@ -45,8 +55,11 @@ TODO(R): Missing
 }
 \details{
 TODO(R): Missing
+
+Explain what 'z' can take.
 }
 \examples{
+## TODO(R): Outdated.
 data <- structure(list(bin = c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
     12, 13, 14, 15, 16, 17, 18, 19), tp = c(0.998987937051858, 0.997723761984778,
     0.994959741987477, 0.989144986733817, 0.977718308296039, 0.958030163744388,

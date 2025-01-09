@@ -47,7 +47,7 @@ tmdist <- function(x, newdata = NULL, newresponse = NULL) {
     # based on the data used for training.
     if (inherits(x, "tm")) {
         warning("TODO(R): Here I sould call procast?")
-        vars <- attr(terms(TransitionModels:::fake_formula(formula(b))), "term.labels")
+        vars <- attr(terms(fake_formula(formula(b))), "term.labels")
         vars <- vars[!vars == "theta"]
         d    <- x$model.frame
         nb   <- length(x$bins)
@@ -171,6 +171,7 @@ procast.tm <- function(object, newdata = NULL, na.action = na.pass,
 #'        returned, where the columns contain transition probabilities (\code{tp_})
 #'        as well as the lower (\code{lo_}) and upper (\code{up}) bound of the
 #'        corresponding bin.
+#' @param \dots unused.
 #'
 #' @return Numeric matrix. If \code{expand = FALSE} the return is of dimension
 #' \code{c(length(x), <ncol>)}.
@@ -184,7 +185,7 @@ procast.tm <- function(object, newdata = NULL, na.action = na.pass,
 #' This expanded version is used when calling the .C functions.
 #'
 #' @author Reto
-as.matrix.tmdist <- function(x, expand = FALSE) {
+as.matrix.tmdist <- function(x, expand = FALSE, ...) {
     stopifnot("'expand' must be logical TRUE or FALSE" = isTRUE(expand) || isFALSE(expand))
 
     xnames <- names(x) # Keep for later
@@ -410,8 +411,8 @@ quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = 
 }
 
 
-median.tmdist <- function(x, ...) {
-    quantile(x, probs = 0.5, ...)
+median.tmdist <- function(x, na.rm = NULL, ncores = NULL, ...) {
+    quantile(x, probs = 0.5, ncores = ncores, ...)
 }
 
 
@@ -465,29 +466,29 @@ random.tmdist <- function(x, n = 1L, drop = TRUE, ...) {
 }
 
 ## Check if distribution is discrete
-is_discrete.tmdist <- function(x, ...) {
+is_discrete.tmdist <- function(d, ...) {
     # Calculating 'bin mid', if all bin mid points
     # are integer we assume it is a discrete dist.
     fn <- function(i) {
-        y <- as.matrix(x[i], expand = TRUE)
+        y <- as.matrix(d[i], expand = TRUE)
         binmid <- (y[, "lo"] + y[, "up"]) / 2
         all(abs(binmid %% 1) < sqrt(.Machine$double.eps))
     }
-    sapply(seq_along(x), fn)
+    sapply(seq_along(d), fn)
 }
 
 ## Check if distribution is continuous
-is_continuous.tmdist <- function(x, ...) {
-    return(!is_discrete(x))
+is_continuous.tmdist <- function(d, ...) {
+    return(!is_discrete(d))
 }
 
 ## Support (bin range) of the distributions
-support.tmdist <- function(x, ...) {
+support.tmdist <- function(d, drop = NULL, ...) {
     fn <- function(i) {
-        y <- as.matrix(x[i], expand = TRUE)
+        y <- as.matrix(d[i], expand = TRUE)
         c(min = min(y[, "lo"]), max = max(y[, "up"]))
     }
-    t(sapply(seq_along(x), fn))
+    t(sapply(seq_along(d), fn))
 }
 
 

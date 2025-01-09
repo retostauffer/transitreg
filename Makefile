@@ -21,8 +21,11 @@ install:
 coverage: install
 	Rscript -e "covr::report(file = \"_coverage.html\")"
 
-.PHONY: check
-check:
+.PHONY: check clean
+clean:
+	-rm src/*.so
+	-rm src/*.o
+check: clean
 	@echo Checking current version: $(VERSION)
 	(cd ../ && \
 		R CMD build --no-build-vignettes TransitionModels && \

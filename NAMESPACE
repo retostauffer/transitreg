@@ -36,6 +36,10 @@ S3method(print, tm)
 S3method(rootogram, tm)
 
 ## Distributions3 implementation
+importFrom("distributions3", "prodist", "is_discrete", "is_continuous", "support")
+importFrom("utils", "head", "tail")
+importFrom("stats", "na.pass")
+
 S3method(prodist,     tm)
 S3method(procast,     tm)
 S3method(newresponse, tm)

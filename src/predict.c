@@ -215,7 +215,7 @@ doubleVec tm_calc_quantile(int* positions, int count,
                            double* tpptr, double* lowerptr, double* upperptr,
                            double* prob, int np, bool disc) {
 
-    int i, j;
+    int i;
 
     // Get max(prob), allows for early stopping in the loop
     double pmax = -1;
@@ -240,42 +240,79 @@ doubleVec tm_calc_quantile(int* positions, int count,
     }
 
     // Initialize the results vector with -nan; just for safety reasons, should not be needed
-    for (i = 0; i < np; i++) { res.values[i] = NA_REAL; } 
+    for (i = 0; i < np; i++)    { res.values[i] = NA_REAL; } 
+    for (i = 0; i < count; i++) { tmp[i]        = NA_REAL; } 
 
     // Initialize with (1 - p[0])
     tmp[0] = 1.0 - tpptr[positions[0]];
 
-    // Looping over 'tpptr' (counts) to calculate the quantiles; store in 'tmp'.
-    // As soon as the calculated quantile tmp[i] is larger than pmax we can stop
-    // as we will not need it.
-    if (count > 0) {
+    // No bin information?
+    bool nobm = ISNAN(lowerptr[0]) | ISNAN(upperptr[0]);
+
+    // If tmp[0] >= pmax: We have already found our solution, no need to calculate
+    // the rest. Setting i = 0 (important for legacy mode).
+    if (tmp[0] >= pmax) {
+        i = 0; // Important
+    // Else (tmp[0] < pmax) and we have count > 0 (i.e., more than only one
+    // transition probability) calculate the remaining quantiles.
+    } else if ( count > 0) {
         double pprod = 1.0; // Initialize with 1.0 for product
-        for (int i = 1; i < count; i++) {
+        for (i = 1; i < count; i++) {
             if (ISNAN(tpptr[positions[i - 1]])) {
                 error("TODO(R): ISNAN must be implemented first (doubleVec; in cdf)");
                 //return R_NaReal;
             }
-            pprod *= tpptr[positions[i - 1]]; // Multiply with previous element
+
+            // Update product of transition probabilities
+            pprod *= tpptr[positions[i - 1]];
+
             tmp[i] = tmp[i - 1] + (1.0 - tpptr[positions[i]]) * pprod;
 
             // Break for loop as tmp[i] is already larger than pmax
-            if (tmp[i] > pmax) { break; }
+            if (tmp[i] >= pmax) { break; }
         }
     }
+
+    // "Legacy mode": Return the index of the bin the quantile falls into {0, 1, ...}
+    if (nobm) {
+        res.values[0] = i;
+        return res;
+    }
+
+    // Else we already translate the 'bin index' in its proper numeric response.
+    // In case of 'disc = true' (discrete distribution) this will be the center
+    // of the bin (and thus an 'integer', although technically a double) or
+    // a double (if 'disc = false') which will be linearely interpolated depending
+    // on it's position within the bin.
+    printf(" ----- not legacy mode\n");
+    eval_bins_quantile(res.values, tmp, positions, count, lowerptr, upperptr, prob, np, disc);
+
+    free(tmp); // Freeing allocated memory
+
+    return res;
+}
+
+
+
+void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
+                        double* lowerptr, double* upperptr, double* prob, int np, bool disc) {
+
+    int i, j;
 
     // Assign correct quantile to each element in res.values.
     // i: Loops over the quantiles we are looking for
     // j: Loops over calculated quantiles
-    // Store bin mid (quantile we are looking for)
     j = disc ? 1 : 0; // Discrete distributions: start at j = 1, else j = 0
     for (i = 0; i < np; i++) {
         for (j = j; j < count; j++) {
-            // Here we distinguish between discrete and non-discrete distributions.
-            // If discrete, the quantile _must_ lie within a bin, and we take the
-            // center of the bin.
+            if (ISNAN(tmp[j])) { break; }
+
+            // Here we distinguish between discrete and non-discrete
+            // distributions. If discrete, the quantile _must_ lie within a
+            // bin, and we take the center of the bin.
             if (disc) {
                 if ((prob[i] >= tmp[j - 1]) & (prob[i] < tmp[j])) {
-                    res.values[i] = (lowerptr[positions[j]] + upperptr[positions[j]]) * 0.5;
+                    res[i] = (lowerptr[positions[j]] + upperptr[positions[j]]) * 0.5;
                 }
             // If not discrete we do the following:
             // (1) If j == 0 we set the quantile to the lower support of the distribution at first.
@@ -285,26 +322,25 @@ doubleVec tm_calc_quantile(int* positions, int count,
             } else {
                 // If j = 0 take lowest possible value
                 if (j == 0) {
-                    res.values[i] = lowerptr[positions[j]];
+                    res[i] = lowerptr[positions[j]];
                 // If j == (count - 1), last iteration, take highest possible value
                 } else if (j == (count - 1)) {
-                    res.values[i] = upperptr[positions[j]];
+                    res[i] = upperptr[positions[j]];
                 } 
                 // Check if we fall into this bin
                 if ((prob[i] >= tmp[j - 1]) & (prob[i] < tmp[j])) {
                     // Perform linear interpolation between the two neighboring bin mids.
-                    res.values[i] = interpolate_linear(lowerptr[positions[j]], tmp[j - 1],
-                                                       upperptr[positions[j]], tmp[j],
-                                                       prob[i]);
+                    res[i] = interpolate_linear(lowerptr[positions[j]], tmp[j - 1],
+                                                upperptr[positions[j]], tmp[j],
+                                                prob[i]);
                     break; // Found what we were looking for, break inner loop
                 }
             }
         }
     }
-    free(tmp); // Freeing allocated memory
-
-    return res;
+    // void function, no return
 }
+
 
 /* Helper function for type = "pmax"
  */
