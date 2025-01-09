@@ -101,10 +101,10 @@ doubleVec tm_calc_pdf(int* positions, int count,
             error("TODO(R): First element ISNAN, must be adressed in C");
             //return R_NaReal; 
         }
-        // Updating product of transition probabilities
-        prod *= tpptr[positions[i]];
         // Updating temporary PDF vector
         tmp[i] = prod * (1.0 - tpptr[positions[i]]);
+        // Updating product of transition probabilities
+        prod *= tpptr[positions[i]];
     }
 
     // If nobm (no bin mids given) the result is simply the last value in tmp;
