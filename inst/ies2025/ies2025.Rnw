@@ -472,6 +472,13 @@ if(!file.exists("premodel.png") & FALSE) {
     err2 <- c(err2, sum(qgam::pinLoss(dtest$sqrt_pre, pj2, j)))
   }
 
+#R> err1
+#[1]   2314.927  23149.270 112589.150  71447.505  11941.508
+#R> err2
+#[1]   2314.927  23149.270 112545.307  71472.810  12087.671
+#R> round((err1 - err2) / err2 * 100, 2)
+#[1]  0.00  0.00  0.04 -0.04 -1.21
+
   download.file("http://bamlss.org/misc/precipitation_clim.tar.gz", "clim.tar.gz")
   untar("clim.tar.gz", exdir = ".")
 
