@@ -192,6 +192,7 @@ as.matrix.tmdist <- function(x, expand = FALSE, ...) {
 
     # convert to data.frame -> matrix
     x <- as.matrix(structure(x, class = "data.frame"))
+    rownames(x) <- xnames
     if (expand) {
         # Keep original dimension as we transpose(x) in a second
         nd <- nrow(x)      # Number of distributions

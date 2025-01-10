@@ -25,7 +25,6 @@ tp_to_cdf <- function(tp) {
     res <- (1 - tp[1])
     if (length(tp) > 1) {
         for (i in seq.int(2, length(tp))) {
-            print(i)
             res <- c(res, res[i - 1] + (1 - tp[i]) * prod(tp[1:(i-1)]))
         }
     }

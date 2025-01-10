@@ -2,11 +2,8 @@
 # Testing implementation distributions3 objects and methods
 # -------------------------------------------------------------------
 
-rm(list = objects())
-
+suppressPackageStartupMessages(library("tinytest"))
 suppressPackageStartupMessages(library("TransitionModels"))
-if (interactive()) library("tinytest")
-
 
 # -------------------------------------------------------------------
 # For testing, faking transition probabilities by drawing from
@@ -46,7 +43,7 @@ expect_identical(length(d1), 1L, info = "Testing length")
 # Convert to matrix
 expect_silent(m1 <- as.matrix(d1),                          info = "Converting to matrix")
 expect_true(is.matrix(m1) && is.numeric(m1),                info = "Testing matrix class")
-expect_identical(dim(m1), c(1L, 3 * nrow(fake1)),           info = "Testing matrix dimension")
+expect_identical(dim(m1), c(1L, 3L * nrow(fake1)),          info = "Testing matrix dimension")
 expect_true(all(grep("^(tp|lo|up)_[0-9]+$", colnames(m1))), info = "Matrix column names")
 expect_true(is.null(rownames(m1)),                          info = "Matrix row names (unnamed)")
 rm(m1)
@@ -81,7 +78,7 @@ expect_identical(length(d2), 1L,   info = "Testing length")
 # Convert to matrix
 expect_silent(m2 <- as.matrix(d2),                          info = "Converting to matrix")
 expect_true(is.matrix(m2) && is.numeric(m2),                info = "Testing matrix class")
-expect_identical(dim(m2), c(1L, 3 * nrow(fake1)),           info = "Testing matrix dimension")
+expect_identical(dim(m2), c(1L, 3L * length(fake2[[1]])),   info = "Testing matrix dimension")
 expect_true(all(grep("^(tp|lo|up)_[0-9]+$", colnames(m2))), info = "Matrix column names")
 expect_identical(rownames(m2), "A",                         info = "Matrix row name")
 rm(m2)
@@ -89,7 +86,7 @@ rm(m2)
 # Convert to extended (long) matrix
 expect_silent(m2e <- as.matrix(d2, expand = TRUE),           info = "Converting to extended matrix")
 expect_true(is.matrix(m2e) && is.numeric(m2e),               info = "Testing extended matrix class")
-expect_identical(dim(m2e), c(nrow(fake1), 4L),               info = "Testing extended matrix dimension")
+expect_identical(dim(m2e), c(length(fake2[[1]]), 4L),        info = "Testing extended matrix dimension")
 expect_true(identical(exp_colnames, colnames(m2e)),          info = "Matrix extended column names")
 expect_true(all(grepl("^A_[0-9]+$", rownames(m2e))),         info = "Extended matrix row names")
 
@@ -198,10 +195,23 @@ expect_equal(support(d3), exp_support,                   info = "Checking suppor
 expect_silent(is_discrete(d3),                           info = "is_discrete() should be silent")
 expect_silent(is_continuous(d3),                         info = "is_continuous() should be silent")
 expect_identical(is_discrete(d3), c(TRUE, FALSE),        info = "Testing return of is_discrete")
-expect_identical(is_discrete(d3), !c(TRUE, FALSE),       info = "Testing return of is_continuous")
+expect_identical(is_continuous(d3), !c(TRUE, FALSE),     info = "Testing return of is_continuous")
 expect_identical(is_discrete(d3), !is_continuous(d3),    info = "Must be complementary")
 
 
+# Quickly calculate CDF/PDF at 'bin mid', should result
+# in the same as if we do it 'manually' (?tmutils) based
+# on the transition probabilities of 'fake1'.
+x1 <- (fake1$lo + fake1$up) / 2
+expect_silent(pp1 <- cdf(d1, x1) |> as.vector())
+expect_true(is.double(pp1))
+expect_identical(length(pp1), length(x1))
+expect_equal(pp1, TransitionModels:::tp_to_cdf(fake1$tp))
+
+expect_silent(dd1 <- pdf(d1, x1) |> as.vector())
+expect_true(is.double(dd1))
+expect_identical(length(dd1), length(x1))
+expect_equal(dd1, TransitionModels:::tp_to_pdf(fake1$tp))
 
 
 
