@@ -22,6 +22,7 @@ export(
   "tm",
   "tm_data",
   "tm_dist",
+  "tm_convert",
   "tm_detect_cores"
 )
 
@@ -59,6 +60,7 @@ S3method(random,         tmdist)
 S3method(is_discrete,    tmdist)
 S3method(is_continuous,  tmdist)
 S3method(support,        tmdist)
+
 
 ## GLMNET test
 importFrom("mgcv", "interpret.gam", "smoothCon")
