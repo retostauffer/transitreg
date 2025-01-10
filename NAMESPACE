@@ -22,8 +22,8 @@ export(
   "transitreg",
   "transitreg_data",
   "transitreg_dist",
-  "convert_tp",
-  "omp_detect_cores"
+  "transitreg_detect_cores",
+  "convert_tp"
 )
 
 S3method(plot, transitreg)

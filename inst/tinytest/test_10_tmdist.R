@@ -3,14 +3,14 @@
 # -------------------------------------------------------------------
 
 suppressPackageStartupMessages(library("tinytest"))
-suppressPackageStartupMessages(library("TransitionModels"))
+suppressPackageStartupMessages(library("transitreg"))
 
 # -------------------------------------------------------------------
 # For testing, faking transition probabilities by drawing from
 # a binomial distribution
 # -------------------------------------------------------------------
 # Converting CDF to transition probabilities
-p2tp <- TransitionModels:::cdf_to_tp
+p2tp <- transitreg:::cdf_to_tp
 
 # First fake distribution. A data.frame, though
 # the order of the columns is 'off'.
@@ -29,14 +29,14 @@ fake2 <- list(p2tp(pbinom(1:15, size = 15, prob = 0.20)), # transition prob
 
 
 # --------------------------------------------------------------------
-# Convert distribution to 'tmdist' object, testing return.
+# Convert distribution to 'Transition' object, testing return.
 # --------------------------------------------------------------------
 
 exp_colnames <- c("index", "tp", "lo", "up")
 
 # ------------- distribution d1 (based on fake1) ---------------------
-expect_silent(d1 <- tmdist(fake1), info = "Testing conversion")
-expect_inherits(d1, "tmdist", info = "Testing return class")
+expect_silent(d1 <- Transition(fake1), info = "Testing conversion")
+expect_inherits(d1, "Transition", info = "Testing return class")
 expect_identical(length(d1), 1L, info = "Testing length")
 
 
@@ -68,10 +68,10 @@ rm(d1)
 
 # In contrast to the test above we name the distribution "A";
 # should result in proper rownames on the matrices.
-expect_silent(d2 <- tmdist(fake2), info = "Testing conversion")
+expect_silent(d2 <- Transition(fake2), info = "Testing conversion")
 expect_silent(names(d2) <- "A",    info = "Adding name")
 expect_identical(names(d2), "A",   info = "Testing added name")
-expect_inherits(d2, "tmdist",      info = "Testing return class")
+expect_inherits(d2, "Transition",      info = "Testing return class")
 expect_identical(length(d2), 1L,   info = "Testing length")
 
 
@@ -100,15 +100,15 @@ rm(d2)
 
 
 # ------------- distribution d1 and d2 -------------------------------
-# This results in a tmdist object of length 2; we're also adding
+# This results in a Transition object of length 2; we're also adding
 # row names for testing. As one distribution is longer than the other,
 # the non-extended matrix will contain a series of missing values.
 # In the extended version, they should be gone, and the number of
 # rows corresponds to the sum of the length of both distributions
 # (defined by fake1 and fake2).
 
-expect_silent(d3 <- tmdist(list(fake1, fake2)), info = "Testing conversion (lenght 2)")
-expect_inherits(d3, "tmdist", info = "Testing return class")
+expect_silent(d3 <- Transition(list(fake1, fake2)), info = "Testing conversion (lenght 2)")
+expect_inherits(d3, "Transition", info = "Testing return class")
 expect_identical(length(d3), 2L, info = "Testing length")
 expect_silent(names(d3) <- c("FOO", "BAR"),     info = "Adding names (length 2)")
 expect_identical(c("FOO", "BAR"), names(d3),    info = "Testing added names")
@@ -154,12 +154,12 @@ rm(d3)
 # --------------------------------------------------------------------
 # Testing other S3 methods, using the same fake distributions from above.
 # --------------------------------------------------------------------
-d1 <- tmdist(fake1)
-d3 <- setNames(tmdist(list(fake1, fake2)), LETTERS[1:2])
+d1 <- Transition(fake1)
+d3 <- setNames(Transition(list(fake1, fake2)), LETTERS[1:2])
 
 # Just to ensure the two objects are available:
-expect_inherits(d1, "tmdist"); expect_identical(length(d1), 1L)
-expect_inherits(d3, "tmdist"); expect_identical(length(d3), 2L)
+expect_inherits(d1, "Transition"); expect_identical(length(d1), 1L)
+expect_inherits(d3, "Transition"); expect_identical(length(d3), 2L)
 expect_identical(names(d3), c("A", "B"))
 
 # Print
@@ -199,19 +199,18 @@ expect_identical(is_continuous(d3), !c(TRUE, FALSE),     info = "Testing return 
 expect_identical(is_discrete(d3), !is_continuous(d3),    info = "Must be complementary")
 
 
-# Quickly calculate CDF/PDF at 'bin mid', should result
-# in the same as if we do it 'manually' (?tmutils) based
-# on the transition probabilities of 'fake1'.
+# Quickly calculate CDF/PDF at 'bin mid', should result in the same as if we do
+# it 'manually' (?convert_tp) based on the transition probabilities of 'fake1'.
 x1 <- (fake1$lo + fake1$up) / 2
 expect_silent(pp1 <- cdf(d1, x1) |> as.vector())
 expect_true(is.double(pp1))
 expect_identical(length(pp1), length(x1))
-expect_equal(pp1, TransitionModels:::tp_to_cdf(fake1$tp))
+expect_equal(pp1, transitreg:::tp_to_cdf(fake1$tp))
 
 expect_silent(dd1 <- pdf(d1, x1) |> as.vector())
 expect_true(is.double(dd1))
 expect_identical(length(dd1), length(x1))
-expect_equal(dd1, TransitionModels:::tp_to_pdf(fake1$tp))
+expect_equal(dd1, transitreg:::tp_to_pdf(fake1$tp))
 
 
 

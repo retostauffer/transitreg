@@ -5,7 +5,7 @@ VERSION := $(shell grep '^Version:' DESCRIPTION | awk '{print $$2}')
 
 
 .PHONY: test
-test:
+test: install
 	Rscript -e "library('transitreg'); tinytest::test_all()"
 
 .PHONY: install

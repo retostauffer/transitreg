@@ -72,7 +72,8 @@ Explain what 'z' can take.
 ## Creating 'fake' Transition dist using Poisson distribution, converted to
 ## transition models using ## cdf_to_tp function.
 p  <- ppois(0:30, lambda = 5) # CDF
-tp <- TransitionModels:::cdf_to_tp(p) # Transition probabilities
+## TODO(R) Update to convert_tp
+tp <- transitreg:::cdf_to_tp(p) # Transition probabilities
 
 ## Create named list; one form to create a 'Transition' object.
 ## Requires 'tp' (transition probabilities), as well as lower and

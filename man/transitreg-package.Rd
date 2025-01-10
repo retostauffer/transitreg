@@ -1,6 +1,5 @@
-\name{TransitionModels-package}
-\alias{TransitionModels-package}
-\alias{TransitionModels}
+\name{transitreg-package}
+\alias{transitreg-package}
 
 \docType{package}
 
@@ -9,7 +8,7 @@
 }
 
 \description{
-  The \pkg{TransitionModels} package provides tools for estimating and visualizing 
+  The \pkg{transitreg} package provides tools for estimating and visualizing 
   transition models, a flexible framework for modeling count or continuous responses 
   without assuming fixed distributional forms. These models allow for dynamic 
   probabilistic learning using binary GLM-type approaches and can handle scenarios 
@@ -17,7 +16,7 @@
 }
 
 \details{
-  \pkg{TransitionModels} supports the following key features:
+  \pkg{transitreg} supports the following key features:
   \itemize{
     \item \code{\link{transitreg}}: Fit transition models to count or continuous response data, 
       leveraging generalized additive model (GAM) techniques for estimation.

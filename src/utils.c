@@ -13,7 +13,7 @@
 
 #include <R.h>
 #include <Rinternals.h>
-#include "tm.h"
+#include "transitreg.h"
 
 /* Helper function to check if OMP is ON (i.e.,
  * parallelization enabled

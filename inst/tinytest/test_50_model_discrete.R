@@ -1,12 +1,12 @@
 # -------------------------------------------------------------------
-# Testing 'tm' for discrete response (count data).
+# Testing 'transitreg' for discrete response (count data).
 # TODO(R): Remove useC and comparison against the R version
 #          once we removed that.
 # -------------------------------------------------------------------
 
 
 suppressPackageStartupMessages(library("tinytest"))
-suppressPackageStartupMessages(library("TransitionModels"))
+suppressPackageStartupMessages(library("transitreg"))
 
 
 # ===================================================================
@@ -19,9 +19,9 @@ data("CD4", package = "gamlss.data")
 # -------------------------------------------------------------------
 # Estimating simple model, testing return object.
 # -------------------------------------------------------------------
-m1   <- tm(cd4 ~ theta, data = CD4, useC = TRUE)
+m1   <- transitreg(cd4 ~ theta, data = CD4, useC = TRUE)
 
-expect_inherits(m1, "tm", info = "Returnclass")
+expect_inherits(m1, "transitreg", info = "Returnclass")
 expect_true(is.list(m1))
 expected <- c("new_formula", "model", "response", "model.frame",
               "maxcounts", "theta_vars", "factor", "probs")
@@ -32,7 +32,7 @@ expect_true(all(names(m1) %in% expected),
 # -------------------------------------------
 # checking element $new_formula
 # For comparison and convenience I am also testing
-# the S3 method formula.tm here and compare $new_formula
+# the S3 method formula.transitreg here and compare $new_formula
 # to the model formula.
 # -------------------------------------------
 expect_silent(f <- formula(m1), info = "Testing S3 method formula")
@@ -107,7 +107,7 @@ expect_equivalent(sum(m1$probs), 306.1717, tolerance = 1e-3, info = "sum($probs)
 
 # RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR
 # Rudimentary check against the R version
-m1_R <- tm(cd4 ~ theta, data = CD4)
+m1_R <- transitreg(cd4 ~ theta, data = CD4)
 expect_equal(logLik(m1), logLik(m1_R), info = "Comparing R/C version")
 expect_equal(coef(m1), coef(m1_R),     info = "Comparing R/C version")
 rm(m1_R)
@@ -118,7 +118,7 @@ rm(m1_R)
 # Estimate the same model, specifying all default options to
 # test that they remain unchanged.
 # -------------------------------------------------------------------
-m2   <- tm(cd4 ~ theta, data = CD4,
+m2   <- transitreg(cd4 ~ theta, data = CD4,
            engine = "bam", scale.x = FALSE, breaks = NULL,
            model = TRUE, ncores = NULL, verbose = FALSE,
            useC = TRUE)

@@ -1,25 +1,25 @@
 # -------------------------------------------------------------------
-# Testing 'tm' for discrete response (count data).
+# Testing 'transitreg' for discrete response (count data).
 # TODO(R): Remove useC and comparison against the R version
 #          once we removed that.
 # -------------------------------------------------------------------
 
 suppressPackageStartupMessages(library("tinytest"))
-suppressPackageStartupMessages(library("TransitionModels"))
+suppressPackageStartupMessages(library("transitreg"))
 
 
 # -------------------------------------------------------------------
 # -------------------------------------------------------------------
 
-# Example from ?tm with 20 bins only for testing
+# Example from ?transitreg with 20 bins only for testing
 set.seed(123)
 n <- 1000
 x <- runif(n, -3, 3)
 y <- sin(x) + rnorm(n, sd = exp(-1 + cos(x)))
 
 ## Fit model with continuous response.
-mod <- tm(y ~ s(theta) + s(x) + te(x, theta), breaks = 20, verbose = FALSE)
-expect_inherits(mod, "tm", info = "Check model class")
+mod <- transitreg(y ~ s(theta) + s(x) + te(x, theta), breaks = 20, verbose = FALSE)
+expect_inherits(mod, "transitreg", info = "Check model class")
 
 ## Setting up new data.frame and new response,
 ## predict CDF and PDF to compare them. The cumulative sum of the
