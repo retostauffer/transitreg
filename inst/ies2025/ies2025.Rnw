@@ -551,7 +551,7 @@ if(!file.exists("premodel.png") & FALSE) {
     scale_y_continuous(breaks = yb) + # Adjust y-axis ticks
     coord_sf(crs = st_crs(Tyrol)) + # Respect CRS and aspect ratio
     theme_minimal() +
-    labs(title = "Predicted 99%-Quantiles",
+    labs(title = NULL,
          x = "Longitude",
          y = "Latitude",
          fill = "Precipitation\n[mm]")
