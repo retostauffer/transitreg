@@ -1,5 +1,5 @@
-\name{tm_detect_cores}
-\alias{tm_detect_cores}
+\name{transitreg_detect_cores}
+\alias{transitreg_detect_cores}
 
 \title{
     Detect availability cores available for OMP
@@ -14,7 +14,7 @@
 }
 
 \usage{
-tm_detect_cores(verbose = TRUE)
+transitreg_detect_cores(verbose = TRUE)
 }
 
 \arguments{
@@ -27,10 +27,10 @@ tm_detect_cores(verbose = TRUE)
 }
 
 \seealso{
-  \code{\link{tm}}
+  \code{\link{transitreg}}
 }
 
 \examples{
-    tm_detect_cores()
-    tm_detect_cores(verbose = FALSE)
+    transitreg_detect_cores()
+    transitreg_detect_cores(verbose = FALSE)
 }

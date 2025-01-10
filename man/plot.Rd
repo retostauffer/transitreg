@@ -1,5 +1,5 @@
-\name{plot.tm}
-\alias{plot.tm}
+\name{plot.transitreg}
+\alias{plot.transitreg}
 
 \title{
   Plot Method for Transition Model Fits
@@ -7,16 +7,16 @@
 
 \description{
   Provides diagnostic and visualization plots for transition models fitted
-  using the \code{\link{tm}} function. The method supports plotting effects and
+  using the \code{\link{transitreg}} function. The method supports plotting effects and
   quantile residual diagnostic plots.
 }
 
 \usage{
-\method{plot}{tm}(x, which = "effects", spar = TRUE, k = 5, ...)
+\method{plot}{transitreg}(x, which = "effects", spar = TRUE, k = 5, ...)
 }
 
 \arguments{
-  \item{x}{An object of class \code{"tm"} resulting from a call to \code{\link{tm}}.}
+  \item{x}{An object of class \code{"transitreg"} resulting from a call to \code{\link{transitreg}}.}
   \item{which}{A character string or integer specifying the type of plot(s) to
     generate. Options include:
     \describe{
@@ -35,7 +35,7 @@
 }
 
 \details{
-  The \code{plot.tm} method provides flexible visualization options for
+  The \code{plot.transitreg} method provides flexible visualization options for
   evaluating transition model fits. Users can choose to:
   \itemize{
     \item Visualize the effects of predictors on the response variable
@@ -54,7 +54,7 @@
 }
 
 \seealso{
-  \code{\link{tm}}, \code{link{tm_dist}}, \code{link{tm_data}}, \code{\link{predict.tm}}
+  \code{\link{transitreg}}, \code{link{transitreg_dist}}, \code{link{transitreg_data}}, \code{\link{predict.transitreg}}
 }
 
 \examples{
@@ -63,7 +63,7 @@ set.seed(123)
 n <- 500
 x <- runif(n, -3, 3)
 y <- rpois(n, exp(2 + sin(x)))
-b <- tm(y ~ s(theta) + s(x))
+b <- transitreg(y ~ s(theta) + s(x))
 
 ## Plot effects.
 plot(b, which = "effects")

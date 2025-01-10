@@ -13,9 +13,9 @@
 #' available, \code{1L} is returned.
 #'
 #' @author Reto
-tm_detect_cores <- function(verbose = TRUE) {
+transitreg_detect_cores <- function(verbose = TRUE) {
     stopifnot("'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose))
-    ncores <- .Call("tm_detect_cores")
+    ncores <- .Call("treg_detect_cores")
     if (verbose && ncores) {
         message("OMP available, number of cores detected: ", ncores)
     } else if (verbose) {
@@ -40,20 +40,20 @@ tm_detect_cores <- function(verbose = TRUE) {
 #' else set tot he 'total number of cores available'.
 #'
 #' @author Reto
-tm_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
+transitreg_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
   ## Number of cores to be used for OpenMP. If
   ## - NULL: Guess cores (max cores - 2L)
   ## - Smaller or equal to 0: Set to 1L (single-core processing)
   ## - Else: Take user input; limited to maximum number of detected cores.
-  ncores <- if (!is.null(ncores)) as.integer(ncores)[1L] else tm_detect_cores(verbose = FALSE) - 2L
-  ncores <- if (ncores < 1L) 1L else pmin(ncores, tm_detect_cores(verbose = FALSE))
+  ncores <- if (!is.null(ncores)) as.integer(ncores)[1L] else transitreg_detect_cores(verbose = FALSE) - 2L
+  ncores <- if (ncores < 1L) 1L else pmin(ncores, transitreg_detect_cores(verbose = FALSE))
   if (verbose) message("Number of cores set to: ", ncores)
   return(ncores)
 }
 
 
 ## Function to set up expanded data set.
-tm_data <- function(data, response = NULL, verbose = TRUE) {
+transitreg_data <- function(data, response = NULL, verbose = TRUE) {
   ## Ensure data is a data frame.
   if (!is.data.frame(data))
     data <- as.data.frame(data)
@@ -123,7 +123,7 @@ tm_data <- function(data, response = NULL, verbose = TRUE) {
 }
 
 ## Predict function.
-tm_predict <- function(object, bins, newdata,
+transitreg_predict <- function(object, bins, newdata,
   type = c("pdf", "cdf", "quantile", "pmax"),
   response = NULL, y = NULL, prob = 0.5, maxcounts = 1e+03,
   verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
@@ -144,7 +144,7 @@ tm_predict <- function(object, bins, newdata,
   ##}
 
   if (is.null(ncores))
-    ncores <- tm_get_number_of_cores(ncores, verbose = verbose)
+    ncores <- transitreg_get_number_of_cores(ncores, verbose = verbose)
 
   ## Staying sane
   stopifnot(
@@ -170,7 +170,7 @@ tm_predict <- function(object, bins, newdata,
   }
 
   ## Preparing data
-  nd <- tm_data(newdata, response = response, verbose = verbose)
+  nd <- transitreg_data(newdata, response = response, verbose = verbose)
   if (factor)
     nd$theta <- as.factor(nd$theta)
 
@@ -205,7 +205,7 @@ tm_predict <- function(object, bins, newdata,
       prob <- NA_real_ # dummy value for C (not used if type != 'quantile')
   }
 
-  probs <- .Call("tm_predict",
+  probs <- .Call("treg_predict",
                  uidx  = ui,                       # Unique distribution index (int)
                  idx   = nd$index,                 # Index vector (int)
                  tp    = tp,                       # Transition probabilities
@@ -219,7 +219,7 @@ tm_predict <- function(object, bins, newdata,
   return(probs)
 }
 
-tm_dist <- function(y, data = NULL, ...)
+transitreg_dist <- function(y, data = NULL, ...)
 {
   if (is.null(y))
     stop("argument y is NULL!")
@@ -238,7 +238,7 @@ tm_dist <- function(y, data = NULL, ...)
   }
 
   ## Estimate model.
-  b <- tm(f, data = data, ...)
+  b <- transitreg(f, data = data, ...)
 
   if (inherits(y, "formula"))
     y <- model.response(b$model.frame)
@@ -309,7 +309,7 @@ make_bins <- function(y, breaks = 30, scale = FALSE , ...) {
 }
 
 ## Wrapper function to estimate CTMs.
-tm <- function(formula, data, subset, na.action,
+transitreg <- function(formula, data, subset, na.action,
   engine = "bam", scale.x = FALSE, breaks = NULL,
   model = TRUE, ncores = NULL, verbose = FALSE, ...)
 {
@@ -320,7 +320,7 @@ tm <- function(formula, data, subset, na.action,
     "'ncores' must be NULL or numeric" = is.null(ncores) || is.numeric(ncores),
     "'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose)
   )
-  ncores <- tm_get_number_of_cores(ncores, verbose = verbose)
+  ncores <- transitreg_get_number_of_cores(ncores, verbose = verbose)
 
   cl <- match.call()
 
@@ -394,7 +394,7 @@ tm <- function(formula, data, subset, na.action,
   k <- min(c(ymax - 1L, 20L))
 
   ## Transform data.
-  tmf <- tm_data(mf, response = rn, verbose = verbose)
+  tmf <- transitreg_data(mf, response = rn, verbose = verbose)
 
   if (!is.null(scaler)) {
     scaler$theta <- list("mean" = mean(tmf$theta), "sd" = sd(tmf$theta))
@@ -434,7 +434,7 @@ tm <- function(formula, data, subset, na.action,
   } else if (engine == "nnet") {
     rval$model <- nnet::nnet(rval$new_formula, data = tmf, ...)
   } else if (engine == "glmnet") {
-    rval$model <- tm_glmnet(rval$new_formula, data = tmf, ...)
+    rval$model <- transitreg_glmnet(rval$new_formula, data = tmf, ...)
   }
   options("warn" = warn)
 
@@ -460,9 +460,9 @@ tm <- function(formula, data, subset, na.action,
   ui <- unique(tmf$index)
   probs <- cprobs <- numeric(length(ui))
 
-  ## c_tm_predict_pdfcdf returns a list with PDF and CDF, calculating
+  ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.
-  tmp    <- .Call("tm_predict_pdfcdf", uidx = ui, idx = tmf$index, p = p, ncores = ncores)
+  tmp    <- .Call("treg_predict_pdfcdf", uidx = ui, idx = tmf$index, p = p, ncores = ncores)
   probs  <- tmp$pdf
   cprobs <- tmp$cdf
   rm(tmp)
@@ -484,13 +484,13 @@ tm <- function(formula, data, subset, na.action,
   }
 
   ## Assign class.
-  class(rval) <- "tm"
+  class(rval) <- "transitreg"
 
   return(rval)
 }
 
 ## Plotting method.
-plot.tm <- function(x, which = "effects", spar = TRUE, k = 5, ...)
+plot.transitreg <- function(x, which = "effects", spar = TRUE, k = 5, ...)
 {
   ## What should be plotted?
   which.match <- c("effects", "hist-resid", "qq-resid", "wp-resid")
@@ -538,39 +538,39 @@ plot.tm <- function(x, which = "effects", spar = TRUE, k = 5, ...)
 }
 
 ## Summary method.
-summary.tm <- function(object, ...)
+summary.transitreg <- function(object, ...)
 {
   summary(object$model)
 }
 
 ## formula method.
-formula.tm <- function(x, ...)
+formula.transitreg <- function(x, ...)
 {
   formula(x$model)
 }
 
 
 ## Coef method.
-coef.tm <- function(object, ...)
+coef.transitreg <- function(object, ...)
 {
   coef(object$model)
 }
 
 ## Model frame extractor.
-model.frame.tm <- function(formula, ...)
+model.frame.transitreg <- function(formula, ...)
 {
   return(formula$model.frame)
 }
 
 ## Printing method.
-print.tm <- function(x, ...)
+print.transitreg <- function(x, ...)
 {
   cat("Count Transition Model\n---")
   print(x$model)
 }
 
 ## Predict method.
-predict.tm <- function(object, newdata = NULL,
+predict.transitreg <- function(object, newdata = NULL,
   y = NULL, prob = NULL,
   type = c("pdf", "cdf", "pmax", "quantile"), ncores = NULL, ...)
 {
@@ -578,7 +578,7 @@ predict.tm <- function(object, newdata = NULL,
   type <- match.arg(type)
 
   ## Get number of cores for OpenMP parallelization
-  ncores <- tm_get_number_of_cores(ncores, FALSE)
+  ncores <- transitreg_get_number_of_cores(ncores, FALSE)
 
   if (!is.null(prob))
     type <- "quantile"
@@ -613,8 +613,8 @@ predict.tm <- function(object, newdata = NULL,
     }
   }
 
-  ## Calling tm_predict to perform the actual prediction
-  pred <- tm_predict(object$model,
+  ## Calling transitreg_predict to perform the actual prediction
+  pred <- transitreg_predict(object$model,
                      bins         = object$bins,
                      newdata      = newdata,
                      ncores       = ncores,
@@ -648,7 +648,7 @@ predict.tm <- function(object, newdata = NULL,
 }
 
 ## logLik method.
-logLik.tm <- function(object, newdata = NULL, ...)
+logLik.transitreg <- function(object, newdata = NULL, ...)
 {
   if (is.null(newdata)) {
     p <- object$probs$pdf
@@ -663,7 +663,7 @@ logLik.tm <- function(object, newdata = NULL, ...)
 }
 
 ## Residuals method.
-residuals.tm <- function(object, newdata = NULL, y = NULL, ...)
+residuals.transitreg <- function(object, newdata = NULL, y = NULL, ...)
 {
   if (is.null(newdata)) {
     if (is.null(object$model.frame))
@@ -701,7 +701,7 @@ residuals.tm <- function(object, newdata = NULL, y = NULL, ...)
 
 
 ## Rootogram method.
-rootogram.tm <- function(object, newdata = NULL, plot = TRUE,
+rootogram.transitreg <- function(object, newdata = NULL, plot = TRUE,
   width = 0.9, style = c("hanging", "standing", "suspended"),
   scale = c("sqrt", "raw"), expected = TRUE, confint = TRUE,
   ref = TRUE, K = NULL, xlab = NULL, ylab = NULL, main = NULL, ...)

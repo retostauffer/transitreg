@@ -17,7 +17,7 @@
 
 #include <stdbool.h>
 #include <stdlib.h>
-#include "tm.h" // Include header, required to have the OPENMP_ON macro available.
+#include "transitreg.h" // Include header, required to have the OPENMP_ON macro available.
 
 /* Helper function to find position of x in y
  *
@@ -30,10 +30,10 @@
  * @return returns an integer vector (must be freed outside function)
  * with the index position of x in y.
  */
-tmWhich find_positions(int x, int* y, int n) {
-    tmWhich which;
+integerVec find_positions(int x, int* y, int n) {
+    integerVec which;
     which.index = (int*)malloc(n * sizeof(int));  // Allocate max possible size
-    if (which.index == NULL) { error("Memory allocation failed for tmWhich.index."); }
+    if (which.index == NULL) { error("Memory allocation failed for integerVec.index."); }
 
     which.length = 0;
     for (int i = 0; i < n; i++) {
@@ -50,7 +50,7 @@ tmWhich find_positions(int x, int* y, int n) {
  * Calculates elementwise pdf and multiplies it with center of the bin
  * ((lowerptr[i] + upperptr[i]) * 0.5) to get the weighted average.
  * Returns a (doubleVec of length 1) */
-double tm_calc_mean(int* positions, int count, double* tpptr, double* lowerptr, double* upperptr) {
+double treg_calc_mean(int* positions, int count, double* tpptr, double* lowerptr, double* upperptr) {
 
     // Initialize return value, initialize sum with 0
     double res = 0.0;
@@ -74,7 +74,7 @@ double tm_calc_mean(int* positions, int count, double* tpptr, double* lowerptr, 
 
 
 /* Helper function for type = "pdf" */
-doubleVec tm_calc_pdf(int* positions, int count,
+doubleVec treg_calc_pdf(int* positions, int count,
                       double* tpptr, double* lowerptr, double* upperptr,
                       double* y, int ny) {
 
@@ -87,7 +87,7 @@ doubleVec tm_calc_pdf(int* positions, int count,
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
 
     // Set to true if 'lowerptr[0]' or 'upperptr[0]' not given, this is used
-    // when calling 'tm_predict_pdfcdf' as we do not need the bins there (i.e.,
+    // when calling 'treg_predict_pdfcdf' as we do not need the bins there (i.e.,
     // 'lowerptr' and 'upperptr' are of length 1 and contain NA.
     // In this case we simply iterate trough the entire tp vector and store the
     // very last value.
@@ -148,7 +148,7 @@ void eval_bins_pdf_cdf(double* res, double* tmp, int* positions, int count,
 }
 
 /* Helper function for type = "cdf" */
-doubleVec tm_calc_cdf(int* positions, int count,
+doubleVec treg_calc_cdf(int* positions, int count,
                       double* tpptr, double* lowerptr, double* upperptr,
                       double* y, int ny) {
 
@@ -211,7 +211,7 @@ double interpolate_linear(double x1, double y1, double x2, double y2, double p) 
 }
 
 /* Helper function for type = "quantile" */
-doubleVec tm_calc_quantile(int* positions, int count,
+doubleVec treg_calc_quantile(int* positions, int count,
                            double* tpptr, double* lowerptr, double* upperptr,
                            double* prob, int np, bool disc) {
 
@@ -344,7 +344,7 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
 
 /* Helper function for type = "pmax"
  */
-double tm_calc_pmax(int* positions, int count, double* pptr) {
+double treg_calc_pmax(int* positions, int count, double* pptr) {
     // If the first value is NA: return NA immediately
     if (ISNAN(pptr[positions[0]])) { return R_NaReal; }
 
@@ -353,7 +353,7 @@ double tm_calc_pmax(int* positions, int count, double* pptr) {
     double max_res = res; // Current maximum
     int    pmax = 0;      // Position of highest value (max cdf)
 
-    // Does the same as tm_calc_cdf except summing up, and only
+    // Does the same as treg_calc_cdf except summing up, and only
     // keeps the index of the highest value. As soon as we
     // detect a missing value - return NA.
     if (count > 0) {
@@ -422,7 +422,7 @@ double tm_calc_pmax(int* positions, int count, double* pptr) {
  *
  * @return TODO(R): Depends on mode.
  */
-SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
+SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
                 SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete) {
 
     int    *uidxptr   = INTEGER(uidx);     // Unique indices in the dtaa
@@ -471,7 +471,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
 
     // If binmid is NA, but yptr is not: Error (this combination is not allowed)
     if ((do_cdf | do_pdf) & (ISNAN(lowerptr[0]) | ISNAN(upperptr[0])) & !ISNAN(yptr[0])) {
-        error("Problem in C tm_predict(): lower or upper is NA, but y is not.");
+        error("Problem in C treg_predict(): lower or upper is NA, but y is not.");
     }
 
     // If mode is not pdf, cdf, or quantile, elementwise must be true.
@@ -483,7 +483,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
     }
 
     // Custom struct object to mimik "which()"
-    tmWhich which;
+    integerVec which;
     doubleVec tmp;
 
     #if OPENMP_ON
@@ -496,27 +496,27 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
             if (do_pdf) {
                 // Single PDF
                 if (ewise) {
-                    tmp = tm_calc_pdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, 1);
+                    tmp = treg_calc_pdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, 1);
                 // Multiple PDFs (elementwise)
                 } else {
-                    tmp = tm_calc_pdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, LENGTH(y));
+                    tmp = treg_calc_pdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, LENGTH(y));
                 }
             // --- Calculating cumulative distribution
             } else if (do_cdf) {
                 // Single CDF
                 if (ewise) {
-                    tmp = tm_calc_cdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, 1);
+                    tmp = treg_calc_cdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, 1);
                 // Multiple CDFs (elementwise)
                 } else {
-                    tmp = tm_calc_cdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, LENGTH(y));
+                    tmp = treg_calc_cdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, LENGTH(y));
                 }
             } else {
                 // Single quantile
                 if (ewise) {
-                    tmp = tm_calc_quantile(which.index, which.length, tpptr, lowerptr, upperptr, &yptr[i], 1, discptr[i] == 1);
+                    tmp = treg_calc_quantile(which.index, which.length, tpptr, lowerptr, upperptr, &yptr[i], 1, discptr[i] == 1);
                 // Multiple quantiles (elementwise)
                 } else {
-                    tmp = tm_calc_quantile(which.index, which.length, tpptr, lowerptr, upperptr, yptr, LENGTH(y), discptr[i] == 1);
+                    tmp = treg_calc_quantile(which.index, which.length, tpptr, lowerptr, upperptr, yptr, LENGTH(y), discptr[i] == 1);
                 }
             }
 
@@ -537,10 +537,10 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
         // -----------------------------------------------------------
         // Calculate mean
         } else if (do_mean) {
-            resptr[i] = tm_calc_mean(which.index, which.length, tpptr, lowerptr, upperptr);
+            resptr[i] = treg_calc_mean(which.index, which.length, tpptr, lowerptr, upperptr);
         // Else it must be pmax
         } else {
-            resptr[i] = tm_calc_pmax(which.index, which.length, tpptr);
+            resptr[i] = treg_calc_pmax(which.index, which.length, tpptr);
         }
         free(which.index); // Free allocated memory
     }
@@ -554,8 +554,8 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
  *
  * This mode is used when estimating the Transition Model. Calculates
  * the PDF and CDF for each observation at the last bin (i.e., the bin
- * in which the observation falls into). Calls tm_calc_pdf and tm_calc_cdf
- * with a missing value on 'binmidptr' and 'ny = 1' which tells tm_calc_pdf/tm_calc_cdf
+ * in which the observation falls into). Calls treg_calc_pdf and treg_calc_cdf
+ * with a missing value on 'binmidptr' and 'ny = 1' which tells treg_calc_pdf/treg_calc_cdf
  * to use this specific "mode".
  *
  * @param uidx integer vector with unique indices in data.
@@ -564,7 +564,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
  * @param type character, either 'pdf', 'cdf', or 'pmax'.
  * @param ncores integer, number of cores to be used (ignored if OMP not available).
  *
- * @details Does something similar to tm_predict but calculates both PDF and
+ * @details Does something similar to treg_predict but calculates both PDF and
  * CDF simultanously for the very last bin in each distribution (observation),
  * returning a named list. This is used in the main `tm()` function,
  * calculating both at the same time should help to speed up the calculations.
@@ -572,7 +572,7 @@ SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
  * @return Returns named list with two numeric vectors, each of which
  * has length(uidx) (vector with cdf and pdf).
  */
-SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP ncores) {
+SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP ncores) {
 
     double *tpptr   = REAL(tp);
     int    *uidxptr = INTEGER(uidx);  // Unique indices in the dtaa
@@ -583,7 +583,7 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP ncores) {
     int    i;
 
     // Custom struct object to mimik "which()"
-    tmWhich which;
+    integerVec which;
     doubleVec tmppdf;
     doubleVec tmpcdf;
 
@@ -595,7 +595,7 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP ncores) {
     SEXP cdf; PROTECT(cdf = allocVector(REALSXP, un)); ++nProtected;
     double *cdfptr = REAL(cdf);
 
-    // Dummy value as we need a proper object when calling tm_calc_*() below
+    // Dummy value as we need a proper object when calling treg_calc_*() below
     double* na = malloc(sizeof(double)); // Single double pointer
     na[0] = NA_REAL; // Assign missing value
 
@@ -611,8 +611,8 @@ SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP ncores) {
         // Input arguments are (in this order)
         //     positions, count, tpptr, lowerptr, upperptr, y, ny
         // Here lowerptr, upperptr, y, (and ny) are just dummy values!
-        tmppdf = tm_calc_pdf(which.index, which.length, tpptr, na, na, na, 1);
-        tmpcdf = tm_calc_cdf(which.index, which.length, tpptr, na, na, na, 1);
+        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, na, na, na, 1);
+        tmpcdf = treg_calc_cdf(which.index, which.length, tpptr, na, na, na, 1);
 
         // Store last value, that is the last bin provided for this distribution.
         pdfptr[i] = tmppdf.values[tmppdf.length - 1];

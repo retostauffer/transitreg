@@ -1,5 +1,5 @@
-\name{tm}
-\alias{tm}
+\name{transitreg}
+\alias{transitreg}
 
 \title{
   Transition Models Estimation
@@ -13,10 +13,10 @@
 }
 
 \usage{
-tm(formula, data, subset, na.action,
-  engine = "bam", scale.x = FALSE,
-  breaks = NULL, model = TRUE,
-  ncores = NULL, verbose = FALSE, ...)
+transitreg(formula, data, subset, na.action,
+           engine = "bam", scale.x = FALSE,
+           breaks = NULL, model = TRUE,
+           ncores = NULL, verbose = FALSE, ...)
 }
 
 \arguments{
@@ -44,7 +44,7 @@ tm(formula, data, subset, na.action,
 }
 
 \details{
-  The function transforms the input data using \code{\link{tm_data}} to a format 
+  The function transforms the input data using \code{\link{transitreg_data}} to a format 
   compatible with transition models. Estimation relies on binary GLM-type techniques 
   to model conditional transition probabilities. Note that the \code{theta} variable, representing 
   the current transition level, must be included in the model by the user, please
@@ -56,7 +56,7 @@ tm(formula, data, subset, na.action,
 }
 
 \section{OpenMP}{
-  For improved performance \code{"tm"} is partially implemented in \code{C}, making
+  For improved performance \code{"transitreg"} is partially implemented in \code{C}, making
   use of the OpenMP library for parallelization. The argument \code{ncores} allows
   the user to control how many cores to be used for the \code{C} functions shipped
   with this package. By default, the number of cores will be detected
@@ -72,17 +72,17 @@ tm(formula, data, subset, na.action,
 }
 
 \value{
-  An object of class \code{"tm"}, which includes the following components:
+  An object of class \code{"transitreg"}, which includes the following components:
   \itemize{
     \item Fitted model results compatible with \pkg{mgcv}-style outputs.
     \item Methods for \code{plot}, \code{summary}, \code{residuals}, and \code{predict}.
     \item Model diagnostics and transformation details.
   }
-  See \code{\link{tm_detect_cores}} for some more details.
+  See \code{\link{transitreg_detect_cores}} for some more details.
 }
 
 \seealso{
-  \code{\link{tm_data}}, \code{\link{tm_dist}}, \code{\link[mgcv]{gam}}
+  \code{\link{transitreg_data}}, \code{\link{transitreg_dist}}, \code{\link[mgcv]{gam}}
 }
 
 \examples{
@@ -93,7 +93,7 @@ x <- runif(n, -3, 3)
 y <- rpois(n, exp(2 + sin(x)))
 
 ## Fit transition count response model.
-b <- tm(y ~ s(theta) + s(x))
+b <- transitreg(y ~ s(theta) + s(x))
 
 ## GAM summary.
 summary(b)
@@ -128,7 +128,7 @@ x <- runif(n, -3, 3)
 y <- sin(x) + rnorm(n, sd = exp(-1 + cos(x)))
 
 ## Fit model with continuous response.
-b <- tm(y ~ s(theta) + s(x) + te(x, theta), breaks = 200)
+b <- transitreg(y ~ s(theta) + s(x) + te(x, theta), breaks = 200)
 
 ## Predictions and plotting
 nd <- data.frame(x = seq(-3, 3, length = 100))
@@ -151,8 +151,8 @@ x <- runif(n, -3, 3)
 y <- rpois(n, exp(2 + sin(x)))
 
 ## Fit NN transition count response model.
-b <- tm(y ~ theta + x, scale.x = TRUE, engine = "nnet",
-  size = 5, maxit = 1000, decay = 0.001)
+b <- transitreg(y ~ theta + x, scale.x = TRUE, engine = "nnet",
+                size = 5, maxit = 1000, decay = 0.001)
 
 ## Predictions and plotting.
 nd <- data.frame(x = seq(-3, 3, length = 100))

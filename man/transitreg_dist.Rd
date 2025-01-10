@@ -1,5 +1,5 @@
-\name{tm_dist}
-\alias{tm_dist}
+\name{transitreg_dist}
+\alias{transitreg_dist}
 
 \title{
   Transition Model Probability Density Visualization
@@ -7,12 +7,12 @@
 
 \description{
   Visualizes the probability density function (PDF) and raw count or continuous data 
-  based on transition models estimated using \code{\link{tm}}. This function provides 
+  based on transition models estimated using \code{\link{transitreg}}. This function provides 
   an intuitive way to understand the distribution of the modeled response.
 }
 
 \usage{
-tm_dist(y, data = NULL, ...)
+transitreg_dist(y, data = NULL, ...)
 }
 
 \arguments{
@@ -22,7 +22,7 @@ tm_dist(y, data = NULL, ...)
     discretize the response.}
   \item{data}{Optional. If \code{y} is a formula, this specifies the data frame to 
     be used for model fitting.}
-  \item{\dots}{Additional arguments to be passed to \code{\link{tm}}, including 
+  \item{\dots}{Additional arguments to be passed to \code{\link{transitreg}}, including 
     settings for the estimation engine, formula, and other relevant parameters.}
 }
 
@@ -37,7 +37,7 @@ tm_dist(y, data = NULL, ...)
 }
 
 \value{
-  An object of class \code{"tm"}, as described in \code{\link{tm}}. This includes:
+  An object of class \code{"transitreg"}, as described in \code{\link{transitreg}}. This includes:
   \itemize{
     \item Fitted transition model details.
     \item Model diagnostics and parameters.
@@ -46,7 +46,7 @@ tm_dist(y, data = NULL, ...)
 }
 
 \seealso{
-  \code{\link{tm}}, \code{\link{tm_data}}
+  \code{\link{transitreg}}, \code{\link{transitreg_data}}
 }
 
 \examples{
@@ -56,13 +56,13 @@ n <- 3000
 y <- rpois(n, 10)
 
 # Visualize PDF for count data.
-tm_dist(y)
+transitreg_dist(y)
 
 ## Example 2: Zero-inflated data.
 y <- c(y, rep(0, 500))
 
 ## Include a zero-inflation term.
-tm_dist(y ~ s(theta) + theta0)
+transitreg_dist(y ~ s(theta) + theta0)
 
 ## Example 3: Continuous data.
 set.seed(123)
@@ -70,7 +70,7 @@ n <- 1000
 y <- rgamma(n, shape = 10, rate = 0.1)
 
 ## Visualize PDF for continuous data with discretization.
-tm_dist(y, breaks = 50)
+transitreg_dist(y, breaks = 50)
 }
 
 \keyword{distribution}

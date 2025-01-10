@@ -1,6 +1,6 @@
 
 
-tm_glmnet <- function(formula, data, nfolds = 10, ...) {
+transitreg_glmnet <- function(formula, data, nfolds = 10, ...) {
     stopifnot(requireNamespace("glmnet"))
 
     # Extract smooth terms
@@ -31,26 +31,16 @@ tm_glmnet <- function(formula, data, nfolds = 10, ...) {
     attr(mod, "X") <- X
     attr(mod, "y") <- y
 
-    class(mod) <- c("tm_glmnet", class(mod))
+    class(mod) <- c("transitreg_glmnet", class(mod))
     print(class(mod))
     return(mod)
 }
 
-predict.tm_glmnet <- function(object, type = "response", s = "lambda.min", ...) {
+predict.transietreg_glmnet <- function(object, type = "response", s = "lambda.min", ...) {
     # Removing custom class and call predict.glmnet below
-    class(object) <- class(object)[!class(object) == "tm_glmnet"]
+    class(object) <- class(object)[!class(object) == "transitreg_glmnet"]
 
     return(predict(object, newx = attr(object, "X"), s = s, type = type))
 }
-
-
-
-
-
-
-
-
-
-
 
 

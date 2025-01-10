@@ -19,11 +19,11 @@
 \details{
   \pkg{TransitionModels} supports the following key features:
   \itemize{
-    \item \code{\link{tm}}: Fit transition models to count or continuous response data, 
+    \item \code{\link{transitreg}}: Fit transition models to count or continuous response data, 
       leveraging generalized additive model (GAM) techniques for estimation.
-    \item \code{\link{tm_data}}: Transform raw data into the format required for 
+    \item \code{\link{transitreg_data}}: Transform raw data into the format required for 
       transition model estimation.
-    \item \code{\link{tm_dist}}: Visualize probability density functions (PDFs) and 
+    \item \code{\link{transitreg_dist}}: Visualize probability density functions (PDFs) and 
       raw count data modeled with transition models.
   }
 
@@ -53,7 +53,7 @@
 }
 
 \seealso{
-  \code{\link{tm}}, \code{\link{tm_data}}, \code{\link{tm_dist}}
+  \code{\link{transitreg}}, \code{\link{transitreg_data}}, \code{\link{transitreg_dist}}
 }
 
 \keyword{package}

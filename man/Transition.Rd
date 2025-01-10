@@ -1,44 +1,44 @@
-\name{tmdist}
-\alias{tmdist}
-\alias{random.tmdist}
-\alias{pdf.tmdist}
-\alias{log_pdf.tmdist}
-\alias{cdf.tmdist}
-\alias{quantile.tmdist}
-\alias{median.tmdist}
-\alias{mean.tmdist}
-\alias{as.matrix.tmdist}
-\alias{support.tmdist}
-\alias{is_discrete.tmdist}
-\alias{is_continuous.tmdist}
-\title{Create an tmdist Distribution}
+\name{Transition}
+\alias{Transition}
+\alias{random.Transition}
+\alias{pdf.Transition}
+\alias{log_pdf.Transition}
+\alias{cdf.Transition}
+\alias{quantile.Transition}
+\alias{median.Transition}
+\alias{mean.Transition}
+\alias{as.matrix.Transition}
+\alias{support.Transition}
+\alias{is_discrete.Transition}
+\alias{is_continuous.Transition}
+\title{Create an Transition Distribution}
 \usage{
-    tmdist(z, newdata = NULL, newresponse = NULL)
+    Transition(z, newdata = NULL, newresponse = NULL)
 
-    \method{pdf}{tmdist}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
-    \method{log_pdf}{tmdist}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
-    \method{cdf}{tmdist}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
-    \method{quantile}{tmdist}(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
-    \method{median}{tmdist}(x, na.rm = NULL, ncores = NULL, ...)
-    \method{mean}{tmdist}(x, ncores = NULL, ...)
-    \method{random}{tmdist}(x, n = 1L, drop = TRUE, ...)
+    \method{pdf}{Transition}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
+    \method{log_pdf}{Transition}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
+    \method{cdf}{Transition}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
+    \method{quantile}{Transition}(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
+    \method{median}{Transition}(x, na.rm = NULL, ncores = NULL, ...)
+    \method{mean}{Transition}(x, ncores = NULL, ...)
+    \method{random}{Transition}(x, n = 1L, drop = TRUE, ...)
 
-    \method{is_discrete}{tmdist}(d, ...)
-    \method{is_continuous}{tmdist}(d, ...)
-    \method{support}{tmdist}(d, drop = NULL, ...)
+    \method{is_discrete}{Transition}(d, ...)
+    \method{is_continuous}{Transition}(d, ...)
+    \method{support}{Transition}(d, drop = NULL, ...)
 
-    \method{as.matrix}{tmdist}(x, expand = FALSE, ...)
+    \method{as.matrix}{Transition}(x, expand = FALSE, ...)
 }
 \arguments{
-    \item{z}{an object that can be converted into a \code{c("tmdist", "distributions")}
+    \item{z}{an object that can be converted into a \code{c("Transition", "distributions")}
         object. See section 'Details' for more information.}
-    \item{x}{object of class \code{tmdist} (if main argument), else a numeric
+    \item{x}{object of class \code{Transition} (if main argument), else a numeric
         vector at which the CDF, PDF, or quantile should be evaluated.}
     \item{probs}{Probabilities at which to evaluate the function.}
     \item{...}{Currently not used.}
     \item{n}{The number of samples to draw. Defaults to `1L`.}
     \item{drop}{logical. Should the result be simplified to a vector if possible?}
-    \item{d}{An `tmdist` object created by a call to [tmdist()].}
+    \item{d}{An `Transition` object created by a call to [Transition()].}
     \item{elementwise}{logical. Should each distribution in \code{x} be evaluated
         at all elements of \code{probs} (\code{elementwise = FALSE}, yielding a matrix)?
         Or, if \code{x} and \code{probs} have the same length, should the evaluation be
@@ -56,7 +56,7 @@
         if \code{newdata} is specified, same length as \code{nrow(newdata)}.}
 }
 \value{
-A `tmdist` object.
+A `Transition` object.
 
 TODO(R): Missing.
 }
@@ -74,7 +74,7 @@ Explain what 'z' can take.
 p  <- ppois(0:30, lambda = 5) # CDF
 tp <- TransitionModels:::cdf_to_tp(p) # Transition probabilities
 
-## Create named list; one form to create a 'tmdist' object.
+## Create named list; one form to create a 'Transition' object.
 ## Requires 'tp' (transition probabilities), as well as lower and
 ## upper boundaries of the bins.
 tmp <- list(tp = tp,
@@ -82,8 +82,8 @@ tmp <- list(tp = tp,
             up = seq(-1.25, by = 0.5, length.out = length(tp)) + 0.5)
 str(tmp)
 
-## Convert to 'tmdist' distributions object
-d <- tmdist(tmp)
+## Convert to 'Transition' distributions object
+d <- Transition(tmp)
 print(d)
 
 ## Calculate PDF and CDF (on the center of the bins used to create the distribution)
@@ -92,7 +92,7 @@ d_cdf <- cdf(d, x)
 d_pdf <- pdf(d, x)
 
 barplot(rbind(d_cdf, d_pdf), beside = TRUE, col = c("tomato", "gray30"),
-        las = 2, main = "CDF and PDF of tmdist")
+        las = 2, main = "CDF and PDF of Transition")
 
 ## Mean and median
 c("mean" = mean(d), "median" = median(d))
@@ -107,6 +107,6 @@ is_discrete(d)
 is_continuous(d)
 support(d)
 }
-\concept{tmdist distribution}
+\concept{Transition distribution}
 \concept{Normal distribution}
 \concept{distributions}

@@ -1,5 +1,5 @@
-\name{tm_convert}
-\alias{tm_convert}
+\name{convert_tp}
+\alias{convert_tp}
 \alias{cdf_to_tp}
 \alias{tp_to_cdf}
 \alias{tp_to_pdf}
@@ -18,7 +18,7 @@
 }
 
 \usage{
-    tm_convert(x, from, to, width = NULL, drop = TRUE)
+    convert_tp(x, from, to, width = NULL, drop = TRUE)
 }
 
 \arguments{
@@ -43,21 +43,21 @@ p <- ppois(0:10, lambda = 4)
 d <- dpois(0:10, lambda = 4)
 
 ## Convert Poisson CDF to transition probabilities
-tp <- tm_convert(p, from = "cdf", to = "tp")
+tp <- convert_tp(p, from = "cdf", to = "tp")
 round(tp, 2)
 
-pd <- tm_convert(tp, from = "tp", to = c("pdf", "cdf"))
+pd <- convert_tp(tp, from = "tp", to = c("pdf", "cdf"))
 
 ## Convert transition probabilities back to CDF
-p2 <- tm_convert(tp, from = "tp", to = "cdf")
+p2 <- convert_tp(tp, from = "tp", to = "cdf")
 all.equal(p, p2) # Must be equal
 
 ## Convert transition probabilities to PDF
-d2 <- tm_convert(tp, from = "tp", to = "pdf")
+d2 <- convert_tp(tp, from = "tp", to = "pdf")
 all.equal(d, d2) # Must be equal
 
 ## Or directly from tp to both, CDF and PDF
-d2 <- tm_convert(tp, from = "tp", to = c("cdf", "pdf"))
+d2 <- convert_tp(tp, from = "tp", to = c("cdf", "pdf"))
 all.equal(p, d2$cdf)
 all.equal(d, d2$pdf)
 

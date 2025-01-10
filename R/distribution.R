@@ -1,7 +1,7 @@
 
-#' Creates a tm Distribution
+#' Creates a Transition Distribution
 #'
-#' A tm distrubiton consists of a series of \code{K} transition
+#' A Transition distrubiton consists of a series of \code{K} transition
 #' probabilities for \code{K} 'bins' (counts or pseudo-counts) and
 #' a series of \code{K} numeric values representing the (center of) the
 #' corresponding bins.
@@ -12,7 +12,7 @@
 #' @param bins numeric vector with numeric value for bin 0, ..., K.
 #'
 #' @section Input:
-#' In contrast to may parametric distributions, a 'tm' distribution
+#' In contrast to may parametric distributions, a 'Transition' distribution
 #' does not consist of a set of distribution parameters, but of a set
 #' of transition probabilities (\code{tp}) and a set of 'bins' (same length
 #' as \code{tp}). The \code{tp}s define the probability that that an observation
@@ -36,16 +36,16 @@
 #'    the second \code{bins}.
 #'
 #'
-#' @return Returns an object of class \code{c("tmdist", "distribution")}.
+#' @return Returns an object of class \code{c("Transition", "distribution")}.
 #' @author Reto
-tmdist <- function(z, newdata = NULL, newresponse = NULL) {
+Transition <- function(z, newdata = NULL, newresponse = NULL) {
     # Converting input into a list of data.frames. The lengt of the list
     # corresponds to the number of distributions, whereof each element is a
     # data.frame with the transition probabilities and bins.
 
     # If the input is a Transition Model object, create distributions
     # based on the data used for training.
-    if (inherits(z, "tm")) {
+    if (inherits(z, "transitreg")) {
         warning("TODO(R): Here I sould call procast?")
         vars <- attr(terms(fake_formula(formula(x))), "term.labels")
         vars <- vars[!vars == "theta"]
@@ -62,7 +62,7 @@ tmdist <- function(z, newdata = NULL, newresponse = NULL) {
     # Else try to convert the input (different formats are possible)
     # into a distributions object.
     } else {
-        z <- tmdist_convert_input(z)
+        z <- Transition_convert_input(z)
         if (is.matrix(z)) z <- list(z)
     }
 
@@ -93,12 +93,12 @@ tmdist <- function(z, newdata = NULL, newresponse = NULL) {
     res <- as.data.frame(structure(do.call(rbind, res),
                                    dimnames = list(NULL, get_names(nmax))))
 
-    class(res) <- c("tmdist", "distribution")
+    class(res) <- c("Transition", "distribution")
     return(res)
 }
 
 
-tmdist_convert_input <- function(x) {
+Transition_convert_input <- function(x) {
     # Unnamed list of length 2; where each entry in x is a vector
     if (is.list(x) && all(sapply(x, is.atomic)) && length(x) == 3L && is.null(names(x))) {
         x <- cbind(tp = x[[1]], lo = x[[2]], up = x[[3]])
@@ -110,16 +110,16 @@ tmdist_convert_input <- function(x) {
     # so we call this function again to convert them if possible
     } else if (is.list(x)) {
         # TODO(R): Recursive call on level 1; safe option?
-        x <- lapply(x, tmdist_convert_input)
+        x <- lapply(x, Transition_convert_input)
     # Else we don't really know what to do.
     } else {
-        stop("Problems converting user input to 'tm distribution'")
+        stop("Problems converting user input to 'Transition distribution'")
     }
     #lapply(x, check_values)
     return(x)
 }
 
-prodist.tm <- function(object, newdata = NULL, ...) {
+prodist.transitreg <- function(object, newdata = NULL, ...) {
     # Extracting covariable names to create newdata
     covars <- attr(terms(fake_formula(formula(object))), "term.labels")
     covars <- covars[!covars == "theta"]
@@ -140,7 +140,7 @@ prodist.tm <- function(object, newdata = NULL, ...) {
     res  <- data.frame(c(list(theta = rep(seq_len(nb) - 1, times = nd)), res))
 
     # TODO(R): Currently 'type = response' which differs
-    # for different engines (see tm()).
+    # for different engines (see transitreg()).
     res  <- data.frame(tp = predict(object$model, newdata = res, type = "response"),
                        lo = rep(head(object$bins, -1), times = nd),
                        up = rep(tail(object$bins, -1), times = nd))
@@ -148,25 +148,26 @@ prodist.tm <- function(object, newdata = NULL, ...) {
     res <- split(res, rep(seq_len(nd), each = nb))
 
     # Convert into distributions object, pack into a data.frame
-    return(setNames(as.data.frame(tmdist(res)), as.character(substitute(object))))
+    return(setNames(as.data.frame(Transition(res)), as.character(substitute(object))))
 }
 
-procast.tm <- function(object, newdata = NULL, na.action = na.pass,
-                       type = "distribution", at = 0.5, drop = FALSE, ...) {
-    object <- if (is.null(newdata)) {
-        prodist(object)
-    } else {
-        # TODO(R): na.action passed to 'procast.tm' but not yet implemented (no effect)
-        prodist(object, newdata = newdata, na.action = na.action)
-    }
+# TODO(R): Not needed! Remove once d3 is implemented properly.
+####procast.transitreg <- function(object, newdata = NULL, na.action = na.pass,
+####                       type = "distribution", at = 0.5, drop = FALSE, ...) {
+####    object <- if (is.null(newdata)) {
+####        prodist(object)
+####    } else {
+####        # TODO(R): na.action passed to 'procast.transitreg' but not yet implemented (no effect)
+####        prodist(object, newdata = newdata, na.action = na.action)
+####    }
+####
+####    return(if (drop) object[[1]] else object)
+####}
 
-    return(if (drop) object[[1]] else object)
-}
 
-
-#' Convert tmdist Distributions to Matrix
+#' Convert Transition Distributions to Matrix
 #'
-#' @param x object of class \code{c("tmdist", ...)}.
+#' @param x object of class \code{c("Transition", ...)}.
 #' @param expand logical, if FALSE (default) the wide format is
 #'        returned, where the columns contain transition probabilities (\code{tp_})
 #'        as well as the lower (\code{lo_}) and upper (\code{up}) bound of the
@@ -185,7 +186,7 @@ procast.tm <- function(object, newdata = NULL, na.action = na.pass,
 #' This expanded version is used when calling the .C functions.
 #'
 #' @author Reto
-as.matrix.tmdist <- function(x, expand = FALSE, ...) {
+as.matrix.Transition <- function(x, expand = FALSE, ...) {
     stopifnot("'expand' must be logical TRUE or FALSE" = isTRUE(expand) || isFALSE(expand))
 
     xnames <- names(x) # Keep for later
@@ -220,7 +221,7 @@ as.matrix.tmdist <- function(x, expand = FALSE, ...) {
 }
 
 # Format
-format.tmdist <- function(x, digits = pmax(3L, getOption("digits") - 3L), ...) {
+format.Transition <- function(x, digits = pmax(3L, getOption("digits") - 3L), ...) {
     if (length(x) < 1L) return(character(0))
     xnames <- names(x) # Keep for later
 
@@ -241,10 +242,10 @@ format.tmdist <- function(x, digits = pmax(3L, getOption("digits") - 3L), ...) {
 }
 
 
-pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
+pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
 
     ## Get number of cores for OpenMP parallelization
-    ncores <- tm_get_number_of_cores(ncores, FALSE)
+    ncores <- transitreg_get_number_of_cores(ncores, FALSE)
 
     # Guessing elementwise if set NULL
     if (is.null(elementwise)) {
@@ -262,7 +263,7 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
     ui <- unique(d[, "index"])
 
     ## Calling C to calculate the required values.
-    res <- .Call("tm_predict",
+    res <- .Call("treg_predict",
                  uidx  = as.integer(ui),           # Unique distribution index (int)
                  idx   = as.integer(d[, "index"]), # Index vector (int)
                  tp    = d[, "tp"],                # Transition probabilities
@@ -284,7 +285,7 @@ pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
 }
 
 ## Just returns log(pdf(...))
-log_pdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
+log_pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
     return(log(pdf(d, x, drop = drop, elementwise = elementwise, ncores = ncores, ...)))
 }
 
@@ -312,10 +313,10 @@ get_mat_colnames <- function(x, prefix = NULL, digits = 3) {
     return(x)
 }
 
-cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
+cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
 
     ## Get number of cores for OpenMP parallelization
-    ncores <- tm_get_number_of_cores(ncores, FALSE)
+    ncores <- transitreg_get_number_of_cores(ncores, FALSE)
 
     # Guessing elementwise if set NULL
     if (is.null(elementwise)) {
@@ -333,7 +334,7 @@ cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
     ui <- unique(d[, "index"])
 
     ## Calling C to calculate the required values.
-    res <- .Call("tm_predict",
+    res <- .Call("treg_predict",
                  uidx  = as.integer(ui),           # Unique distribution index (int)
                  idx   = as.integer(d[, "index"]), # Index vector (int)
                  tp    = d[, "tp"],                # Transition probabilities
@@ -365,9 +366,9 @@ cdf.tmdist <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...
     }
 }
 
-quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
+quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
     ## Get number of cores for OpenMP parallelization
-    ncores <- tm_get_number_of_cores(ncores, FALSE)
+    ncores <- transitreg_get_number_of_cores(ncores, FALSE)
 
     # Guessing elementwise if set NULL
     if (is.null(elementwise)) {
@@ -391,7 +392,7 @@ quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = 
     ui <- unique(x[, "index"])
 
     ## Calling C to calculate the required values.
-    res <- .Call("tm_predict",
+    res <- .Call("treg_predict",
                  uidx  = as.integer(ui),           # Unique distribution index (int)
                  idx   = as.integer(x[, "index"]), # Index vector (int)
                  tp    = x[, "tp"],                # Transition probabilities
@@ -412,20 +413,20 @@ quantile.tmdist <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = 
 }
 
 
-median.tmdist <- function(x, na.rm = NULL, ncores = NULL, ...) {
+median.Transition <- function(x, na.rm = NULL, ncores = NULL, ...) {
     quantile(x, probs = 0.5, ncores = ncores, ...)
 }
 
 
-mean.tmdist <- function(x, ncores = NULL, ...) {
+mean.Transition <- function(x, ncores = NULL, ...) {
     ## Get number of cores for OpenMP parallelization
-    ncores <- tm_get_number_of_cores(ncores, FALSE)
+    ncores <- transitreg_get_number_of_cores(ncores, FALSE)
 
     x  <- as.matrix(x, expand = TRUE) # convert distributions to matrix
     ui <- unique(x[, "index"])
 
     ## Calling C to calculate the required values.
-    return(.Call("tm_predict",
+    return(.Call("treg_predict",
                  uidx  = as.integer(ui),           # Unique distribution index (int)
                  idx   = as.integer(x[, "index"]), # Index vector (int)
                  tp    = x[, "tp"],                # Transition probabilities
@@ -438,7 +439,7 @@ mean.tmdist <- function(x, ncores = NULL, ...) {
 
 
 ## Draw random values
-random.tmdist <- function(x, n = 1L, drop = TRUE, ...) {
+random.Transition <- function(x, n = 1L, drop = TRUE, ...) {
     # Helper function, draw weighted sample of length 'n'.
     # Scoping 'x' and 'n'
     fn <- function(i) {
@@ -467,7 +468,7 @@ random.tmdist <- function(x, n = 1L, drop = TRUE, ...) {
 }
 
 ## Check if distribution is discrete
-is_discrete.tmdist <- function(d, ...) {
+is_discrete.Transition <- function(d, ...) {
     # Calculating 'bin mid', if all bin mid points
     # are integer we assume it is a discrete dist.
     fn <- function(i) {
@@ -479,12 +480,12 @@ is_discrete.tmdist <- function(d, ...) {
 }
 
 ## Check if distribution is continuous
-is_continuous.tmdist <- function(d, ...) {
+is_continuous.Transition <- function(d, ...) {
     return(!is_discrete(d))
 }
 
 ## Support (bin range) of the distributions
-support.tmdist <- function(d, drop = NULL, ...) {
+support.Transition <- function(d, drop = NULL, ...) {
     fn <- function(i) {
         y <- as.matrix(d[i], expand = TRUE)
         c(min = min(y[, "lo"]), max = max(y[, "up"]))
@@ -493,7 +494,7 @@ support.tmdist <- function(d, drop = NULL, ...) {
 }
 
 
-newresponse.tm <- function(object, newdata = NULL, ...) {
+newresponse.transitreg <- function(object, newdata = NULL, ...) {
     ## Response name
     yn <- object$response
 

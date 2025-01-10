@@ -6,17 +6,14 @@ VERSION := $(shell grep '^Version:' DESCRIPTION | awk '{print $$2}')
 
 .PHONY: test
 test:
-	Rscript -e "library('TransitionModels'); tinytest::test_all()"
-	##Rscript -e "library(\"tinytest\"); test_all()"
-	##Rscript -e "library(TransitionModels); tinytest::test_all()"
+	Rscript -e "library('transitreg'); tinytest::test_all()"
 
 .PHONY: install
 install:
 	@echo Installing current version: $(VERSION)
 	(cd ../ && \
-		R CMD build --no-build-vignettes TransitionModels && \
-		R CMD INSTALL TransitionModels_$(VERSION).tar.gz)
-####R CMD INSTALL TransitionModels_$(VERSION).tar.gz --configure-args="--enable-verbose")
+		R CMD build --no-build-vignettes transitreg && \
+		R CMD INSTALL transitreg_$(VERSION).tar.gz)
 
 .PHONY: coverage
 coverage: install
@@ -29,5 +26,5 @@ clean:
 check: clean
 	@echo Checking current version: $(VERSION)
 	(cd ../ && \
-		R CMD build --no-build-vignettes TransitionModels && \
-		R CMD check --as-cran TransitionModels_$(VERSION).tar.gz)
+		R CMD build --no-build-vignettes transitreg && \
+		R CMD check --as-cran transitreg_$(VERSION).tar.gz)

@@ -50,7 +50,7 @@
 typedef struct {
     int* index;
     int length;
-} tmWhich;
+} integerVec;
 
 /* Custom type: stuctured object with ...
  * a double vector and length.
@@ -67,23 +67,21 @@ typedef struct {
  *   -   .index:   integer vector. position of 'x' in 'y'.
  *   -   .length:  length of .index, or number of 'x' in 'y'.
  */
-tmWhich find_positions(int x, int* y, int n);
-
-// TODO(R): Delete me! // void fun(double *y, double *H);
+integerVec find_positions(int x, int* y, int n);
 
 void eval_bins_pdf_cdf(double* res, double* tmp, int* positions, int count, double* lowerptr, double* upperptr, double* y, int ny);
 void eval_bins_quantile(double* res, double* tmp, int* positions, int count, double* lowerptr, double* upperptr, double* prob, int np, bool disc);
 
 double interpolate_linear(double x1, double y1, double x2, double y2, double p);
-doubleVec tm_calc_pdf(int* positions, int count, double* tpptr, double* lowerptr, double* upperptr, double* y, int ny);
-doubleVec tm_calc_cdf(int* positions, int count, double* tpptr, double* lowerptr, double* upperptr, double* y, int ny);
-doubleVec tm_calc_quantile(int* positions, int count, double* tpptr, double* lowerptr, double* upperptr, double* prob, int np, bool disc);
+doubleVec treg_calc_pdf(int* positions, int count, double* tpptr, double* lowerptr, double* upperptr, double* y, int ny);
+doubleVec treg_calc_cdf(int* positions, int count, double* tpptr, double* lowerptr, double* upperptr, double* y, int ny);
+doubleVec treg_calc_quantile(int* positions, int count, double* tpptr, double* lowerptr, double* upperptr, double* prob, int np, bool disc);
 
-double tm_calc_pmax(int* positions, int count, double* pptr);
-double tm_calc_mean(int* positions, int count, double* tpptr, double* lowerptr, double* upperptr);
+double treg_calc_pmax(int* positions, int count, double* pptr);
+double treg_calc_mean(int* positions, int count, double* tpptr, double* lowerptr, double* upperptr);
 
-SEXP tm_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y, SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete);
-SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP ncores);
-SEXP tm_detect_cores();
+SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y, SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete);
+SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP ncores);
+SEXP treg_detect_cores();
 
 

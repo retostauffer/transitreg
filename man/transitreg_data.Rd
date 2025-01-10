@@ -1,5 +1,5 @@
-\name{tm_data}
-\alias{tm_data}
+\name{transitreg_data}
+\alias{transitreg_data}
 
 \title{
   Transition Model Data Preparer
@@ -13,7 +13,7 @@
 }
 
 \usage{
-  tm_data(data, response = NULL, verbose = TRUE)
+  transitreg_data(data, response = NULL, verbose = TRUE)
 }
 
 \arguments{
@@ -48,7 +48,7 @@
 }
 
 \seealso{
-  \code{\link{tm}}, \code{\link{tm_dist}}
+  \code{\link{transitreg}}, \code{\link{transitreg_dist}}
 }
 
 \examples{
@@ -60,7 +60,7 @@ d <- data.frame(
 )
 
 ## Transformed data frame.
-dtm <- tm_data(d, response = "counts", verbose = TRUE)
+dtm <- transitreg_data(d, response = "counts", verbose = TRUE)
 print(dtm)
 }
 
