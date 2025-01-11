@@ -148,9 +148,9 @@ transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose =
 }
 
 ## Predict function.
-transitreg_predict <- function(object, bins, newdata,
+transitreg_predict <- function(object, newdata = NULL,
   type = c("pdf", "cdf", "quantile", "pmax"),
-  response = NULL, y = NULL, prob = 0.5, maxcounts = 1e+03,
+  newresponse = NULL, y = NULL, prob = 0.5, maxcounts = 1e+03,
   verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
   factor = FALSE, ncores = NULL) {
 
@@ -172,9 +172,10 @@ transitreg_predict <- function(object, bins, newdata,
 
   ## Staying sane
   stopifnot(
-    "'newdata' must be data.frame" = is.data.frame(newdata),
-    "'response' must be character of length 1 (or NULL)" =
-        (is.character(response) && length(response) == 1) || is.null(response),
+    "'newdata' must be NULL or data.frame" = 
+        is.null(newdata) || is.data.frame(newdata),
+    "'newresponse' must be NULL or numeric vector with length > 0" =
+        is.null(newresponse) || (is.numeric(newresponse) && length(newresponse) > 0),
     "'y' must be NULL or a vector" = is.null(y) || is.vector(y),
     "'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
     "'factor' must be logical TRUE or FALSE" = isTRUE(factor) || isFALSE(factor),
@@ -182,43 +183,56 @@ transitreg_predict <- function(object, bins, newdata,
   )
   ## TODO(R) Not all arguments are checked above
 
-  ## If response is not specified explicitly, assume the first
-  ## variable in the response; should be avoided if possible.
-  if (is.null(response)) {
-    response <- names(newdata)[1L]
-  ## If response was specified but does not exist; set to maxcounts
-  } else if (is.null(newdata[[response]])) {
-    ## TODO(N): Reto is not sure when this is used and what
-    ##          the reason for the + floor(0.1 * maxcounts) is?
-    newdata[[response]] <- maxcounts + floor(0.1 * maxcounts)
+  ## Convert numeric values to bin index. If x == NULL, NULL is returned.
+  num2bin <- function(x, bins) {
+      if (is.null(x)) return(x)
+      if (any(is.na(x)))
+          stop("Response contains missing values (not allowed).")
+      if (any(x < min(bins) | x > max(bins)))
+          stop("Response values outside support (outside range defined by the bins).")
+      cut(x, breaks = bins, labels = FALSE, include.lowest = TRUE) - 1L
   }
 
+  ## If 'newdata' is NULL we take the existing model.frame
+  ## which already contains the response as 'bin index'.
+  if (is.null(newdata)) {
+    newdata <- model.frame(object, inner = FALSE)
+  ## Else convert the response from numeric values to bins.
+  ## If response not in data.frame this has no effect.
+  } else {
+    newdata[[object$response]] <- num2bin(newdata[[object$response]], object$bins)
+  }
+  ## Convert 'newresponse' to bin index (if NULL, stays NULL)
+  newresponse <- num2bin(newresponse, object$bins)
+
   ## Preparing data
-  nd <- transitreg_data(newdata, response = response, verbose = verbose)
+  newdata <- transitreg_data(newdata, response = object$response,
+                             newresponse = newresponse, verbose = verbose)
+
   if (factor)
-    nd$theta <- as.factor(nd$theta)
+    newdata$theta <- as.factor(newdata$theta)
 
   if (!is.null(theta_vars) && length(theta_vars) > 0L) {
     for (j in theta_vars) {
       i <- as.integer(gsub("theta", "", j))
-      nd[[j]] <- as.integer(nd$theta == i)
+      newdata[[j]] <- as.integer(newdata$theta == i)
     }
   }
 
   ## Scaling (standardizing) theta if requested
   if (!is.null(theta_scaler))
-    nd$theta <- (nd$theta - theta_scaler$mean) / theta_scaler$sd
+    newdata$theta <- (newdata$theta - theta_scaler$mean) / theta_scaler$sd
 
   ## Specify argument for generic prediction method called below
-  what <- switch(class(object)[1L],
+  what <- switch(class(object$model)[1L],
     "bam"  = "response",
     "gam"  = "response",
     "nnet" = "raw"
   )
-  tp <- as.numeric(predict(object, newdata = nd, type = what))
+  tp <- as.numeric(predict(object$model, newdata = newdata, type = what))
 
   ## Extract unique indices
-  ui <- unique(nd$index)
+  ui   <- unique(newdata$index)
   prob <- rep(prob, length(ui))
 
   ## Ensure we hand over the correct thing to C
@@ -229,11 +243,19 @@ transitreg_predict <- function(object, bins, newdata,
       prob <- NA_real_ # dummy value for C (not used if type != 'quantile')
   }
 
+  str(list(uidx  = ui,                       # Unique distribution index (int)
+           idx   = newdata$index,            # Index vector (int)
+           tp    = tp,                       # Transition probabilities
+           bins  = object$bins,              # Point intersections of bins
+           y     = prob,                     # Where to evaluate the pdf
+           type  = type, ncores = ncores, elementwise = TRUE,
+           discrete = FALSE))
+
   probs <- .Call("treg_predict",
                  uidx  = ui,                       # Unique distribution index (int)
-                 idx   = nd$index,                 # Index vector (int)
+                 idx   = newdata$index,            # Index vector (int)
                  tp    = tp,                       # Transition probabilities
-                 bins  = bins,                     # Point intersections of bins
+                 bins  = object$bins,              # Point intersections of bins
                  y     = prob,                     # Where to evaluate the pdf
                  type  = type, ncores = ncores, elementwise = TRUE,
                  discrete = FALSE) # <- dummy value
