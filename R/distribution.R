@@ -5,11 +5,10 @@
 #' probabilities (TP) for \code{K} 'bins' (counts or pseudo-counts).
 #'
 #' @param x numeric vector or a numeric matrix.
-#' @param bins numeric vector defining the edges of the bins. The length
-#'        the vector must be of \code{length(x) + 1} (if \code{x} is a vector)
-#'        or \code{ncol(x) + 1} if \code{x} is a matrix. Must be monotonically
-#'        increasing.
-#'
+#' @param bins numeric vector of points of intersection of the bins.
+#'        The length the vector must be of \code{length(x) + 1} (if \code{x} is
+#'        a vector) or \code{ncol(x) + 1} if \code{x} is a matrix. Must be
+#'        monotonically increasing.
 #'
 #' @return Returns an object of class \code{c("Transition", "distribution")}.
 #'
@@ -113,20 +112,18 @@ prodist.transitreg <- function(object, newdata = NULL, ...) {
 #'
 #' @param x object of class \code{c("Transition", ...)}.
 #' @param expand logical, if FALSE (default) the wide format is
-#'        returned, where the columns contain transition probabilities (\code{tp_})
-#'        as well as the lower (\code{lo_}) and upper (\code{up}) bound of the
-#'        corresponding bin.
+#'        returned, else the extended (long) form.
 #' @param \dots unused.
 #'
 #' @return Numeric matrix. If \code{expand = FALSE} the return is of dimension
 #' \code{c(length(x), <ncol>)}.
 #'
 #' If \code{expand = TRUE} the returned matrix is of dimension
-#' \code{c(length(x) * <ncol>, 4L)} where the four columns contain 
+#' \code{c(length(x) * <ncol>, 3L)} where the four columns contain 
 #' \code{index} (1, ..., length(x)) where each index corresponds to the
 #' row-index of the original input \code{x} (distribution identifier),
-#' the transition probabilities \code{tp}, as well as two columns containing
-#' the lower and upper bound of the bin (\code{lo}, \code{up}).
+#' \code{theta} which is the 'bin' the transition probability belongs to,
+#' followed by the transition probabilities \code{tp} itself.
 #' This expanded version is used when calling the .C functions.
 #'
 #' @author Reto
@@ -184,18 +181,18 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
 
     # Store element names for return
     xnames <- names(d)
+    bins <- attr(d, "bins")
 
     if (!elementwise) x <- sort(x) # Important
-    d  <- as.matrix(d, expand = TRUE) # convert distributions to matrix
-    ui <- unique(d[, "index"])
+    ui  <- seq_along(d) # Unique index
+    idx <- rep(ui, each = length(bins) - 1) # Index of distribution
 
     ## Calling C to calculate the required values.
     res <- .Call("treg_predict",
-                 uidx  = as.integer(ui),           # Unique distribution index (int)
-                 idx   = as.integer(d[, "index"]), # Index vector (int)
-                 tp    = d[, "tp"],                # Transition probabilities
-                 lower = d[, "lo"],                # Lower edge of the bin
-                 upper = d[, "up"],                # Upper edge of the bin
+                 uidx  = ui,                       # Unique distribution index (int)
+                 idx   = idx,                      # Index vector (int)
+                 tp    = t(as.matrix(d)),          # Transition probabilities
+                 bins  = bins,                     # Point intersection of bins
                  y     = as.numeric(x),            # Where to evaluate the pdf
                  type  = "pdf", ncores = ncores, elementwise = elementwise,
                  discrete = FALSE) # <- dummy value
@@ -254,23 +251,22 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
         stop("'elementwise = TRUE' but length of x does not match the number of distributions")
 
     # Store element names for return
-    xnames <- names(x)
+    xnames <- names(d)
+    bins   <- attr(d, "bins")
 
     if (!elementwise) x <- sort(x) # Important
-    d  <- as.matrix(d, expand = TRUE) # convert distributions to matrix
-    ui <- unique(d[, "index"])
+    ui  <- seq_along(d) # Unique index
+    idx <- rep(ui, each = length(bins) - 1) # Index of distribution
 
     ## Calling C to calculate the required values.
     res <- .Call("treg_predict",
-                 uidx  = as.integer(ui),           # Unique distribution index (int)
-                 idx   = as.integer(d[, "index"]), # Index vector (int)
-                 tp    = d[, "tp"],                # Transition probabilities
-                 lower = d[, "lo"],                # Lower edge of the bin
-                 upper = d[, "up"],                # Upper edge of the bin
+                 uidx  = ui,                       # Unique distribution index (int)
+                 idx   = idx,                      # Index vector (int)
+                 tp    = t(as.matrix(d)),          # Transition probabilities
+                 bins  = bins,                     # Point intersection of bins
                  y     = as.numeric(x),            # Where to evaluate the pdf
                  type  = "cdf", ncores = ncores, elementwise = elementwise,
                  discrete = FALSE) # <- dummy value
-
 
     # If elementwise: Return named vector
     if (elementwise) {
@@ -307,6 +303,7 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
 
     # Store element names for return
     xnames <- names(x)
+    bins   <- attr(x, "bins")
 
     # Discrete distributions?
     discrete <- is_discrete(x)
@@ -315,16 +312,15 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
     nprobs <- length(probs)
 
     if (elementwise) probs <- sort(probs) # Important
-    x  <- as.matrix(x, expand = TRUE) # convert distributions to matrix
-    ui <- unique(x[, "index"])
+    ui  <- seq_along(x) # Unique index
+    idx <- rep(ui, each = length(bins) - 1) # Index of distribution
 
     ## Calling C to calculate the required values.
     res <- .Call("treg_predict",
-                 uidx  = as.integer(ui),           # Unique distribution index (int)
-                 idx   = as.integer(x[, "index"]), # Index vector (int)
-                 tp    = x[, "tp"],                # Transition probabilities
-                 lower = x[, "lo"],                # Lower edge of the bin
-                 upper = x[, "up"],                # Upper edge of the bin
+                 uidx  = ui,                       # Unique distribution index (int)
+                 idx   = idx,                      # Index vector (int)
+                 tp    = t(as.matrix(x)),          # Transition probabilities
+                 bins  = bins,                     # Point intersection of bins
                  y     = as.numeric(probs),        # Where to evaluate the pdf
                  type  = "quantile", ncores = ncores, elementwise = elementwise,
                  discrete = as.logical(discrete))
@@ -349,6 +345,7 @@ mean.Transition <- function(x, ncores = NULL, ...) {
     ## Get number of cores for OpenMP parallelization
     ncores <- transitreg_get_number_of_cores(ncores, FALSE)
 
+    bins <- attr(x, "bins")
     x  <- as.matrix(x, expand = TRUE) # convert distributions to matrix
     ui <- unique(x[, "index"])
 
@@ -357,8 +354,7 @@ mean.Transition <- function(x, ncores = NULL, ...) {
                  uidx  = as.integer(ui),           # Unique distribution index (int)
                  idx   = as.integer(x[, "index"]), # Index vector (int)
                  tp    = x[, "tp"],                # Transition probabilities
-                 lower = x[, "lo"],                # Lower edge of the bin
-                 upper = x[, "up"],                # Upper edge of the bin
+                 bins  = bins,                     # Point intersection of bins
                  y     = NA_real_,                 # <- Dummy value
                  type  = "mean", ncores = ncores,
                  elementwise = TRUE, discrete = FALSE)) # <- Dummy values
@@ -367,16 +363,26 @@ mean.Transition <- function(x, ncores = NULL, ...) {
 
 ## Draw random values
 random.Transition <- function(x, n = 1L, drop = TRUE, ...) {
+
+    # Calculating 'bin mids'
+    bins <- attr(x, "bins")
+    i <- seq_len(length(bins) - 1)
+    binmid <- (bins[i + 1] + bins[i]) / 2.
+    binwidth <- diff(bins)
+
+    # Logical vector, is the distribution discrete?
+    discrete <- is_discrete(x)
+
     # Helper function, draw weighted sample of length 'n'.
-    # Scoping 'x' and 'n'
+    # Scoping 'x', 'n', 'binmid', 'binwidth'
     fn <- function(i) {
-        y        <- as.matrix(x[i], expand = TRUE)
-        binmid   <- rowMeans(y[, c("lo", "up")])
-        p        <- as.numeric(pdf(x[i], binmid))
-        binwidth <- y[, "up"] - y[, "lo"]
-        sample(binmid, size = n, prob = p, replace = TRUE) +
-            runif(n, -binwidth / 2, binwidth / 2)
-        # TODO(R): Currently adding +/- uniform random error
+        y <- as.matrix(x[i], expand = TRUE)
+        p <- as.numeric(pdf(x[i], binmid))
+        r <- sample(binmid, size = n, prob = p, replace = TRUE)
+        # Adding random uniform error
+        if (!discrete[i])
+            r <- r + runif(n, min = -binwidth[r] / 2, max = +binwidth[r] / 2)
+        return(r)
     }
     res <- lapply(seq_along(x), fn)
 

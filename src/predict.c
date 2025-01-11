@@ -48,9 +48,9 @@ integerVec find_positions(int x, int* y, int n) {
 
 /* Helper function for type = "mean".
  * Calculates elementwise pdf and multiplies it with center of the bin
- * ((lowerptr[i] + upperptr[i]) * 0.5) to get the weighted average.
+ * ((binsptr[i + 1] + binsptr[i]) * 0.5) to get the weighted average.
  * Returns a (doubleVec of length 1) */
-double treg_calc_mean(int* positions, int count, double* tpptr, double* lowerptr, double* upperptr) {
+double treg_calc_mean(int* positions, int count, double* tpptr, double* binsptr) {
 
     // Initialize return value, initialize sum with 0
     double res = 0.0;
@@ -60,23 +60,22 @@ double treg_calc_mean(int* positions, int count, double* tpptr, double* lowerptr
     double prod = 1.0; // Initialize product
     for (int i = 0; i < count; i++) {
         if (ISNAN(tpptr[positions[i]])) {
-            error("TODO(R): First element ISNAN, must be adressed in C");
+            error("TODO(R): Found missing value in tpptr, must be adressed in C");
             //return R_NaReal; 
         }
+        // Updating weighted sum, simply "binmid * pdf(bin)" summed up
+        // (binsptr[i + 1] + binsptr[i]) * 0.5 -> center of the bin
+        res += (binsptr[i + 1] + binsptr[i]) * 0.5 * prod * (1.0 - tpptr[positions[i]]);
         // Updating product of transition probabilities
         prod *= tpptr[positions[i]];
-        // Updating weighted sum, simply "binmid * pdf(bin)" summed up
-        // (lowerptr[i] + upperptr[i]) * 0.5 -> center of the bin
-        res += (lowerptr[i] + upperptr[i]) * 0.5 * prod * (1.0 - tpptr[positions[i]]);
     }
     return res;
 }
 
 
 /* Helper function for type = "pdf" */
-doubleVec treg_calc_pdf(int* positions, int count,
-                      double* tpptr, double* lowerptr, double* upperptr,
-                      double* y, int ny) {
+doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
+                        double* binsptr, double* y, int ny) {
 
     // Initialize return value/object.
     doubleVec res;
@@ -86,17 +85,17 @@ doubleVec treg_calc_pdf(int* positions, int count,
     // Temporary double vector to calculate PDF along i = 0, ..., count - 1
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
 
-    // Set to true if 'lowerptr[0]' or 'upperptr[0]' not given, this is used
-    // when calling 'treg_predict_pdfcdf' as we do not need the bins there (i.e.,
-    // 'lowerptr' and 'upperptr' are of length 1 and contain NA.
-    // In this case we simply iterate trough the entire tp vector and store the
-    // very last value.
-    bool nobm = ISNAN(lowerptr[0]) | ISNAN(upperptr[0]);
+    // Set to true if 'binsptr[0]' is missing (not provided)
+    if (ISNAN(binsptr[0])) {
+        error("TODO(R): binsptr MUST be provided, we can remove the nobm mode");
+    }
+    bool nobm = ISNAN(binsptr[0]);
 
     // Calculate PDF for each bin given by the distribution for i = 0, ..., count - 1.
     // Store in double 'tmp', the required values will be extracted after this loop.
+    int i = 0;
     double prod = 1.0; // Initialize product
-    for (int i = 0; i < count; i++) {
+    for (i = 0; i < count; i++) {
         if (ISNAN(tpptr[positions[i]])) {
             error("TODO(R): First element ISNAN, must be adressed in C");
             //return R_NaReal; 
@@ -106,6 +105,8 @@ doubleVec treg_calc_pdf(int* positions, int count,
         // Updating product of transition probabilities
         prod *= tpptr[positions[i]];
     }
+    // Divide PDF by width of the bin
+    for (i = 0; i < count; i++) { tmp[i] = tmp[i] / (binsptr[i + 1] - binsptr[i]); }
 
     // If nobm (no bin mids given) the result is simply the last value in tmp;
     // the PDF evaluated at the end of the entire distribution.
@@ -115,7 +116,7 @@ doubleVec treg_calc_pdf(int* positions, int count,
     // into which bin each of the thresholds/values in y fall into,
     // and assign the corresponding PDF to res.values | y.
     } else {
-        eval_bins_pdf_cdf(res.values, tmp, positions, count, lowerptr, upperptr, y, ny);
+        eval_bins_pdf_cdf(res.values, tmp, positions, count, binsptr, y, ny);
     }
 
     // Free allocated memory, return result
@@ -124,7 +125,7 @@ doubleVec treg_calc_pdf(int* positions, int count,
 }
 
 void eval_bins_pdf_cdf(double* res, double* tmp, int* positions, int count,
-                       double* lowerptr, double* upperptr, double* y, int ny) {
+                       double* binsptr, double* y, int ny) {
 
     // Guesstimate/calculate bin width
     int i, j;
@@ -133,13 +134,12 @@ void eval_bins_pdf_cdf(double* res, double* tmp, int* positions, int count,
     for (j = 0; j < ny; j++) {
         res[j] = NA_REAL; // Initial value
         for (i = i; i < count; i++) {
-            // Current 'y' below current bin OR above highest bin (outside
-            // upper support) we break the inner loop.
-            if ((y[j] <= lowerptr[positions[i]]) | (y[j] > upperptr[positions[count - 1]])) {
+            // Current 'y' below current bin: break
+            if (y[j] <= binsptr[i]) {
                 break;
             }
             // If y[j] in current bin: Store PDF, break loop and continue search
-            if ((y[j] > lowerptr[positions[i]]) & (y[j] <= upperptr[positions[i]])) {
+            if ((y[j] > binsptr[i]) & (y[j] <= binsptr[i + 1])) {
                 res[j] = tmp[i];
                 break;
             }
@@ -148,9 +148,8 @@ void eval_bins_pdf_cdf(double* res, double* tmp, int* positions, int count,
 }
 
 /* Helper function for type = "cdf" */
-doubleVec treg_calc_cdf(int* positions, int count,
-                      double* tpptr, double* lowerptr, double* upperptr,
-                      double* y, int ny) {
+doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
+                      double* binsptr,  double* y, int ny) {
 
     // Initialize return value/object.
     doubleVec res;
@@ -162,7 +161,10 @@ doubleVec treg_calc_cdf(int* positions, int count,
 
     // Set to true if 'binmidptr' is not provided (an NA). In this case we simply
     // iterate trough the entire tp vector and store the very last value.
-    bool nobm = ISNAN(lowerptr[0]) | ISNAN(upperptr[0]);
+    if (ISNAN(binsptr[0])) {
+        error("TODO(R): binsptr MUST be provided, we can remove the nobm mode");
+    }
+    bool nobm = ISNAN(binsptr[0]);
 
     // Calculate CDF for each bin given by the distribution for i = 0, ..., count - 1
     // Store in double 'tmp', the required values will be extracted after this loop.
@@ -190,7 +192,7 @@ doubleVec treg_calc_cdf(int* positions, int count,
     // into which bin each of the thresholds/values in y fall into,
     // and assign the corresponding PDF to res.values | y.
     } else {
-        eval_bins_pdf_cdf(res.values, tmp, positions, count, lowerptr, upperptr, y, ny);
+        eval_bins_pdf_cdf(res.values, tmp, positions, count, binsptr, y, ny);
     }
 
     // Free allocated memory, return result
@@ -211,9 +213,8 @@ double interpolate_linear(double x1, double y1, double x2, double y2, double p) 
 }
 
 /* Helper function for type = "quantile" */
-doubleVec treg_calc_quantile(int* positions, int count,
-                           double* tpptr, double* lowerptr, double* upperptr,
-                           double* prob, int np, bool disc) {
+doubleVec treg_calc_quantile(int* positions, int count, double* tpptr,
+                             double* binsptr, double* prob, int np, bool disc) {
 
     int i;
 
@@ -247,7 +248,10 @@ doubleVec treg_calc_quantile(int* positions, int count,
     tmp[0] = 1.0 - tpptr[positions[0]];
 
     // No bin information?
-    bool nobm = ISNAN(lowerptr[0]) | ISNAN(upperptr[0]);
+    if (ISNAN(binsptr[0])) {
+        error("TODO(R): binsptr MUST be provided, we can remove the nobm mode");
+    }
+    bool nobm = ISNAN(binsptr[0]);
 
     // If tmp[0] >= pmax: We have already found our solution, no need to calculate
     // the rest. Setting i = 0 (important for legacy mode).
@@ -279,13 +283,13 @@ doubleVec treg_calc_quantile(int* positions, int count,
         return res;
     }
 
+
     // Else we already translate the 'bin index' in its proper numeric response.
     // In case of 'disc = true' (discrete distribution) this will be the center
     // of the bin (and thus an 'integer', although technically a double) or
     // a double (if 'disc = false') which will be linearely interpolated depending
     // on it's position within the bin.
-    printf(" ----- not legacy mode\n");
-    eval_bins_quantile(res.values, tmp, positions, count, lowerptr, upperptr, prob, np, disc);
+    eval_bins_quantile(res.values, tmp, positions, count, binsptr, prob, np, disc);
 
     free(tmp); // Freeing allocated memory
 
@@ -295,7 +299,7 @@ doubleVec treg_calc_quantile(int* positions, int count,
 
 
 void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
-                        double* lowerptr, double* upperptr, double* prob, int np, bool disc) {
+                        double* binsptr, double* prob, int np, bool disc) {
 
     int i, j;
 
@@ -305,40 +309,38 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
     j = disc ? 1 : 0; // Discrete distributions: start at j = 1, else j = 0
     for (i = 0; i < np; i++) {
         for (j = j; j < count; j++) {
+            // Probability we are looking for too low?
             if (ISNAN(tmp[j])) { break; }
 
-            // Here we distinguish between discrete and non-discrete
-            // distributions. If discrete, the quantile _must_ lie within a
-            // bin, and we take the center of the bin.
-            if (disc) {
-                if ((prob[i] >= tmp[j - 1]) & (prob[i] < tmp[j])) {
-                    res[i] = (lowerptr[positions[j]] + upperptr[positions[j]]) * 0.5;
-                }
-            // If not discrete we do the following:
-            // (1) If j == 0 we set the quantile to the lower support of the distribution at first.
-            // (2) If j == (count - 1), the last iteration, we store the upper end of the support.
-            // (3) Else we check if we fall into the current bin. If so, we use linear interpolation
-            //     within the bin (lower-upper); this overwrites rules (1) and (2).
-            } else {
-                // If j = 0 take lowest possible value
-                if (j == 0) {
-                    res[i] = lowerptr[positions[j]];
-                // If j == (count - 1), last iteration, take highest possible value
-                } else if (j == (count - 1)) {
-                    res[i] = upperptr[positions[j]];
-                } 
-                // Check if we fall into this bin
-                if ((prob[i] >= tmp[j - 1]) & (prob[i] < tmp[j])) {
-                    // Perform linear interpolation between the two neighboring bin mids.
-                    res[i] = interpolate_linear(lowerptr[positions[j]], tmp[j - 1],
-                                                upperptr[positions[j]], tmp[j],
+            // If prob[i] < tmp[0]: Store lowest value and break loop
+            if (prob[i] < tmp[0]) {
+                res[i] = disc ? (binsptr[1] + binsptr[0]) * 0.5 : binsptr[0];
+                break;
+            }
+
+            // Check if we fall into this bin
+            if ((prob[i] >= tmp[j - 1]) & (prob[i] < tmp[j])) {
+                // If discrete: Store center of the bin
+                if (disc) {
+                    res[i] = (binsptr[j + 1] + binsptr[j]) * 0.5;
+                // Perform linear interpolation between the two neighboring bin mids.
+                } else {
+                    res[i] = interpolate_linear(binsptr[j],       tmp[j - 1],
+                                                binsptr[j + 1],   tmp[j],
                                                 prob[i]);
-                    break; // Found what we were looking for, break inner loop
                 }
+                break; // Found what we were looking for, break inner loop
             }
         }
+
+        // j == count?
+        // This means we reached the end of the loop above but could not find a
+        // bin we fall into. Fill the results vector with "highest bin".
+        if (j == count) {
+            res[i] = disc ? (binsptr[count] + binsptr[count - 1]) * 0.5 : binsptr[count];
+        }
     }
-    // void function, no return
+    // void function, no return, we have updated/modified 'res'
 }
 
 
@@ -422,7 +424,7 @@ double treg_calc_pmax(int* positions, int count, double* pptr) {
  *
  * @return TODO(R): Depends on mode.
  */
-SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
+SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
                 SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete) {
 
     int    *uidxptr   = INTEGER(uidx);     // Unique indices in the dtaa
@@ -433,8 +435,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
     int    i, j, np;
 
     double *tpptr     = REAL(tp);          // Transition probabilities
-    double *lowerptr  = REAL(lower);       // Lower bound of bin
-    double *upperptr  = REAL(upper);       // Upper bound of bin
+    double *binsptr   = REAL(bins);        // Bins, points of intersection
     double *yptr      = REAL(y);           // Where to evaluate the distribution
 
     bool   ewise      = asLogical(elementwise); // Elementwise calculation?
@@ -470,7 +471,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
     double *resptr = REAL(res);
 
     // If binmid is NA, but yptr is not: Error (this combination is not allowed)
-    if ((do_cdf | do_pdf) & (ISNAN(lowerptr[0]) | ISNAN(upperptr[0])) & !ISNAN(yptr[0])) {
+    if ((do_cdf | do_pdf) & ISNAN(binsptr[0]) & !ISNAN(yptr[0])) {
         error("Problem in C treg_predict(): lower or upper is NA, but y is not.");
     }
 
@@ -496,27 +497,27 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
             if (do_pdf) {
                 // Single PDF
                 if (ewise) {
-                    tmp = treg_calc_pdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, 1);
+                    tmp = treg_calc_pdf(which.index, which.length, tpptr, binsptr, yptr, 1);
                 // Multiple PDFs (elementwise)
                 } else {
-                    tmp = treg_calc_pdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, LENGTH(y));
+                    tmp = treg_calc_pdf(which.index, which.length, tpptr, binsptr, yptr, LENGTH(y));
                 }
             // --- Calculating cumulative distribution
             } else if (do_cdf) {
                 // Single CDF
                 if (ewise) {
-                    tmp = treg_calc_cdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, 1);
+                    tmp = treg_calc_cdf(which.index, which.length, tpptr, binsptr, yptr, 1);
                 // Multiple CDFs (elementwise)
                 } else {
-                    tmp = treg_calc_cdf(which.index, which.length, tpptr, lowerptr, upperptr, yptr, LENGTH(y));
+                    tmp = treg_calc_cdf(which.index, which.length, tpptr, binsptr, yptr, LENGTH(y));
                 }
             } else {
                 // Single quantile
                 if (ewise) {
-                    tmp = treg_calc_quantile(which.index, which.length, tpptr, lowerptr, upperptr, &yptr[i], 1, discptr[i] == 1);
+                    tmp = treg_calc_quantile(which.index, which.length, tpptr, binsptr, &yptr[i], 1, discptr[i] == 1);
                 // Multiple quantiles (elementwise)
                 } else {
-                    tmp = treg_calc_quantile(which.index, which.length, tpptr, lowerptr, upperptr, yptr, LENGTH(y), discptr[i] == 1);
+                    tmp = treg_calc_quantile(which.index, which.length, tpptr, binsptr, yptr, LENGTH(y), discptr[i] == 1);
                 }
             }
 
@@ -537,7 +538,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP lower, SEXP upper, SEXP y,
         // -----------------------------------------------------------
         // Calculate mean
         } else if (do_mean) {
-            resptr[i] = treg_calc_mean(which.index, which.length, tpptr, lowerptr, upperptr);
+            resptr[i] = treg_calc_mean(which.index, which.length, tpptr, binsptr);
         // Else it must be pmax
         } else {
             resptr[i] = treg_calc_pmax(which.index, which.length, tpptr);
@@ -609,10 +610,11 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP ncores) {
 
         // Calculate pdf and cdf (for the last bin)
         // Input arguments are (in this order)
-        //     positions, count, tpptr, lowerptr, upperptr, y, ny
-        // Here lowerptr, upperptr, y, (and ny) are just dummy values!
-        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, na, na, na, 1);
-        tmpcdf = treg_calc_cdf(which.index, which.length, tpptr, na, na, na, 1);
+        //     positions, count, tpptr, binsptr, y, ny
+        // Here binsptr, y, (and ny) are just dummy values!
+        // TODO(R): We must add 'bins' as input to properly calculate CDF/PDF
+        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, na, na, 1);
+        tmpcdf = treg_calc_cdf(which.index, which.length, tpptr, na, na, 1);
 
         // Store last value, that is the last bin provided for this distribution.
         pdfptr[i] = tmppdf.values[tmppdf.length - 1];

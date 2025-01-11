@@ -16,9 +16,9 @@
 #include "transitreg.h"
 
 static const R_CallMethodDef callMethods[] = {
-  {"treg_predict",             (DL_FUNC) &treg_predict,          10},
-  {"treg_predict_pdfcdf",      (DL_FUNC) &treg_predict_pdfcdf,    4},
-  {"treg_detect_cores",        (DL_FUNC) &treg_detect_cores,      0},
+  {"treg_predict",             (DL_FUNC) &treg_predict,          9},
+  {"treg_predict_pdfcdf",      (DL_FUNC) &treg_predict_pdfcdf,   4},
+  {"treg_detect_cores",        (DL_FUNC) &treg_detect_cores,     0},
   {NULL, NULL, 0} // Termination entry
 };
 
