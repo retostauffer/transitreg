@@ -327,6 +327,8 @@ convert_tp <- function(x, from, to, width = NULL, drop = TRUE) {
         res[[do[[i]]]] <- get(fnname)(x)
     }
 
+    str(res)
+
     # Return
     res <- as.data.frame(res)
     res <- res[, unname(do), drop = drop]
@@ -343,15 +345,19 @@ convert_tp <- function(x, from, to, width = NULL, drop = TRUE) {
 # Converts a cdf vector into transition probabilities.
 cdf_to_tp <- function(x) {
     stopifnot(is.numeric(x), all(x >= 0 & x <= 1))
-    stopifnot(all(diff(x) > 0))
+    stopifnot(all(diff(x) >= -.Machine$double.eps))
 
     # Converting CDF to transition probabilities
     tp <- numeric(length(x))
-    tp[1] = 1 - x[1]
-    prod <- 1
+    tp[1] <- 1 - x[1]
+    prod  <- 1
     for (i in seq.int(2, length(x))) {
         prod <- prod * tp[i - 1]
-        tp[i] = (x[i - 1] - x[i] + prod) / prod
+        if (prod < sqrt(.Machine$double.eps)) {
+            tmp   <- 0.0
+        } else {
+            tp[i] <- (x[i - 1] - x[i] + prod) / prod
+        }
     }
     return(tp)
 }
@@ -359,7 +365,7 @@ cdf_to_tp <- function(x) {
 # Converts transition probabilities (tp) to cdf
 tp_to_cdf <- function(tp) {
     stopifnot(is.numeric(tp), all(tp >= 0 & tp <= 1), length(tp) >= 1L)
-    stopifnot(all(diff(tp) <= 0))
+    stopifnot(all(diff(tp) <= .Machine$double.eps))
 
     res <- (1 - tp[1])
     if (length(tp) > 1) {

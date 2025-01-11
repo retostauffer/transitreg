@@ -1,122 +1,66 @@
 
 #' Creates a Transition Distribution
 #'
-#' A Transition distrubiton consists of a series of \code{K} transition
-#' probabilities for \code{K} 'bins' (counts or pseudo-counts) and
-#' a series of \code{K} numeric values representing the (center of) the
-#' corresponding bins.
+#' A 'Transition' distrubiton consists of a series of \code{K} transition
+#' probabilities (TP) for \code{K} 'bins' (counts or pseudo-counts).
 #'
-#' @param x one (or multiple) transitionmodel distributions. See section
-#'        'Input' for more details.
-#' @param probs numeric vector with transition probabilities (0, ..., K).
-#' @param bins numeric vector with numeric value for bin 0, ..., K.
-#'
-#' @section Input:
-#' In contrast to may parametric distributions, a 'Transition' distribution
-#' does not consist of a set of distribution parameters, but of a set
-#' of transition probabilities (\code{tp}) and a set of 'bins' (same length
-#' as \code{tp}). The \code{tp}s define the probability that that an observation
-#' is larger than the current one (in terms of \code{bins}).
-#'
-#' This constructor function allows for different input formats for convenience,
-#' and tries to accomodate everything that easy to detect and not ambiguous.
-#' For all cases covered the following conditions must be met:
-#'
-#' * Both (\code{tp}, \code{bins}) must be numeric and of same length.
-#' * \code{tp} must be in the range of \code{[0, 1]}
-#'   (for now; TODO(R): Do we always need the full distribution or is it enough if
-#'    we allow for 'partial' ones? If cut at the upper end it may be OK, but
-#'    if cut at the lower that goes wrong at all times, right?).
-#' * \code{bins} must be monotonically increasing (sorted).
-#'
-#' Input argument \code{x} can be:
-#'
-#' 1. Named list or data.frame with two elements: \code{tp} and \code{bins}.
-#' 2. Unnamed list of length 2, expecting the first entry to be \code{tp},
-#'    the second \code{bins}.
+#' @param x numeric vector or a numeric matrix.
+#' @param bins numeric vector defining the edges of the bins. The length
+#'        the vector must be of \code{length(x) + 1} (if \code{x} is a vector)
+#'        or \code{ncol(x) + 1} if \code{x} is a matrix. Must be monotonically
+#'        increasing.
 #'
 #'
 #' @return Returns an object of class \code{c("Transition", "distribution")}.
+#'
 #' @author Reto
-Transition <- function(z, newdata = NULL, newresponse = NULL) {
-    # Converting input into a list of data.frames. The lengt of the list
-    # corresponds to the number of distributions, whereof each element is a
-    # data.frame with the transition probabilities and bins.
+Transition <- function(x, bins) {
 
-    # If the input is a Transition Model object, create distributions
-    # based on the data used for training.
-    if (inherits(z, "transitreg")) {
-        warning("TODO(R): Here I sould call procast?")
-        vars <- attr(terms(fake_formula(formula(x))), "term.labels")
-        vars <- vars[!vars == "theta"]
-        d    <- x$model.frame
-        nb   <- length(x$bins)
-        tmp  <- lapply(d[, vars, drop = FALSE], function(x, nb) rep(x, each = nb), nb = nb)
-        tmp  <- data.frame(c(list(theta = rep(seq_len(nb) - 1, times = nrow(d))), tmp))
+    # Sanity checks
+    stopifnot(
+        "'x' must be numeric (vector or matrix)" = is.numeric(x) && is.atomic(x),
+        "'x' must be a vector or a matrix" = is.vector(x) || is.matrix(x),
+        "length of 'x' must be > 0" = length(x) > 0L,
+        "'bins' must be a numeric vector" = is.atomic(bins) && is.numeric(bins),
+        "missing values in 'bins' not allowed" = all(!is.na(bins)),
+        "'bins' must be monotonically increasing" = all(diff(bins) > 0)
+    )
 
-        tmp  <- data.frame(tp   = predict(x$model, newdata = tmp, type = "response"),
-                           bins = rep(x$bins, times = nrow(d)))
-        # Split into individual data.frames
-        x <- split(tmp, rep(seq_len(nrow(d)), each = nb))
-        rm(d, tmp)
-    # Else try to convert the input (different formats are possible)
-    # into a distributions object.
-    } else {
-        z <- Transition_convert_input(z)
-        if (is.matrix(z)) z <- list(z)
-    }
+    # If 'x' is a vector, convert to matrix
+    if (is.vector(x)) x <- matrix(x, nrow = 1)
 
-    # Sanity check on the newly created list of data.frames
-    # Sanity check my data.frames
-    check_matrices <- function(y) {
-        stopifnot(is.matrix(y), is.numeric(y))
-        stopifnot(all(y[, "tp"] >= 0 & y[, "tp"] <= 1))
-        stopifnot(all(y[, "lo"] < y[, "up"]))
-        stopifnot(all(y[, "up"] - y[, "lo"] > 0))
-    }
-    lapply(z, check_matrices)
+    # Checking 'bins' vector
+    if (length(bins) != (ncol(x) + 1))
+        stop("'bins' must be of length ", ncol(x) + 1)
 
-    # Find max length of the dfs
-    nmax <- max(sapply(z, nrow))
 
-    # Helper function to create the names for the matrix (and the matrix inserts)
-    get_names <- function(n)
-        as.vector(outer(c("tp", "lo", "up"), seq_len(n) - 1, paste, sep = "_"))
+    # Ensure to convert to double in case input is integer
+    x[,] <- as.numeric(x)
+    bins <- as.numeric(bins)
 
-    # Converting to data.frame, adding custom class, and return.
-    to_matrix <- function(y, n) {
-        m <- matrix(NA_real_, nrow = 1, ncol = 3L * n)
-        m[seq_along(y)] <- as.vector(t(y))
-        return(m)
-    }
-    res <- lapply(z, to_matrix, n = nmax)
-    res <- as.data.frame(structure(do.call(rbind, res),
-                                   dimnames = list(NULL, get_names(nmax))))
+    res <- setNames(as.data.frame(x),
+                    paste("tp", seq_len(ncol(x)) - 1, sep = "_"))
 
-    class(res) <- c("Transition", "distribution")
-    return(res)
+    structure(res, class = c("Transition", "distribution"), bins = bins)
 }
 
+# Combine Transition objects, only allowed if they have the very same bins
+# (come from the same distribution; same number of transition probabilities).
+c.Transition <- function(...) {
+    x <- list(...)
+    if (length(x) == 1) return(x[[1]])
 
-Transition_convert_input <- function(x) {
-    # Unnamed list of length 2; where each entry in x is a vector
-    if (is.list(x) && all(sapply(x, is.atomic)) && length(x) == 3L && is.null(names(x))) {
-        x <- cbind(tp = x[[1]], lo = x[[2]], up = x[[3]])
-    # Named list
-    } else if (is.list(x) && all(c("tp", "lo", "up") %in% names(x))) {
-        stopifnot("length of input vectrs differ" = length(unique(sapply(x, length))) == 1L)
-        x <- cbind(tp = x$tp, lo = x$lo, up = x$up)
-    # Else we expect to have gotten a series of distributions,
-    # so we call this function again to convert them if possible
-    } else if (is.list(x)) {
-        # TODO(R): Recursive call on level 1; safe option?
-        x <- lapply(x, Transition_convert_input)
-    # Else we don't really know what to do.
-    } else {
-        stop("Problems converting user input to 'Transition distribution'")
+    # Else check whether or not we can combine the objects
+    for (i in seq.int(2, length(x))) {
+        stopifnot("input not of class Transition" = inherits(x[[i]], "Transition"))
+        if (!all.equal(attr(x[[1]], "bins"), attr(x[[2]], "bins")))
+            stop("bins of the ", i, ifelse(i == 2, "nd", "th"),
+                 "object not the same as for the first object. Can't be combined.")
     }
-    #lapply(x, check_values)
-    return(x)
+
+    # Combine and return
+    res <- do.call(rbind, lapply(x, as.matrix))
+    Transition(res, attr(x[[1]], "bins"))
 }
 
 prodist.transitreg <- function(object, newdata = NULL, ...) {
@@ -190,35 +134,24 @@ as.matrix.Transition <- function(x, expand = FALSE, ...) {
     stopifnot("'expand' must be logical TRUE or FALSE" = isTRUE(expand) || isFALSE(expand))
 
     xnames <- names(x) # Keep for later
+    bins   <- attr(x, "bins")
 
     # convert to data.frame -> matrix
     x <- as.matrix(structure(x, class = "data.frame"))
     rownames(x) <- xnames
     if (expand) {
         # Keep original dimension as we transpose(x) in a second
-        nd <- nrow(x)      # Number of distributions
-        nb <- ncol(x) / 3L # Number of bins
+        nd <- nrow(x)          # Number of distributions
+        nb <- length(bins) - 1 # Number of bins
 
-        x <- t(x) # Transpose 'x' to properly extract data
-
-        res <- list(index = rep(seq_len(nd), each = nb))
-        for (n in c("tp", "lo", "up")) {
-            res[[n]] <- as.vector(x[grep(sprintf("^%s_[0-9]+$", n), rownames(x)), ])
-        }
-        # Create new rownames if there were any
-        if (!is.null(xnames))
-            xnames <- paste(rep(xnames, each = nb),
-                            rep(seq_len(nb), times = nd), sep = "_")
-
-        # Convert to matrix
-        x <- as.matrix(do.call(cbind, res))
-        if (!is.null(xnames)) rownames(x) <- xnames
-
-        # Remove missing values
-        x <- x[apply(is.na(x), MARGIN = 1, sum) == 0, ]
+        index <- rep(seq_len(nd), each = nb) # distribution index
+        theta <- rep(seq_len(nb) - 1, times = nd) # 'bin' index or theta
+        x <- cbind(index = index, theta = theta, tp = as.vector(t(x)))
     }
-    return(x)
+
+    structure(x, class = c("Transitionmatrix", class(x)), bins = bins)
 }
+
 
 # Format
 format.Transition <- function(x, digits = pmax(3L, getOption("digits") - 3L), ...) {
@@ -227,17 +160,11 @@ format.Transition <- function(x, digits = pmax(3L, getOption("digits") - 3L), ..
 
     # Extracting probabilites and bins
     fmtfun <- function(i) {
-        y <- as.matrix(x[i], expand = TRUE)
-        sprintf("%d; %s [%s,%s], ... , %s [%s,%s]", nrow(y),
-                format(y[1,       "tp"], digits = digits),
-                format(y[1,       "lo"], digits = digits),
-                format(y[1,       "up"], digits = digits),
-                format(y[nrow(y), "tp"], digits = digits),
-                format(y[nrow(y), "lo"], digits = digits),
-                format(y[nrow(y), "up"], digits = digits))
+        y <- as.matrix(x[i], expand = FALSE)
+        sprintf("n = %d", ncol(y))
     }
     f <- sapply(seq_along(x), fmtfun)
-    f <- sprintf("Transition Dist (%s)", f)
+    f <- sprintf("Transition(%s)", f)
     setNames(f, xnames)
 }
 
@@ -469,14 +396,12 @@ random.Transition <- function(x, n = 1L, drop = TRUE, ...) {
 
 ## Check if distribution is discrete
 is_discrete.Transition <- function(d, ...) {
-    # Calculating 'bin mid', if all bin mid points
-    # are integer we assume it is a discrete dist.
-    fn <- function(i) {
-        y <- as.matrix(d[i], expand = TRUE)
-        binmid <- (y[, "lo"] + y[, "up"]) / 2
-        all(abs(binmid %% 1) < sqrt(.Machine$double.eps))
-    }
-    sapply(seq_along(d), fn)
+    x <- attr(d, "bins")
+    # Calculating mid of bins
+    idx <- seq_len(length(x) - 1)
+    x <- x[idx + 1] - x[idx]
+    # If all 'bin mids' integer we assume it is a discrete distribution
+    rep(all(abs(x %% 1) < sqrt(.Machine$double.eps)), length(d))
 }
 
 ## Check if distribution is continuous
@@ -486,11 +411,12 @@ is_continuous.Transition <- function(d, ...) {
 
 ## Support (bin range) of the distributions
 support.Transition <- function(d, drop = NULL, ...) {
-    fn <- function(i) {
-        y <- as.matrix(d[i], expand = TRUE)
-        c(min = min(y[, "lo"]), max = max(y[, "up"]))
+    x <- setNames(range(attr(d, "bins")), c("min", "max"))
+    if (length(x) > 1) {
+        x <- matrix(x, nrow = length(d), ncol = 2, byrow = TRUE,
+                    dimnames = list(names(d), names(x)))
     }
-    t(sapply(seq_along(d), fn))
+    return(x)
 }
 
 
