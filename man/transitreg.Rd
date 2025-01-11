@@ -1,22 +1,20 @@
 \name{transitreg}
 \alias{transitreg}
-
 \title{
   Transition Models Estimation
 }
-
 \description{
   Fits transition models to count or continuous response data. The method leverages 
   transition probabilities to construct flexible probabilistic models without assuming 
   a fixed distribution for the response variable. Estimation relies on \pkg{mgcv} 
   infrastructure for GLM-type binary modeling.
 }
-
 \usage{
-transitreg(formula, data, subset, na.action,
-           engine = "bam", scale.x = FALSE,
-           breaks = NULL, model = TRUE,
-           ncores = NULL, verbose = FALSE, ...)
+    transitreg(formula, data, subset, na.action,
+               engine = "bam", scale.x = FALSE,
+               breaks = NULL, model = TRUE,
+               ncores = NULL, verbose = FALSE, ...)
+    \method{model.frame}{transitreg}(formula, inner = FALSE, ...)
 }
 
 \arguments{
@@ -41,6 +39,9 @@ transitreg(formula, data, subset, na.action,
   \item{verbose}{Logical value indicating whether progress and diagnostic messages 
     should be printed. Default is \code{FALSE}.}
   \item{\dots}{Additional arguments to be passed to the estimation engine.}
+  \item{formula}{Object of class \code{transitreg}.}
+  \item{inner}{Logical, if \code{FALSE} the 'outer' model frame is returned,
+      else the 'inner' model frame, the one used by the estimation engine.}
 }
 
 \details{

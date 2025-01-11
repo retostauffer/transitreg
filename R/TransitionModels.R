@@ -53,62 +53,87 @@ transitreg_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
 
 
 ## Function to set up expanded data set.
-transitreg_data <- function(data, response = NULL, verbose = TRUE) {
+transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose = TRUE) {
+
+  stopifnot(
+    "'response' must be NULL or a character of length 1" =
+        is.null(response) || (is.character(response) && length(response) == 1L),
+    "'newresponse' must be NULL or a numeric vector with length > 0" =
+        is.null(newresponse) || (is.numeric(newresponse) && length(newresponse > 0)),
+    "'verbose' must be TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose)
+  )
+
   ## Ensure data is a data frame.
   if (!is.data.frame(data))
     data <- as.data.frame(data)
 
-  ## Determine response column.
+  ## Determine response column if not specified by user.
   if (is.null(response))
     response <- names(data)[1L]
 
-  if (!response %in% names(data))
-    stop("The specified response column does not exist in the data!")
-
-  ## Initialize progress bar.
-  if (verbose)
-    pb <- utils::txtProgressBar(min = 0, max = nrow(data), style = 3)
-
-  ## Preallocate list.
-  n    <- nrow(data)
-  step <- if (n > 20) floor(n / 20) else 1
-
-  response_values <- data[[response]]
-  df_list <- vector("list", n)
+  ## If 'response' is provided in 'data' and an additional 'newresponse'
+  ## is provided, we will replace 'data[[response]]' with the newresponse.
+  if (response %in% names(data) & !is.null(newresponse)) {
+    warning("'newresponse' will overwrite response provided in 'data'.")
+    data[[response]] <- newresponse
+  } else if (!response %in% names(data)) {
+    ## 'newresponse' must be provided. If missing, stop, else append.
+    if (is.null(newresponse))
+      stop("'response' not contained in 'data', must be provided via 'newresponse'.")
+    data <- cbind(setNames(data.frame(newresponse), response), data)
+  }
+  rm(newresponse) # Delete object, no longer needed
 
   ## If any missing value in response: stop
-  if (any(is.na(response_values)))
-    stop("NA values in response data!")
+  if (any(is.na(data[[response]])))
+      stop("NA values in response data!")
+
+  ## response$values must all be bin indices, so integers >= 0
+  check <- all(data[[response]] > -sqrt(.Machine$double.eps) |
+               abs(data[[response]] %% 1) > sqrt(.Machine$double.eps))
+  if (!check)
+    stop("The response must be bin indices, so integers in the range of {0, Inf}.")
+  data[[response]] <- as.integer(data[[response]])
 
   ## Setting up the new data.frame with (pseudo-)bins
 
-  ## Length of vectors in list; names of list elements.
-  nout <- sum(response_values) + length(response_values)
+  ## Define length of vectors in list
+  ## Sum of response indices + nrow(data), the latter to account for the
+  ## additional "0" bin.
+  nout <- sum(data[[response]]) + nrow(data)
+
+  ## ------ building transitreg data -------
+
+  ## Names of list elements.
   names_out <- c("index", "Y", "theta", names(data))
 
-  ## Building index vector; each observation 1:n gets its
-  ## unique index (ID).
+  ## Building index vector; each observation 1:nrow(data) gets its unique index
   result <- list()
-  result$index <- rep(seq_len(n), response_values + 1L)
+  result$index <- rep(seq_len(nrow(data)), times = data[[response]] + 1L)
 
   ## Creating Y; always 1 except for the last entry per index.
-  result$Y     <- rep(1L, nout)
-  result$Y[cumsum(response_values + 1)] <- 0L
+  fn_get_Y <- function(nout, resp) {
+    res <- rep(1L, nout); res[cumsum(resp + 1)] <- 0L; return(res)
+  }
+  result$Y <- fn_get_Y(nout, data[[response]])
 
   ## Creating theta; a sequence from zero to the
   ## response_value for each index. The following
   ## Two lines create this sequence of sequences.
-  reset_to_zero <- c(0, which(diff(result$index) > 0))
-  result$theta <- seq_len(nout) - rep(reset_to_zero, response_values + 1) - 1
+  fn_get_theta <- function(nout, resp, idx) {
+    resettozero <- c(0, which(diff(idx) > 0))
+    return(seq_len(nout) - rep(resettozero, resp + 1) - 1)
+  }
+  result$theta <- fn_get_theta(nout, data[[response]], result$index)
 
   ## Appending the remaining data from 'data'.
   for (n in names(data)) {
       ## If data[[n]] is a simple vector
       if (!is.matrix(data[[n]])) {
-        result[[n]] <- rep(data[[n]], response_values + 1)
+        result[[n]] <- rep(data[[n]], data[[response]] + 1)
       ## Else create matrix
       } else {
-        result[[n]] <- matrix(rep(data[[n]], rep(response_values + 1, ncol(data[[n]]))),
+        result[[n]] <- matrix(rep(data[[n]], rep(data[[response]] + 1, ncol(data[[n]]))),
                               ncol = ncol(data[[n]]),
                               dimnames = list(NULL, colnames(data[[n]])))
       }
@@ -127,8 +152,7 @@ transitreg_predict <- function(object, bins, newdata,
   type = c("pdf", "cdf", "quantile", "pmax"),
   response = NULL, y = NULL, prob = 0.5, maxcounts = 1e+03,
   verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
-  factor = FALSE, ncores = NULL)
-{
+  factor = FALSE, ncores = NULL) {
 
   ## Pre-processing inputs
   type <- tolower(type)
@@ -217,8 +241,7 @@ transitreg_predict <- function(object, bins, newdata,
   return(probs)
 }
 
-transitreg_dist <- function(y, data = NULL, ...)
-{
+transitreg_dist <- function(y, data = NULL, ...) {
   if (is.null(y))
     stop("argument y is NULL!")
 
@@ -304,9 +327,9 @@ make_bins <- function(y, breaks = 30, scale = FALSE , ...) {
 
 ## Wrapper function to estimate CTMs.
 transitreg <- function(formula, data, subset, na.action,
-  engine = "bam", scale.x = FALSE, breaks = NULL,
-  model = TRUE, ncores = NULL, verbose = FALSE, ...)
-{
+                       engine = "bam", scale.x = FALSE, breaks = NULL,
+                       model = TRUE, ncores = NULL, verbose = FALSE, ...) {
+
   if (!is.null(breaks)) breaks <- as.numeric(breaks)
 
   ## Staying sane
@@ -318,17 +341,19 @@ transitreg <- function(formula, data, subset, na.action,
 
   cl <- match.call()
 
-
   ## Evaluate the model frame
   mf <- match.call(expand.dots = FALSE)
-  m <- match(c("formula", "data", "subset", "na.action"), names(mf), 0L)
+  m  <- match(c("formula", "data", "subset", "na.action"), names(mf), 0L)
   mf <- mf[c(1L, m)]
   mf$drop.unused.levels <- TRUE
+
   ff <- as.formula(paste("~", paste(all.vars(fake_formula(formula)), collapse = "+")))
   environment(ff) <- environment(formula)
+
   ff2 <- formula
   ff2[3L] <- ff[2L]
   ff2 <- update(ff2, ~ . - theta)
+
   tv <- all.vars(ff2)
   tv <- grep("theta", tv, value = TRUE)
   tv <- tv[tv != "theta"]
@@ -336,6 +361,7 @@ transitreg <- function(formula, data, subset, na.action,
     for (j in tv)
       ff2 <- eval(parse(text = paste0("update(ff2, . ~ . -", j, ")")))
   }
+
   mf[["formula"]] <- ff2
   mf[[1L]] <- quote(stats::model.frame)
   mf <- eval(mf, parent.frame())
@@ -344,7 +370,6 @@ transitreg <- function(formula, data, subset, na.action,
   rn <- response_name(formula)
 
   yscale <- NULL
-
 
   ## Discretize response?
   if (bin.y <- !is.null(breaks)) {
@@ -570,23 +595,26 @@ coef.transitreg <- function(object, ...)
 }
 
 ## Model frame extractor.
-model.frame.transitreg <- function(formula, ...)
-{
-  return(formula$model.frame)
+## If inner == FALSE the model.frame from the transitreg model
+## is returned. If TRUE, the model.frame from estimation model
+## (controlled via the 'engine' argument) is returned.
+model.frame.transitreg <- function(formula, inner = FALSE, ...) {
+  stopifnot("'engine' must be logical TRUE or FALSE" =
+            isTRUE(inner) || isFALSE(inner))
+
+  return(if (!inner) formula$model.frame else model.frame(formula$model))
 }
 
 ## Printing method.
-print.transitreg <- function(x, ...)
-{
+print.transitreg <- function(x, ...) {
   cat("Count Transition Model\n---")
   print(x$model)
 }
 
 ## Predict method.
-predict.transitreg <- function(object, newdata = NULL,
-  y = NULL, prob = NULL,
-  type = c("pdf", "cdf", "pmax", "quantile"), ncores = NULL, ...)
-{
+predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
+        type = c("pdf", "cdf", "pmax", "quantile"), ncores = NULL, ...) {
+
   type <- tolower(type)
   type <- match.arg(type)
 
@@ -661,8 +689,7 @@ predict.transitreg <- function(object, newdata = NULL,
 }
 
 ## logLik method.
-logLik.transitreg <- function(object, newdata = NULL, ...)
-{
+logLik.transitreg <- function(object, newdata = NULL, ...) {
   if (is.null(newdata)) {
     p <- object$probs$pdf
   } else {
@@ -676,8 +703,7 @@ logLik.transitreg <- function(object, newdata = NULL, ...)
 }
 
 ## Residuals method.
-residuals.transitreg <- function(object, newdata = NULL, y = NULL, ...)
-{
+residuals.transitreg <- function(object, newdata = NULL, y = NULL, ...) {
   if (is.null(newdata)) {
     if (is.null(object$model.frame))
       stop("cannot compute residuals, no model.frame including the response!")
@@ -717,8 +743,7 @@ residuals.transitreg <- function(object, newdata = NULL, y = NULL, ...)
 rootogram.transitreg <- function(object, newdata = NULL, plot = TRUE,
   width = 0.9, style = c("hanging", "standing", "suspended"),
   scale = c("sqrt", "raw"), expected = TRUE, confint = TRUE,
-  ref = TRUE, K = NULL, xlab = NULL, ylab = NULL, main = NULL, ...)
-{
+  ref = TRUE, K = NULL, xlab = NULL, ylab = NULL, main = NULL, ...) {
   if (is.null(newdata))
     newdata <- object$model.frame
 
@@ -780,8 +805,7 @@ rootogram.transitreg <- function(object, newdata = NULL, plot = TRUE,
 rootogram.tmdist <- function(object, newdata = NULL, plot = TRUE,
   width = 0.9, style = c("hanging", "standing", "suspended"),
   scale = c("sqrt", "raw"), expected = TRUE, confint = TRUE,
-  ref = TRUE, K = NULL, xlab = NULL, ylab = NULL, main = NULL, ...)
-{
+  ref = TRUE, K = NULL, xlab = NULL, ylab = NULL, main = NULL, ...) {
   if (is.null(newdata))
     newdata <- object$model.frame
 

@@ -23,11 +23,13 @@ export(
   "transitreg_data",
   "transitreg_dist",
   "transitreg_detect_cores",
+  "reto",
   "convert_tp"
 )
 
 S3method(plot, transitreg)
 S3method(predict, transitreg)
+S3method(model.frame, transitreg)
 S3method(residuals, transitreg)
 S3method(logLik, transitreg)
 S3method(summary, transitreg)
