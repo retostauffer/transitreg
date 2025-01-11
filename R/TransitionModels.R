@@ -204,6 +204,8 @@ transitreg_predict <- function(object, bins, newdata,
   } else if (is.null(prob)) {
       prob <- NA_real_ # dummy value for C (not used if type != 'quantile')
   }
+  print(bins)
+  stop(" --- bins in transitreg predict not yet properly added --- ")
 
   probs <- .Call("treg_predict",
                  uidx  = ui,                       # Unique distribution index (int)
@@ -462,7 +464,8 @@ transitreg <- function(formula, data, subset, na.action,
 
   ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.
-  tmp    <- .Call("treg_predict_pdfcdf", uidx = ui, idx = tmf$index, p = p, ncores = ncores)
+  tmp    <- .Call("treg_predict_pdfcdf", uidx = ui, idx = tmf$index,
+                  p = p, bins = bins, ncores = ncores)
   probs  <- tmp$pdf
   cprobs <- tmp$cdf
   rm(tmp)

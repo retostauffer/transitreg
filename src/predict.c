@@ -85,11 +85,9 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
     // Temporary double vector to calculate PDF along i = 0, ..., count - 1
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
 
-    // Set to true if 'binsptr[0]' is missing (not provided)
-    if (ISNAN(binsptr[0])) {
-        error("TODO(R): binsptr MUST be provided, we can remove the nobm mode");
-    }
-    bool nobm = ISNAN(binsptr[0]);
+    // If ISNAN(y[0]) we run the function in the 'model estimation' mode, in this
+    // case return the last value only (res.values[0] is the result we need).
+    bool only_last = ISNAN(y[0]);
 
     // Calculate PDF for each bin given by the distribution for i = 0, ..., count - 1.
     // Store in double 'tmp', the required values will be extracted after this loop.
@@ -108,9 +106,9 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
     // Divide PDF by width of the bin
     for (i = 0; i < count; i++) { tmp[i] = tmp[i] / (binsptr[i + 1] - binsptr[i]); }
 
-    // If nobm (no bin mids given) the result is simply the last value in tmp;
+    // If only_last, the result is simply the last value in tmp;
     // the PDF evaluated at the end of the entire distribution.
-    if (nobm) {
+    if (only_last) {
         res.values[0] = tmp[count - 1];
     // Else we are calling eval_bins_pdf_cdf which evaluates
     // into which bin each of the thresholds/values in y fall into,
@@ -159,12 +157,9 @@ doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
     // Temporary double vector to calculate PDF along i = 0, ..., count - 1
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
 
-    // Set to true if 'binmidptr' is not provided (an NA). In this case we simply
-    // iterate trough the entire tp vector and store the very last value.
-    if (ISNAN(binsptr[0])) {
-        error("TODO(R): binsptr MUST be provided, we can remove the nobm mode");
-    }
-    bool nobm = ISNAN(binsptr[0]);
+    // If ISNAN(y[0]) we run the function in the 'model estimation' mode, in this
+    // case return the last value only (res.values[0] is the result we need).
+    bool only_last = ISNAN(y[0]);
 
     // Calculate CDF for each bin given by the distribution for i = 0, ..., count - 1
     // Store in double 'tmp', the required values will be extracted after this loop.
@@ -178,15 +173,14 @@ doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
                 //return R_NaReal;
             }
             pprod *= tpptr[positions[i - 1]]; // Multiply with previous element
-            // If 'nobm' is true (we have no binmidptr) we only need the PDF
-            // of the final bin; overwrite res.values[0] in each iteration.
-            tmp[i] = tmp[i - 1] + (1.0 - tpptr[positions[i]]) * pprod;
+
+            tmp[i] = tmp[i - 1] + (1.0 - tpptr[positions[i]]) * pprod; // Calculate pdf
         }
     }
 
-    // If nobm (no bin mids given) the result is simply the last value in tmp;
+    // If only_last, the result is simply the last value in tmp;
     // the PDF evaluated at the end of the entire distribution.
-    if (nobm) {
+    if (only_last) {
         res.values[0] = tmp[count - 1];
     // Else we are calling eval_bins_pdf_cdf which evaluates
     // into which bin each of the thresholds/values in y fall into,
@@ -247,12 +241,6 @@ doubleVec treg_calc_quantile(int* positions, int count, double* tpptr,
     // Initialize with (1 - p[0])
     tmp[0] = 1.0 - tpptr[positions[0]];
 
-    // No bin information?
-    if (ISNAN(binsptr[0])) {
-        error("TODO(R): binsptr MUST be provided, we can remove the nobm mode");
-    }
-    bool nobm = ISNAN(binsptr[0]);
-
     // If tmp[0] >= pmax: We have already found our solution, no need to calculate
     // the rest. Setting i = 0 (important for legacy mode).
     if (tmp[0] >= pmax) {
@@ -276,13 +264,6 @@ doubleVec treg_calc_quantile(int* positions, int count, double* tpptr,
             if (tmp[i] >= pmax) { break; }
         }
     }
-
-    // "Legacy mode": Return the index of the bin the quantile falls into {0, 1, ...}
-    if (nobm) {
-        res.values[0] = i;
-        return res;
-    }
-
 
     // Else we already translate the 'bin index' in its proper numeric response.
     // In case of 'disc = true' (discrete distribution) this will be the center
@@ -573,15 +554,16 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
  * @return Returns named list with two numeric vectors, each of which
  * has length(uidx) (vector with cdf and pdf).
  */
-SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP ncores) {
+SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP ncores) {
 
-    double *tpptr   = REAL(tp);
-    int    *uidxptr = INTEGER(uidx);  // Unique indices in the dtaa
-    int    *idxptr  = INTEGER(idx);   // Index vector
-    int    nthreads = asInteger(ncores); // Number of threads for OMP
-    int    n        = LENGTH(idx);
-    int    un       = LENGTH(uidx);
-    int    i;
+    double* tpptr    = REAL(tp);
+    int*    uidxptr  = INTEGER(uidx);  // Unique indices in the dtaa
+    int*    idxptr   = INTEGER(idx);   // Index vector
+    double* binsptr  = REAL(bins);     // Point intersection of bins
+    int     nthreads = asInteger(ncores); // Number of threads for OMP
+    int     n        = LENGTH(idx);
+    int     un       = LENGTH(uidx);
+    int     i;
 
     // Custom struct object to mimik "which()"
     integerVec which;
@@ -609,12 +591,20 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP ncores) {
         which = find_positions(uidxptr[i], idxptr, n);
 
         // Calculate pdf and cdf (for the last bin)
+        //
+        //     NOTE: This is the 'estimate model' mode and is only used while
+        //     calling transitreg(). In this case we are only interested in the
+        //     CDF and PDF of the very last value for the current distribution.
+        //
+        //     Important: To run this mode, 'y' must be NA (used to detect this
+        //     mode) and 'ny' must be '1' (as we expect one single element in
+        //     return). This is what the last two arguments to treg_calc_pdf()
+        //     and treg_calc_cdf() do below [...., y = na, ny = 1)].
+        //
         // Input arguments are (in this order)
         //     positions, count, tpptr, binsptr, y, ny
-        // Here binsptr, y, (and ny) are just dummy values!
-        // TODO(R): We must add 'bins' as input to properly calculate CDF/PDF
-        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, na, na, 1);
-        tmpcdf = treg_calc_cdf(which.index, which.length, tpptr, na, na, 1);
+        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, binsptr, na, 1);
+        tmpcdf = treg_calc_cdf(which.index, which.length, tpptr, binsptr, na, 1);
 
         // Store last value, that is the last bin provided for this distribution.
         pdfptr[i] = tmppdf.values[tmppdf.length - 1];

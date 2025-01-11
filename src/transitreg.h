@@ -81,7 +81,7 @@ double treg_calc_pmax(int* positions, int count, double* pptr);
 double treg_calc_mean(int* positions, int count, double* tpptr, double* binsptr);
 
 SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y, SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete);
-SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP ncores);
+SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP ncores);
 SEXP treg_detect_cores();
 
 
