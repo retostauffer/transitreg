@@ -247,16 +247,16 @@ transitreg_predict <- function(object, newdata = NULL,
            idx   = newdata$index,            # Index vector (int)
            tp    = tp,                       # Transition probabilities
            bins  = object$bins,              # Point intersections of bins
-           y     = prob,                     # Where to evaluate the pdf
+           y     = NA_real_,                 # Where to evaluate the pdf
            type  = type, ncores = ncores, elementwise = TRUE,
            discrete = FALSE))
-
+  print(object$bins)
   probs <- .Call("treg_predict",
                  uidx  = ui,                       # Unique distribution index (int)
                  idx   = newdata$index,            # Index vector (int)
                  tp    = tp,                       # Transition probabilities
                  bins  = object$bins,              # Point intersections of bins
-                 y     = prob,                     # Where to evaluate the pdf
+                 y     = NA_real_,                 # Where to evaluate the pdf
                  type  = type, ncores = ncores, elementwise = TRUE,
                  discrete = FALSE) # <- dummy value
 
@@ -505,9 +505,9 @@ transitreg <- function(formula, data, subset, na.action,
   rval$factor <- isTRUE(list(...)$factor)
 
   if (inherits(rval$model, "nnet")) {
-    p <- predict(rval$model, type = "raw")
+    tp <- predict(rval$model, type = "raw")
   } else {
-    p <- predict(rval$model, type = "response")
+    tp <- predict(rval$model, type = "response")
   }
 
   ## Remove model frame.
@@ -518,22 +518,22 @@ transitreg <- function(formula, data, subset, na.action,
   ui <- unique(tmf$index)
   probs <- cprobs <- numeric(length(ui))
 
-
   ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.
+  str(list(uidx = ui, idx = tmf$index,
+                  tp = tp, bins = bins, ncores = ncores))
+  print(bins)
   tmp    <- .Call("treg_predict_pdfcdf", uidx = ui, idx = tmf$index,
-                  p = p, bins = bins, ncores = ncores)
-  probs  <- tmp$pdf
-  cprobs <- tmp$cdf
-  rm(tmp)
+                  tp = tp, bins = bins, ncores = ncores)
 
   eps <- abs(.Machine$double.eps)
-  probs[probs  < eps]      <- eps
-  probs[probs  > 1 - eps]  <- 1 - eps
-  cprobs[cprobs < eps]     <- eps
-  cprobs[cprobs > 1 - eps] <- 1 - eps
+  #####tmp$pdf[tmp$pdf < eps]     <- eps
+  #####tmp$pdf[tmp$pdf > 1 - eps] <- 1 - eps
+  tmp$cdf[tmp$cdf < eps]     <- eps
+  tmp$cdf[tmp$cdf > 1 - eps] <- 1 - eps
 
-  rval$probs <- data.frame("pdf" = probs, "cdf" = cprobs)
+  rval$probs <- as.data.frame(tmp)
+  rm(tmp)
 
   ## If binning.
   if (bin.y) {

@@ -467,6 +467,8 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
     // Custom struct object to mimik "which()"
     integerVec which;
     doubleVec tmp;
+    double* na = malloc(sizeof(double)); // Single double pointer
+    na[0] = NA_REAL; // Assign missing value
 
     #if OPENMP_ON
     #pragma omp parallel for num_threads(nthreads) private(which, tmp, j)
@@ -478,7 +480,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
             if (do_pdf) {
                 // Single PDF
                 if (ewise) {
-                    tmp = treg_calc_pdf(which.index, which.length, tpptr, binsptr, yptr, 1);
+                    tmp = treg_calc_pdf(which.index, which.length, tpptr, binsptr, na, 1);
                 // Multiple PDFs (elementwise)
                 } else {
                     tmp = treg_calc_pdf(which.index, which.length, tpptr, binsptr, yptr, LENGTH(y));
