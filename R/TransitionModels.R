@@ -204,19 +204,15 @@ transitreg_predict <- function(object, bins, newdata,
   } else if (is.null(prob)) {
       prob <- NA_real_ # dummy value for C (not used if type != 'quantile')
   }
-  print(bins)
-  stop(" --- bins in transitreg predict not yet properly added --- ")
 
   probs <- .Call("treg_predict",
                  uidx  = ui,                       # Unique distribution index (int)
                  idx   = nd$index,                 # Index vector (int)
                  tp    = tp,                       # Transition probabilities
-                 lower = NA_real_,                 # Lower edge of the bin
-                 upper = NA_real_,                 # Upper edge of the bin
+                 bins  = bins,                     # Point intersections of bins
                  y     = prob,                     # Where to evaluate the pdf
                  type  = type, ncores = ncores, elementwise = TRUE,
                  discrete = FALSE) # <- dummy value
-  if (type == "quantile") print(summary(probs))
 
   return(probs)
 }
@@ -297,15 +293,11 @@ make_bins <- function(y, breaks = 30, scale = FALSE , ...) {
     my <- min(y)
     y <- sqrt(y - my + 0.01)
     dy <- diff(range(y))
-    bins <- (seq(min(y) - 0.1*dy,
-      max(y) + 0.1*dy, length = breaks))^2 - 0.01 + my
+    bins <- (seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks))^2 - 0.01 + my
   } else {
     dy <- diff(range(y))
-    bins <- seq(min(y) - 0.1*dy,
-      max(y) + 0.1*dy, length = breaks)
-#    bins <- c(min(y) - 0.5*dy,
-#      quantile(y, probs = seq(0, 1, length = breaks)),
-#      max(y) + 0.5*dy)
+    bins <- seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks)
+    #bins <- c(min(y) - 0.5*dy, quantile(y, probs = seq(0, 1, length = breaks)), max(y) + 0.5*dy)
   }
   return(bins)
 }
@@ -353,6 +345,7 @@ transitreg <- function(formula, data, subset, na.action,
 
   yscale <- NULL
 
+
   ## Discretize response?
   if (bin.y <- !is.null(breaks)) {
     if (length(breaks) < 2L) {
@@ -364,8 +357,7 @@ transitreg <- function(formula, data, subset, na.action,
     #bins[length(bins)] <- Inf
 
     ## Discretize numeric response into counts.
-    yc <- cut(model.response(mf), breaks = bins, labels = FALSE,
-      include.lowest = TRUE) - 1
+    yc <- cut(model.response(mf), breaks = bins, labels = FALSE, include.lowest = TRUE) - 1
     ym <- (bins[-1] + bins[-length(bins)]) / 2
 
     lower <- list(...)$lower
@@ -377,6 +369,23 @@ transitreg <- function(formula, data, subset, na.action,
       ym[ym > upper] <- upper
 
     mf[[rn]] <- yc
+  } else {
+    ## TODO(R): Niki, I do need bins to evaluate the cdf. Adjusted this part
+    ##          quick'n'dirty to auto-generate bins for count data if that
+    ##          can be detected. This, however, can create thousands of bins
+    ##          as it uses 0:max(response).
+    ##          We need to re-think this.
+    tmp <- unique(model.response(mf))
+    if (all(tmp > -.Machine$double.eps) && all(tmp %% 1 < .Machine$double.eps)) {
+        ny   <- seq.int(0, max(tmp))
+        bins <- seq.int(0, max(tmp) + 1) - 0.5
+        breaks <- length(bins)
+        bin.y <- TRUE
+        yc <- cut(model.response(mf), breaks = bins, labels = FALSE, include.lowest = TRUE) - 1
+        ym <- (bins[-1] + bins[-length(bins)]) / 2
+    } else {
+        stop("no 'breaks' provided, response does not look like count data.")
+    }
   }
 
   ## Scaling data.
@@ -461,6 +470,7 @@ transitreg <- function(formula, data, subset, na.action,
   ## Compute probabilities.
   ui <- unique(tmf$index)
   probs <- cprobs <- numeric(length(ui))
+
 
   ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.

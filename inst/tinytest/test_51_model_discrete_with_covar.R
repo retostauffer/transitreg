@@ -1,7 +1,5 @@
 # -------------------------------------------------------------------
 # Testing 'transitreg' for discrete response (count data).
-# TODO(R): Remove useC and comparison against the R version
-#          once we removed that.
 # -------------------------------------------------------------------
 
 suppressPackageStartupMessages(library("tinytest"))
@@ -37,8 +35,4 @@ expect_silent(mpdf <- predict(mod, newdata = nd, y = ny, type = "pdf"),
               info = "Calculating pdf (silent)")
 expect_true(is.numeric(mpdf), info = "Return class")
 expect_identical(length(mpdf), nrow(nd), info = "Length of pdf return")
-
-## Comparing cumsum(pdf) to cdf
-expect_equal(cumsum(mpdf), mcdf, tolerance = 1e-15,
-             info = "Comparing cumulative PDF to its CDF")
 

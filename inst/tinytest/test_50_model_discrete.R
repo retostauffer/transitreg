@@ -19,14 +19,21 @@ data("CD4", package = "gamlss.data")
 # -------------------------------------------------------------------
 # Estimating simple model, testing return object.
 # -------------------------------------------------------------------
-m1   <- transitreg(cd4 ~ theta, data = CD4, useC = TRUE)
+m1   <- transitreg(cd4 ~ theta, data = CD4)
 
 expect_inherits(m1, "transitreg", info = "Returnclass")
 expect_true(is.list(m1))
 expected <- c("new_formula", "model", "response", "model.frame",
-              "maxcounts", "theta_vars", "factor", "probs")
+              "maxcounts", "theta_vars", "factor", "probs", "bins", "ym", "yc_tab", "breaks")
 expect_true(all(names(m1) %in% expected),
             info = "Checking if all expected elements are there")
+# transitreg() auto-guesses ym/bins if the response looks like count data.
+# check if it did what it should do.
+m1_ym   <- seq.int(0, max(CD4$cd4))
+m1_bins <- seq.int(0, max(CD4$cd4) + 1) - 0.5
+expect_equal(m1_ym,   m1$ym,   info = "Testing if auto-guessed ym is correct")
+expect_equal(m1_bins, m1$bins, info = "Testing if auto-guessed bins is correct")
+rm(m1_ym, m1_bins)
 
 
 # -------------------------------------------
@@ -103,15 +110,6 @@ rm(tmp)
 #     we expect for this very specific model.
 expect_equivalent(sum(m1$probs), 306.1717, tolerance = 1e-3, info = "sum($probs) as quick check")
 
-
-
-# RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR
-# Rudimentary check against the R version
-m1_R <- transitreg(cd4 ~ theta, data = CD4)
-expect_equal(logLik(m1), logLik(m1_R), info = "Comparing R/C version")
-expect_equal(coef(m1), coef(m1_R),     info = "Comparing R/C version")
-rm(m1_R)
-# RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR
 
 
 # -------------------------------------------------------------------
