@@ -200,6 +200,9 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     # If elementwise: Return named vector
     if (elementwise) {
         return(setNames(res, xnames))
+    # Returning simplified result
+    } else if (length(d) == 1L & drop) {
+        return(res)
     # Else return a matrix with dimension length(ui) x length(x)
     } else {
         # Create and return matrix
@@ -271,6 +274,9 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     # If elementwise: Return named vector
     if (elementwise) {
         return(setNames(res, xnames))
+    # Returning simplified result
+    } else if (length(d) == 1L & drop) {
+        return(res)
     # Else return a data.frame with dimension length(ui) x length(x)
     } else {
         get_colnames <- function(x) {
@@ -298,12 +304,13 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
         if (length(probs) == 1L) probs <- rep(probs, length(x))
         elementwise <- length(x) == length(probs)
     }
+    if (elementwise & length(probs) == 1L) probs <- rep(probs, length(x))
     if (elementwise & length(probs) != length(x))
         stop("'elementwise = TRUE' but number of probs does not match the number of distributions")
 
     # Store element names for return
     xnames <- names(x)
-    bins   <- attr(x, "bins")
+    bins   <- as.numeric(attr(x, "bins"))
 
     # Discrete distributions?
     discrete <- is_discrete(x)
@@ -328,6 +335,9 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
     # If elementwise: Return named vector
     if (elementwise) {
         return(setNames(res, xnames))
+    # Returning simplified result
+    } else if (length(x) == 1L & drop) {
+        return(res)
     # Else return matrix
     } else {
         return(matrix(res, byrow = TRUE, ncol = length(probs),
@@ -346,18 +356,19 @@ mean.Transition <- function(x, ncores = NULL, ...) {
     ncores <- transitreg_get_number_of_cores(ncores, FALSE)
 
     bins <- attr(x, "bins")
-    x  <- as.matrix(x, expand = TRUE) # convert distributions to matrix
-    ui <- unique(x[, "index"])
+    ui   <- seq_along(x) # Unique index
+    idx  <- rep(ui, each = length(bins) - 1) # Index of distribution
 
     ## Calling C to calculate the required values.
-    return(.Call("treg_predict",
-                 uidx  = as.integer(ui),           # Unique distribution index (int)
-                 idx   = as.integer(x[, "index"]), # Index vector (int)
-                 tp    = x[, "tp"],                # Transition probabilities
-                 bins  = bins,                     # Point intersection of bins
+    res <- .Call("treg_predict",
+                 uidx  = ui,                       # Unique distribution index (int)
+                 idx   = idx,                      # Index vector (int)
+                 tp    = t(as.matrix(x)),          # Transition probabilities
+                 bins  = as.numeric(bins),         # Point intersection of bins
                  y     = NA_real_,                 # <- Dummy value
                  type  = "mean", ncores = ncores,
-                 elementwise = TRUE, discrete = FALSE)) # <- Dummy values
+                 elementwise = TRUE, discrete = FALSE) # <- Dummy values
+    setNames(res, names(x))
 }
 
 

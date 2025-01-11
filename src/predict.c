@@ -406,7 +406,7 @@ double treg_calc_pmax(int* positions, int count, double* pptr) {
  * @return TODO(R): Depends on mode.
  */
 SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
-                SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete) {
+                  SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete) {
 
     int    *uidxptr   = INTEGER(uidx);     // Unique indices in the dtaa
     int    *idxptr    = INTEGER(idx);      // Distribution index

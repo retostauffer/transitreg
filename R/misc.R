@@ -327,8 +327,6 @@ convert_tp <- function(x, from, to, width = NULL, drop = TRUE) {
         res[[do[[i]]]] <- get(fnname)(x)
     }
 
-    str(res)
-
     # Return
     res <- as.data.frame(res)
     res <- res[, unname(do), drop = drop]
