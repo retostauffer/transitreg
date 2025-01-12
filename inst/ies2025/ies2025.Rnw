@@ -35,6 +35,8 @@
 
 \linespread{1.2}
 
+\usepackage[font=small,skip=5pt]{caption}
+
 %% https://ies2025.sis-statistica.it/
 \title{Transition Models for Precipitation Climatology Estimation}
 
@@ -70,15 +72,15 @@ software designed for binary response models. In this paper, we extend the appli
 transition models to continuous data by employing a slicing technique that transforms continuous
 observations into count-like data. This approach enables the estimation of full probabilistic
 models, including distributional and quantile regression, using simple binary regression
-methods. We show that the stepwise approximation of the cumulative distribution function (CDF)
+methods. The stepwise approximation of the cumulative distribution function (CDF)
 converges uniformly to the true CDF.
 The proposed method is highly adaptable, seamlessly handling complex data structures,
-including excess zeros and non-standard distributions. We demonstrate the robustness and utility
-of this approach through an application to precipitation climatology estimation in Germany,
-showcasing its potential for broader applications in probabilistic modeling.
+including excess zeros and non-standard distributions. We demonstrate the robustness and
+utility of this approach with an application to precipitation climatology estimation in Tyrol, 
+Austria, highlighting its potential for broader applications in probabilistic modeling
 \noindent 
 \hspace{1cm}\\
-\emph{Keywords}: transition models, probabilistic models
+\emph{Keywords}: transition models, distributional regression, quantile regression
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -115,7 +117,7 @@ function (CDF), ensuring the method's theoretical soundness.
 Our proposed method is highly effective in capturing complex data structures and provides a
 computationally efficient way to estimate full probabilistic models using standard binary
 regression techniques. We illustrate the versatility and robustness of this approach through
-an application to precipitation climatology estimation in Germany, highlighting its potential
+an application to precipitation climatology estimation in Tyrol, Austria, highlighting its potential
 for use in various other domains.
 
 \section{Transition Models} \label{sec:tm}
@@ -140,7 +142,7 @@ $$
 \eta_{ir}(\boldsymbol{\alpha}) = \theta_r + \sum_{j=1}^k f_j(\mathbf{x}_i, r; \boldsymbol{\beta}),
 $$
 with $\boldsymbol{\alpha} = (\boldsymbol{\theta}^\top, \boldsymbol{\beta}^\top)$,
-including count-specific intercepts $\theta_r$, and $f_j(\cdot)$ as unspecified smooth
+including count-specific intercepts $\boldsymbol{\theta} = (\theta_0, \theta_1, \ldots)^\top$, and $f_j(\cdot)$ as unspecified smooth
 functions of the covariates and possible count-specific interactions. These functions are
 estimated using regression splines.
 
@@ -151,7 +153,7 @@ $\pi_{ir}$ for each count $r$ can be expressed recursively using the transition 
   &=& (1 - F(\eta_{ir}(\boldsymbol{\alpha}))) \prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha})).
 \end{eqnarray*}
 
-To estimate the parameters, the underlying Markov chain $Y_{i0}, Y_{i1}, Y_{i2}, \ldots$,
+To estimate the parameters, the underlying Markov chain $Y_{i0}, Y_{i1}, \ldots$,
 with $Y_{ir} = I(y_i = r)$, is considered, where $I(\cdot)$ is the indicator function.
 This allows the log-likelihood of the transition model \eqref{eqn:tm} to be written as
 $$
@@ -163,8 +165,8 @@ This formulation is equivalent to a binary model, which can be estimated using c
 software for generalized additive models (GAM, \cite{Wood17}). Therefore, the original dataset is
 extended by creating new binary response variables
 $(Y_{i0}, Y_{i1}, \ldots, Y_{iy_i})^\top = (0, 0, \ldots, 0, 1)$, along with a new covariate
-$\mathbf{z}_i = (0, 1, \ldots, y_i)$, which is used to estimate count-specific effects
-$f_j(\mathbf{x}_i, \mathbf{z}_i)$ or simple count-specific intercepts. All other covariates values
+$\boldsymbol{\Theta}_i = (0, 1, \ldots, y_i)^\top$, which is used to estimate count-specific effects
+$f_j(\mathbf{x}_i, \boldsymbol{\Theta}_i)$ or simple count-specific intercepts. All other covariates values
 are duplicated accordingly to match the extended structure.
 
 Although the extended dataset for estimation can grow significantly in size, the model can
@@ -226,79 +228,71 @@ reconstructed CDF and density. Predictions for the continuous response variable 
 by mapping the predicted counts $\tilde{y}_i$ back to the continuous scale,
 typically using the midpoints of the corresponding intervals as approximations.
 
-\subsection{Convergence of the Stepwise Approximation} \label{sec:convergence}
+%\subsection{Convergence of the Stepwise Approximation} \label{sec:convergence}
 
-To prove that the stepwise approximation $\hat{F}(y)$ converges uniformly to the true
-cumulative distribution function (CDF) $F(y)$, we proceed as follows. The true CDF $F(y)$ is
-defined as
-$$
-F(y) = P(Y \leq y), \quad y \in \mathbb{R}.
-$$
-The stepwise approximation $\hat{F}(y)$ is given by
-$$
-\hat{F}(y) = \sum_{r=0}^{l-1} P(\tilde{y} = r) + \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l),
-$$
-where $y \in (\zeta_l, \zeta_{l+1}]$, $P(\tilde{y} = r)$ corresponds to the probability
-mass assigned to the discrete count $r$, and $\zeta_l, \zeta_{l+1}$ are the bin boundaries.
-To show uniform convergence, we need to show
-$$
-\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \to 0 \quad \text{as } m \to \infty,
-$$
-where $m$ is the number of bins used in the stepwise approximation. As $m \to \infty$, the
-bin boundaries $\{\zeta_l\}_{l=1}^m$ partition $\mathbb{R}$ into intervals of shrinking width
-$$
-\max_{l} (\zeta_{l+1} - \zeta_l) \to 0 \quad \text{as } m \to \infty.
-$$
+%To prove that the stepwise approximation $\hat{F}(y)$ converges uniformly to the true
+%cumulative distribution function (CDF) $F(y)$, we proceed as follows. The true CDF $F(y)$ is
+%defined as
+%$$
+%F(y) = P(Y \leq y), \quad y \in \mathbb{R}.
+%$$
+%The stepwise approximation $\hat{F}(y)$ is given by
+%$$
+%\hat{F}(y) = \sum_{r=0}^{l-1} P(\tilde{y} = r) + \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l),
+%$$
+%where $y \in (\zeta_l, \zeta_{l+1}]$, $P(\tilde{y} = r)$ corresponds to the probability
+%mass assigned to the discrete count $r$, and $\zeta_l, \zeta_{l+1}$ are the bin boundaries.
+%To show uniform convergence, we need to show
+%$$
+%\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \to 0 \quad \text{as } m \to \infty,
+%$$
+%where $m$ is the number of bins used in the stepwise approximation. As $m \to \infty$, the
+%bin boundaries $\{\zeta_l\}_{l=1}^m$ partition $\mathbb{R}$ into intervals of shrinking width
+%$$
+%\max_{l} (\zeta_{l+1} - \zeta_l) \to 0 \quad \text{as } m \to \infty.
+%$$
 
-The error between $\hat{F}(y)$ and $F(y)$ can be decomposed as
-$$
-\left| \hat{F}(y) - F(y) \right| = \underbrace{\left| \sum_{r=0}^{l-1} P(\tilde{y} = r) - F(\zeta_l) \right|}_{\text{Discrete Bin Approximation Error}} + \underbrace{\left| \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) - \left(F(y) - F(\zeta_l)\right) \right|}_{\text{Linear Interpolation Error}}.
-$$
+%The error between $\hat{F}(y)$ and $F(y)$ can be decomposed as
+%$$
+%\left| \hat{F}(y) - F(y) \right| = \underbrace{\left| \sum_{r=0}^{l-1} P(\tilde{y} = r) - F(\zeta_l) \right|}_{\text{Discrete Bin Approximation Error}} + \underbrace{\left| \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) - \left(F(y) - F(\zeta_l)\right) \right|}_{\text{Linear Interpolation Error}}.
+%$$
 
-The discrete bin approximation error is zero because the probability masses $P(\tilde{y} = r)$
-are defined to match the probabilities of the intervals $(\zeta_r, \zeta_{r+1}]$, such that
-$$
-P(\tilde{y} = r) = F(\zeta_{r+1}) - F(\zeta_r), \quad \sum_{r=0}^{l-1} P(\tilde{y} = r) = F(\zeta_l).
-$$
+%The discrete bin approximation error is zero because the probability masses $P(\tilde{y} = r)$
+%are defined to match the probabilities of the intervals $(\zeta_r, \zeta_{r+1}]$, such that
+%$$
+%P(\tilde{y} = r) = F(\zeta_{r+1}) - F(\zeta_r), \quad \sum_{r=0}^{l-1} P(\tilde{y} = r) = F(\zeta_l).
+%$$
 
-For the linear interpolation error, within each bin $(\zeta_l, \zeta_{l+1}]$, the true CDF
-$F(y)$ can be expanded as
-$$
-F(y) = F(\zeta_l) + \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} \big(F(\zeta_{l+1}) - F(\zeta_l)\big) + \mathcal{O}((\zeta_{l+1} - \zeta_l)^2).
-$$
-By construction,
-$$
-\frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) = \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} \big(F(\zeta_{l+1}) - F(\zeta_l)\big).
-$$
-The linear interpolation error is thus bounded by the higher-order term
-$\mathcal{O}((\zeta_{l+1} - \zeta_l)^2)$
-$$
-\left| \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) - \big(F(y) - F(\zeta_l)\big) \right| \leq C (\zeta_{l+1} - \zeta_l)^2,
-$$
-where $C$ is a constant depending on the second derivative of $F(y)$. Combining these results,
-the total error is bounded as
-$$
-\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \leq C \max_{l} (\zeta_{l+1} - \zeta_l)^2.
-$$
+%For the linear interpolation error, within each bin $(\zeta_l, \zeta_{l+1}]$, the true CDF
+%$F(y)$ can be expanded as
+%$$
+%F(y) = F(\zeta_l) + \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} \big(F(\zeta_{l+1}) - F(\zeta_l)\big) + \mathcal{O}((\zeta_{l+1} - \zeta_l)^2).
+%$$
+%By construction,
+%$$
+%\frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) = \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} \big(F(\zeta_{l+1}) - F(\zeta_l)\big).
+%$$
+%The linear interpolation error is thus bounded by the higher-order term
+%$\mathcal{O}((\zeta_{l+1} - \zeta_l)^2)$
+%$$
+%\left| \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) - \big(F(y) - F(\zeta_l)\big) \right| \leq C (\zeta_{l+1} - \zeta_l)^2,
+%$$
+%where $C$ is a constant depending on the second derivative of $F(y)$. Combining these results,
+%the total error is bounded as
+%$$
+%\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \leq C \max_{l} (\zeta_{l+1} - \zeta_l)^2.
+%$$
 
-As $m \to \infty$, $\max_{l} (\zeta_{l+1} - \zeta_l) \to 0$, and hence
-$$
-\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \to 0.
-$$
+%As $m \to \infty$, $\max_{l} (\zeta_{l+1} - \zeta_l) \to 0$, and hence
+%$$
+%\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \to 0.
+%$$
 
-Thus, the stepwise approximation $\hat{F}(y)$ converges uniformly to the true CDF $F(y)$ as
-$m \to \infty$, provided that the bin widths shrink to zero, ensuring that the
-discretization approach is a consistent method for approximating the smooth CDF $F(y)$.
+%Thus, the stepwise approximation $\hat{F}(y)$ converges uniformly to the true CDF $F(y)$ as
+%$m \to \infty$, provided that the bin widths shrink to zero, ensuring that the
+%discretization approach is a consistent method for approximating the smooth CDF $F(y)$.
 
 \section{Application} \label{sec:application}
-
-In this application, we analyze 30 years of precipitation data from the Tyrolean Alps to estimate a 
-climatology for precipitation. Figure~\ref{fig:Kirchberg} visualizes the raw data for the station 
-Kirchberg in Tirol. The left panel presents a histogram of the square root-transformed precipitation 
-values, overlaid with density estimates from a parametric censored normal (CN) model and a
-transition model (TM). Notably, the TM captures the inherent structure of the data more effectively, 
-particularly the spike at zero precipitation. This demonstrates the flexibility of the TM approach, 
-allowing it to directly model key features such as excess zeros.
 
 \begin{figure}[!ht]
 \centering
@@ -420,10 +414,9 @@ if(!file.exists("ts_hist.png")) {
   along with their respective pinball loss (PBL) values, demonstrating the models' performance
   in capturing the distribution of precipitation.}
 \end{figure}
-
-\begin{figure}[!ht]
+\begin{figure}[!h]
 \centering
-%% \setkeys{Gin}{width=1\textwidth}
+\captionsetup{skip=-6.2cm}
 <<echo=FALSE, results=hide>>=
 if(!file.exists("premodel.png") & FALSE) {
   d <- readRDS("../ehydTirol_Tageschniederschlagssummen.rds")
@@ -504,21 +497,30 @@ if(!file.exists("premodel.png") & FALSE) {
 
   nd <- as.data.frame(coordinates(dem))
   names(nd) <- c("lon", "lat")
-  nd$alt <- extract(dem, coordinates(dem))
+  nd$alt <- values(dem)
 
-  for(j in c(1, 90, 182, 272)) {
+  days <- c(15, 46, 74, 105, 135, 166, 196, 227, 258, 288, 319, 349)
+  names(days) <- month.name
+
+  for(j in names(days)) {
     print(j)
-    nd$day <- j
-    nd[[paste0("m1_day_", j)]] <- predict(m1, newdata = nd, prob = 0.99)
+
+    nd$day <- days[j]
+    nd[[paste0("m1_", j)]] <- predict(m1, newdata = nd, prob = 0.99)
+
+    par <- predict(m2, newdata = nd, type = "parameter")
+    par <- as.data.frame(par)
+    p2 <- family(m2)$q(0.99, par)
+    nd[[paste0("m2_", j)]][!is.na(nd$alt)] <- p2
   }
 
-  r_list <- lapply(c(1, 90, 182, 272), function(day) {
-    a <- nd[, c("lon", "lat", paste0("m1_day_", day))]
-    a[[paste0("m1_day_", day)]] <- a[[paste0("m1_day_", day)]]^2
+  r_list <- lapply(names(days), function(j) {
+    a <- nd[, c("lon", "lat", paste0("m1_", j))]
+    a[[paste0("m1_", j)]] <- a[[paste0("m1_", j)]]^2
     rasterFromXYZ(a)
   })
   pred <- stack(r_list)
-  names(pred) <- c("Winter", "Spring", "Summer", "Autumn") ##paste0("day_", c(1, 90, 182, 272))
+  names(pred) <- gsub("m1_", "", names(pred))
   crs(pred) <- crs(dem)
 
   library("ggplot2")
@@ -526,23 +528,45 @@ if(!file.exists("premodel.png") & FALSE) {
   library("tidyr")
 
   pred_df <- as.data.frame(pred, xy = TRUE)
-  pred_df <- pred_df[, c("x", "y", "Summer", "Autumn", "Winter", "Spring")]
+  pred_df <- pred_df[, c("x", "y", names(pred))]
   
   pred_long <- pivot_longer(
     pred_df, 
-    cols = c("Summer", "Autumn", "Winter", "Spring"), 
+    cols = names(pred), 
     names_to = "Season", 
     values_to = "value"
   )
 
-  pred_long$Season <- factor(pred_long$Season, levels = c("Winter", "Spring", "Summer", "Autumn"))
+  pred_long$Season <- factor(pred_long$Season, levels = names(pred))
 
-  png("predictions.png", units = "in", res = 200, width = 10, height = 6)
+  rain_colors <- function (n, h = c(-160, -38), c. = c(10, 80), l = c(86, 39), 
+    power = c(2.75806451612903, 1), fixup = FALSE, gamma = NULL, 
+    alpha = 1, ...) 
+  {
+    if (!is.null(gamma)) 
+        warning("'gamma' is deprecated and has no effect")
+    if (n < 1L) 
+        return(character(0L))
+    h <- rep(h, length.out = 2L)
+    c <- rep(c., length.out = 2L)
+    l <- rep(l, length.out = 2L)
+    power <- rep(power, length.out = 2L)
+    rval <- seq(1, 0, length = n)
+    rval <- hex(polarLUV(L = l[2L] - diff(l) * rval^power[2L], 
+        C = c[2L] - diff(c) * rval^power[1L], H = h[2L] - diff(h) * 
+            rval), fixup = fixup, ...)
+    if (!missing(alpha)) {
+        alpha <- pmax(pmin(alpha, 1), 0)
+        alpha <- format(as.hexmode(round(alpha * 255 + 1e-04)), 
+            width = 2L, upper.case = TRUE)
+        rval <- paste(rval, alpha, sep = "")
+    }
+    return(rval)
+  }
 
-  rc <- colorspace::diverge_hcl(100)
-  rc <- colorspace::diverge_hcl(100, h = c(50, 250), c = c(90, 70), l = c(85, 40))
-  rc <- colorspace::diverge_hcl(100, h = c(60, 240), c = 100, l = c(90, 30))
-  rc <- diverge_hcl(100, h = c(260, 0), c = 100, l = c(40, 90, 40))
+  rc <- rain_colors(100)
+
+  png("predictions.png", units = "in", res = 200, width = 10, height = 16)
 
   xr <- range(pred_long$x)
   xb <- round(seq(xr[1] + 0.1*abs(diff(xr)), xr[2] - 0.1*abs(diff(xr)), length = 5), 2)
@@ -552,7 +576,7 @@ if(!file.exists("premodel.png") & FALSE) {
   ggplot() +
     geom_tile(data = pred_long, aes(x = x, y = y, fill = value)) +
     geom_sf(data = Tyrol, fill = NA, color = "black", size = 0.5) + # Overlay Tyrol border
-    facet_wrap(~ Season, nrow = 2, as.table = FALSE) + # Correct ordering
+    facet_wrap(~ Season, nrow = 4, ncol = 3) + # Correct ordering
     scale_fill_gradientn(colors = rc, na.value = "transparent") + # Custom color scale
     scale_x_continuous(breaks = xb) + # Adjust x-axis ticks
     scale_y_continuous(breaks = yb) + # Adjust y-axis ticks
@@ -567,8 +591,61 @@ if(!file.exists("premodel.png") & FALSE) {
 }
 @
 \includegraphics[width=1\textwidth]{predictions.png}
-\caption{\label{fig:premodel} \dots}
+\caption{\label{fig:clim} Estimated climatology for the 99\% quantile precipitation using
+  the TM model for selected days representing the 12 months of the year. The figure
+  highlights spatial and seasonal variations in precipitation across Tyrol. Summer
+  months exhibit the highest precipitation levels, whereas in winter, the southern
+  regions experience the most precipitation.}
 \end{figure}
+
+In this application, we analyze 30 years of precipitation data (1992-2021)
+from the Tyrolean Alps to estimate a 
+climatology for precipitation. Figure~\ref{fig:Kirchberg} visualizes the raw data for the station 
+Kirchberg in Tirol. The left panel presents a histogram of the square root-transformed precipitation 
+values, overlaid with density estimates from a transition model (TM) and a parametric censored normal (CN) model. Notably, the TM captures the inherent structure of the data more effectively, 
+particularly the spike at zero precipitation. This demonstrates the flexibility of the TM approach, 
+allowing it to directly model key features such as excess zeros.
+The right panel displays out-of-sample precipitation data along with predicted quantiles. The 
+corresponding pinball loss (PBL) values for the TM, CN, and quantile regression (QR) models are 
+presented in the legend. Among these, the TM model provides the best prediction of the
+out-of-sample distribution, as indicated by the lowest PBL. Notably, the 99\% quantile
+predicted by the CN model is slightly higher than those of the TM and QR models, while
+the 50\% quantile estimate from the QR model exceeds those of the TM and CN models.
+
+Finally, to estimate a full climatology and validate the TM compared to the CN model, we split 
+the data into training and testing sets by excluding 21 (20\%) of the total 105 meteorological 
+stations from the training data. We computed the out-of-sample pinball loss (PBL) for the 0.01, 
+0.1, 0.5, 0.9, and 0.99 quantiles. The TM achieved the lowest overall PBL of 221,442, compared 
+to 221,570 for the CN. For the 99\% quantile, the TM's PBL was 1.21\% lower than the CN, 
+demonstrating slightly better performance.
+
+Although the transformed dataset used for the TM contained over 10 million observations, the 
+estimation time was approximately 15 minutes, significantly faster than the 60 minutes required 
+for the CN. The estimated climatology for the 99\% quantile using the TM is illustrated in 
+Figure~\ref{fig:clim}, showing selected days of the year representing the 12 months. The figure 
+highlights the TM's ability to capture space-time varying seasonal effects. Notably, the
+highest precipitation amounts occur in the summer months, while in winter, the highest 
+precipitation is concentrated in the southern parts of Tyrol.
+
+\section{Summary} \label{sec:summary}
+
+In this paper, we present an innovative application of transition models (TM) for estimating 
+precipitation climatology, focusing on their flexibility and adaptability in handling complex 
+data structures. Transition models, traditionally used for count data, are extended to 
+continuous data using a slicing technique that transforms continuous observations into
+count-like representations. This approach enables the estimation of full probabilistic models, 
+including distributional and quantile regression, using standard binary regression techniques.
+
+Through an application to 30 years of precipitation data from Tyrol, Austria, we demonstrate
+the robustness of the TM approach. The results show that the TM outperforms the censored normal 
+(CN) model, achieving a lower pinball loss (PBL) across all quantiles.
+For the critical 99\% quantile, the TM achieves a 1.21\% lower PBL compared to the CN,
+while maintaining computational efficiency. The estimated climatology highlights seasonal 
+precipitation variations, with summer months showing the highest precipitation levels
+and winter precipitation concentrated in the southern regions of Tyrol.
+This study underscores the potential of transition models for broader applications in 
+probabilistic modeling, offering a computationally efficient and theoretically sound framework 
+for analyzing complex data.
 
 %\bibliographystyle{plainnat}
 %\bibliographystyle{apalike}
