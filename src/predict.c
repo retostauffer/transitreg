@@ -75,20 +75,10 @@ double treg_calc_mean(int* positions, int count, double* tpptr, double* binsptr)
 
 /* Helper function for type = "pdf" */
 doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
-                        double* binsptr, double* y, int ny) {
-
-    // Initialize return value/object.
-    doubleVec res;
-    res.values = (double*)malloc(ny * sizeof(double));  // Allocate vector result
-    res.length = ny;
-    for (int i = 0; i < ny; i++) { res.values[i] = NA_REAL; }
+                        double* binsptr, int* y, int ny) {
 
     // Temporary double vector to calculate PDF along i = 0, ..., count - 1
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
-
-    // If ISNAN(y[0]) we run the function in the 'model estimation' mode, in this
-    // case return the last value only (res.values[0] is the result we need).
-    bool only_last = ISNAN(y[0]);
 
     // Calculate PDF for each bin given by the distribution for i = 0, ..., count - 1.
     // Store in double 'tmp', the required values will be extracted after this loop.
@@ -107,61 +97,25 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
     // Divide PDF by width of the bin
     for (i = 0; i < count; i++) { tmp[i] = tmp[i] / (binsptr[i + 1] - binsptr[i]); }
 
-    // If only_last, the result is simply the last value in tmp;
-    // the PDF evaluated at the end of the entire distribution.
-    if (only_last) {
-        res.values[0] = tmp[count - 1];
-    // Else we are calling eval_bins_pdf_cdf which evaluates
-    // into which bin each of the thresholds/values in y fall into,
-    // and assign the corresponding PDF to res.values | y.
-    } else {
-        eval_bins_pdf_cdf(res.values, tmp, count, binsptr, y, ny);
-    }
+    // Initialize return value/object.
+    doubleVec res;
+    res.values = (double*)malloc(ny * sizeof(double));  // Allocate vector result
+    res.length = ny;
+
+    // Store CDF from tmp[y] to res.values
+    for (int i = 0; i < ny; i++) res.values[i] = tmp[y[i]];
 
     // Free allocated memory, return result
     free(tmp);
     return res;
 }
 
-void eval_bins_pdf_cdf(double* res, double* tmp, int count,
-                       double* binsptr, double* y, int ny) {
-
-    // Guesstimate/calculate bin width
-    int i, j;
-
-    i = 0;
-    for (j = 0; j < ny; j++) {
-        res[j] = NA_REAL; // Initial value
-        for (i = i; i < count; i++) {
-            // Current 'y' below current bin: break
-            if (y[j] <= binsptr[i]) {
-                break;
-            }
-            // If y[j] in current bin: Store PDF, break loop and continue search
-            if ((y[j] > binsptr[i]) & (y[j] <= binsptr[i + 1])) {
-                res[j] = tmp[i];
-                break;
-            }
-        }
-    }
-}
-
 /* Helper function for type = "cdf" */
 doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
-                      double* binsptr,  double* y, int ny) {
-
-    // Initialize return value/object.
-    doubleVec res;
-    res.values = (double*)malloc(ny * sizeof(double));  // Allocate vector result
-    res.length = ny;
-    for (int i = 0; i < ny; i++) { res.values[i] = NA_REAL; }
+                      double* binsptr,  int* y, int ny) {
 
     // Temporary double vector to calculate PDF along i = 0, ..., count - 1
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
-
-    // If ISNAN(y[0]) we run the function in the 'model estimation' mode, in this
-    // case return the last value only (res.values[0] is the result we need).
-    bool only_last = ISNAN(y[0]);
 
     // Calculate CDF for each bin given by the distribution for i = 0, ..., count - 1
     // Store in double 'tmp', the required values will be extracted after this loop.
@@ -180,16 +134,13 @@ doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
         }
     }
 
-    // If only_last, the result is simply the last value in tmp;
-    // the PDF evaluated at the end of the entire distribution.
-    if (only_last) {
-        res.values[0] = tmp[count - 1];
-    // Else we are calling eval_bins_pdf_cdf which evaluates
-    // into which bin each of the thresholds/values in y fall into,
-    // and assign the corresponding PDF to res.values | y.
-    } else {
-        eval_bins_pdf_cdf(res.values, tmp, count, binsptr, y, ny);
-    }
+    // Initialize return value/object.
+    doubleVec res;
+    res.values = (double*)malloc(ny * sizeof(double));  // Allocate vector result
+    res.length = ny;
+
+    // Store CDF from tmp[y] to res.values
+    for (int i = 0; i < ny; i++) res.values[i] = tmp[y[i]];
 
     // Free allocated memory, return result
     free(tmp);
@@ -228,17 +179,11 @@ doubleVec treg_calc_quantile(int* positions, int count, double* tpptr,
     // Temporary double vector to store calculated quantiles
     double* tmp;
     tmp = (double*)malloc(count * sizeof(double)); // Allocate max possible size
-
     if (res.values == NULL) { error("Memory allocation failed for doubleVec.values."); }
 
     if (ISNAN(tpptr[positions[0]])) {
-        error("TODO(R): First element ISNAN, must be adressed in C");
-        //return R_NaReal; 
+        error("TODO(R): First element ISNAN, must be adressed in C"); //return R_NaReal; 
     }
-
-    // Initialize the results vector with -nan; just for safety reasons, should not be needed
-    for (i = 0; i < np; i++)    { res.values[i] = NA_REAL; } 
-    for (i = 0; i < count; i++) { tmp[i]        = NA_REAL; } 
 
     // Initialize with (1 - p[0])
     tmp[0] = 1.0 - tpptr[positions[0]];
@@ -254,7 +199,6 @@ doubleVec treg_calc_quantile(int* positions, int count, double* tpptr,
         for (i = 1; i < count; i++) {
             if (ISNAN(tpptr[positions[i - 1]])) {
                 error("TODO(R): ISNAN must be implemented first (doubleVec; in cdf)");
-                //return R_NaReal;
             }
 
             // Update product of transition probabilities
@@ -267,11 +211,7 @@ doubleVec treg_calc_quantile(int* positions, int count, double* tpptr,
         }
     }
 
-    // Else we already translate the 'bin index' in its proper numeric response.
-    // In case of 'disc = true' (discrete distribution) this will be the center
-    // of the bin (and thus an 'integer', although technically a double) or
-    // a double (if 'disc = false') which will be linearely interpolated depending
-    // on it's position within the bin.
+    // Evaluate quantile
     eval_bins_quantile(res.values, tmp, positions, count, binsptr, prob, np, disc);
 
     free(tmp); // Freeing allocated memory
@@ -308,9 +248,7 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
                     res[i] = (binsptr[j + 1] + binsptr[j]) * 0.5;
                 // Perform linear interpolation between the two neighboring bin mids.
                 } else {
-                    res[i] = interpolate_linear(binsptr[j],       tmp[j - 1],
-                                                binsptr[j + 1],   tmp[j],
-                                                prob[i]);
+                    res[i] = interpolate_linear(binsptr[j], tmp[j - 1], binsptr[j + 1], tmp[j], prob[i]);
                 }
                 break; // Found what we were looking for, break inner loop
             }
@@ -407,7 +345,7 @@ double treg_calc_pmax(int* positions, int count, double* pptr) {
  *
  * @return TODO(R): Depends on mode.
  */
-SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
+SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y, SEXP prob,
                   SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete) {
 
     int    *uidxptr   = INTEGER(uidx);     // Unique indices in the dtaa
@@ -417,9 +355,10 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
     int    un         = LENGTH(uidx);
     int    i, j, np;
 
-    double *tpptr     = REAL(tp);          // Transition probabilities
-    double *binsptr   = REAL(bins);        // Bins, points of intersection
-    double *yptr      = REAL(y);           // Where to evaluate the distribution
+    double* tpptr     = REAL(tp);          // Transition probabilities
+    double* binsptr   = REAL(bins);        // Bins, points of intersection
+    int*    yptr      = INTEGER(y);        // Where to evaluate the distribution; for cdf, pdf
+    double* probptr   = REAL(prob);        // Probabilities to be evaluated; only for 'quantile'
 
     bool   ewise      = asLogical(elementwise); // Elementwise calculation?
     int*   discptr    = LOGICAL(discrete);      // Discrete distribution? For quantile
@@ -441,8 +380,11 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
     // times number of probabilites/thresholds at which each distribution is
     // evaluated).
     SEXP res;
-    if (do_pdf | do_cdf | do_q) {
+    if (do_pdf | do_cdf) {
         np = (ewise) ? 1 : LENGTH(y);
+        PROTECT(res = allocVector(REALSXP, un * np));
+    } else if (do_q) {
+        np = (ewise) ? 1 : LENGTH(prob);
         PROTECT(res = allocVector(REALSXP, un * np));
     // Else it is type = "pmax", so length of res is equal to 'un'.
     } else {
@@ -452,11 +394,6 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
 
     // Pointer on results vector 'res'
     double *resptr = REAL(res);
-
-    // If binmid is NA, but yptr is not: Error (this combination is not allowed)
-    if ((do_cdf | do_pdf) & ISNAN(binsptr[0]) & !ISNAN(yptr[0])) {
-        error("Problem in C treg_predict(): lower or upper is NA, but y is not.");
-    }
 
     // If mode is not pdf, cdf, or quantile, elementwise must be true.
     // Else we throw an error here. That is for pmax where elementwise
@@ -470,11 +407,6 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
     integerVec which;
     doubleVec tmp;
 
-    double* na     = malloc(sizeof(double)); // Single double pointer
-    na[0] = NA_REAL; // Assign missing value
-
-    double* yewise = malloc(sizeof(double)); // Single double pointer to store 'y'; used if ewise = true
-
     #if OPENMP_ON
     #pragma omp parallel for num_threads(nthreads) private(which, tmp, j)
     #endif
@@ -482,18 +414,11 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
         which = find_positions(uidxptr[i], idxptr, n);
 
         if (do_pdf | do_cdf | do_q) {
-            // Setting yewise which is used if ewise is true.
-            // If y is NA_REAL (i.e., if yptr[0] is a missing value) we set yewise to NA_REAL as well.
-            // This tells treg_calc_*() to return the CDF/PDF/quantile for the very last bin of each
-            // of the distributions provided via idx/tp.
-            // Else we store yptr[i] on yewise, the i'th element of the vector 'y' used to evaluate
-            // CDF/PDF/quantile for the i'th distribution.
-            yewise[0] = ISNAN(yptr[0]) ? na[0] : yptr[i];
             // --- Calculating probability density
             if (do_pdf) {
                 // Single PDF
                 if (ewise) {
-                    tmp = treg_calc_pdf(which.index, which.length, tpptr, binsptr, yewise, 1);
+                    tmp = treg_calc_pdf(which.index, which.length, tpptr, binsptr, &yptr[i], 1);
                 // Multiple PDFs
                 } else {
                     tmp = treg_calc_pdf(which.index, which.length, tpptr, binsptr, yptr, LENGTH(y));
@@ -502,7 +427,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
             } else if (do_cdf) {
                 // Single CDF
                 if (ewise) {
-                    tmp = treg_calc_cdf(which.index, which.length, tpptr, binsptr, yewise, 1);
+                    tmp = treg_calc_cdf(which.index, which.length, tpptr, binsptr, &yptr[i], 1);
                 // Multiple CDFs
                 } else {
                     tmp = treg_calc_cdf(which.index, which.length, tpptr, binsptr, yptr, LENGTH(y));
@@ -510,10 +435,10 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
             } else {
                 // Single quantile
                 if (ewise) {
-                    tmp = treg_calc_quantile(which.index, which.length, tpptr, binsptr, yewise, 1, discptr[i] == 1);
+                    tmp = treg_calc_quantile(which.index, which.length, tpptr, binsptr, &probptr[i], 1, discptr[i] == 1);
                 // Multiple quantiles (elementwise)
                 } else {
-                    tmp = treg_calc_quantile(which.index, which.length, tpptr, binsptr, yptr, LENGTH(y), discptr[i] == 1);
+                    tmp = treg_calc_quantile(which.index, which.length, tpptr, binsptr, probptr, LENGTH(prob), discptr[i] == 1);
                 }
             }
 
@@ -542,9 +467,6 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
         free(which.index); // Free allocated memory
     }
 
-    free(na);
-    free(yewise);
-
     UNPROTECT(1); // Releasing protected objects
     return res;
 }
@@ -572,11 +494,12 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
  * @return Returns named list with two numeric vectors, each of which
  * has length(uidx) (vector with cdf and pdf).
  */
-SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP ncores) {
+SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP bins, SEXP ncores) {
 
     double* tpptr    = REAL(tp);
     int*    uidxptr  = INTEGER(uidx);  // Unique indices in the dtaa
     int*    idxptr   = INTEGER(idx);   // Index vector
+    int*    yptr     = INTEGER(y);     // Bin at which to evaluate the distribution
     double* binsptr  = REAL(bins);     // Point intersection of bins
     int     nthreads = asInteger(ncores); // Number of threads for OMP
     int     n        = LENGTH(idx);
@@ -621,8 +544,8 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP ncores) {
         //
         // Input arguments are (in this order)
         //     positions, count, tpptr, binsptr, y, ny
-        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, binsptr, na, 1);
-        tmpcdf = treg_calc_cdf(which.index, which.length, tpptr, binsptr, na, 1);
+        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, binsptr, yptr, 1);
+        tmpcdf = treg_calc_cdf(which.index, which.length, tpptr, binsptr, yptr, 1);
 
         // Store last value, that is the last bin provided for this distribution.
         pdfptr[i] = tmppdf.values[tmppdf.length - 1];

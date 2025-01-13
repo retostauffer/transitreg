@@ -24,8 +24,6 @@ bins <- seq(-0.5, by = 1, length.out = ncol(m) + 1)
 # Testing constructor function
 # --------------------------------------------------------------------
 
-Transition(m[1, ], bins)
-
 # ------------- distribution m[1, ] w/ fake data ---------------------
 
 # One single distribution based on m[1, ]. Firstly, we test that
@@ -168,17 +166,19 @@ expect_silent(dpdf <- pdf(d3[i], binmid),                     info = "Calling S3
 expect_identical(dpdf, convert_tp(m[i, ], "tp", "pdf"),       info = "Compare result from C/R")
 rm(dpdf, dcdf)
 
+
 # S3 method mean and median
 dmean <- mean(d3)
-expect_silent(dmean <- mean(d3),                              info = "Calling S3 method mean")
+expect_warning(dmean <- mean(d3),                             info = "Calling S3 method mean")
 expect_true(is.double(dmean) && length(dmean) == length(d3),  info = "Checking return object")
 expect_identical(names(dmean), names(d3),                     info = "Testing if names were carried along")
+rm(dmean)
 
 expect_silent(dmedian <- median(d3),                              info = "Calling S3 method median")
 expect_true(is.double(dmedian) && length(dmedian) == length(d3),  info = "Checking return object")
 expect_identical(names(dmedian), names(d3),                       info = "Testing if names were carried along")
 expect_identical(median(d3), quantile(d3, 0.5),                   info = "Check that median == quantile_0.5")
-rm(dmean, dmedian)
+rm(dmedian)
 
 
 # S3 method quantile

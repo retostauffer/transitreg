@@ -79,9 +79,10 @@ expect_true(is.character(m1$theta_vars) && length(m1$theta_vars) == 0,
 expect_true(isFALSE(m1$factor), info = "Boolean value $factor")
 
 expect_inherits(m1$probs, "data.frame", info = "Class of $probs")
-expect_identical(dim(m1$probs), c(nrow(CD4), 2L), info = "Dimension of $probs")
-expect_identical(names(m1$probs), c("pdf", "cdf"), info = "Names of $probs")
-expect_true(all(m1$probs >= 0 & m1$probs <= 1), info = "All $probs in [0, 1]")
+expect_identical(dim(m1$probs), c(nrow(CD4), 2L),       info = "Dimension of $probs")
+expect_identical(names(m1$probs), c("pdf", "cdf"),      info = "Names of $probs")
+expect_true(all(m1$probs$cdf >= 0 & m1$probs$cdf <= 1), info = "All $probs$cdf in [0, 1]")
+expect_true(all(m1$probs$pdf >= 0),                     info = "All $probs$pdf in [0, Inf]")
 
 
 # -------------------------------------------
@@ -118,8 +119,7 @@ expect_equivalent(sum(m1$probs), 306.1717, tolerance = 1e-3, info = "sum($probs)
 # -------------------------------------------------------------------
 m2   <- transitreg(cd4 ~ theta, data = CD4,
            engine = "bam", scale.x = FALSE, breaks = NULL,
-           model = TRUE, ncores = NULL, verbose = FALSE,
-           useC = TRUE)
+           model = TRUE, ncores = NULL, verbose = FALSE)
 
 # Comparing m1 against m2 (rough check)
 expect_equal(logLik(m1), logLik(m2), info = "Checking results w/ default args")

@@ -78,9 +78,14 @@ fn <- function(i, tp, binwidth = 1) {
     tp <- tp[seq_len(i)] # Take first 'i' values
     # Fake bins: width 1
     bins <- seq(binwidth / 2, by = binwidth, length.out = i + 1)
+    ynum <- (tail(bins, -1) + head(bins, -1)) / 2
+    # Calculate numeric value falling into the last bin
+    ynum <- mean(tail(bins, 2))
+    # Convert numeric response to 'bin' representation (num2bin)
+    y    <- transitreg:::num2bin(ynum, bins)
     res <- .Call("treg_predict_pdfcdf",
                  uidx = 42L, idx = rep(42L, length(tp)), tp = tp,
-                 bins = bins, ncores = 1L, PACKAGE = "transitreg")
+                 y = y, bins = bins, ncores = 1L, PACKAGE = "transitreg")
     return(data.frame(res))
 }
 tp <- convert_tp(pp, from = "cdf", to = "tp")
@@ -91,11 +96,11 @@ expect_equal(res$cdf, pp)
 # Calling transitreg_predict
 bins <- seq(-0.5, by = 1, length.out = length(tp) + 1)
 p3 <- .Call("treg_predict", uidx = 3L, idx = rep(3L, length(tp)), tp = tp,
-            bins = bins, y = as.numeric(0:15), type = "cdf",
+            bins = bins, y = 0:15, prob = NA_real_, type = "cdf",
             cors = 1L, elementwise = FALSE, discrete = TRUE)
 expect_equal(pp, p3)
 d3 <- .Call("treg_predict", uidx = 3L, idx = rep(3L, length(tp)), tp = tp,
-            bins = bins, y = as.numeric(0:15), type = "pdf",
+            bins = bins, y = 0:15, prob = NA_real_, type = "pdf",
             cores = 1L, elementwise = FALSE, discrete = TRUE)
 expect_equal(dd, d3)
 

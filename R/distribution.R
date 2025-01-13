@@ -183,6 +183,9 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     xnames <- names(d)
     bins <- attr(d, "bins")
 
+    # Convert numeric values to corresponding 'bin indices' (int)
+    x <- num2bin(x, bins)
+
     if (!elementwise) x <- sort(x) # Important
     ui  <- seq_along(d) # Unique index
     idx <- rep(ui, each = length(bins) - 1) # Index of distribution
@@ -193,7 +196,8 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
                  idx   = idx,                      # Index vector (int)
                  tp    = t(as.matrix(d)),          # Transition probabilities
                  bins  = bins,                     # Point intersection of bins
-                 y     = as.numeric(x),            # Where to evaluate the pdf
+                 y     = x,                        # Where to evaluate the pdf
+                 prob  = NA_real_,                 # Dummy, only used for 'quantile'
                  type  = "pdf", ncores = ncores, elementwise = elementwise,
                  discrete = FALSE) # <- dummy value
 
@@ -257,6 +261,9 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     xnames <- names(d)
     bins   <- attr(d, "bins")
 
+    # Convert numeric values to corresponding 'bin indices' (int)
+    x <- num2bin(x, bins)
+
     if (!elementwise) x <- sort(x) # Important
     ui  <- seq_along(d) # Unique index
     idx <- rep(ui, each = length(bins) - 1) # Index of distribution
@@ -267,7 +274,8 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
                  idx   = idx,                      # Index vector (int)
                  tp    = t(as.matrix(d)),          # Transition probabilities
                  bins  = bins,                     # Point intersection of bins
-                 y     = as.numeric(x),            # Where to evaluate the pdf
+                 y     = x,                        # Where to evaluate the pdf
+                 prob  = NA_real_,                 # Dummy, only used for 'quantile'
                  type  = "cdf", ncores = ncores, elementwise = elementwise,
                  discrete = FALSE) # <- dummy value
 
@@ -328,7 +336,8 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
                  idx   = idx,                      # Index vector (int)
                  tp    = t(as.matrix(x)),          # Transition probabilities
                  bins  = bins,                     # Point intersection of bins
-                 y     = as.numeric(probs),        # Where to evaluate the pdf
+                 y     = NA_integer_,              # Dummy, only used for cdf/pdf
+                 prob  = probs,                    # Probabilities where to evaluate the distribution
                  type  = "quantile", ncores = ncores, elementwise = elementwise,
                  discrete = as.logical(discrete))
 
@@ -352,6 +361,13 @@ median.Transition <- function(x, na.rm = NULL, ncores = NULL, ...) {
 
 
 mean.Transition <- function(x, ncores = NULL, ...) {
+
+    ## TODO(R): Not correct if the distribution does not cover
+    ## the entire range of the data. Throw a warning for now.
+    warning("mean.Transition is only experimental. The result is incorrect ",
+            "if the distribution provided does not span the full support/range ",
+            "of the response distribution.")
+
     ## Get number of cores for OpenMP parallelization
     ncores <- transitreg_get_number_of_cores(ncores, FALSE)
 
@@ -364,8 +380,9 @@ mean.Transition <- function(x, ncores = NULL, ...) {
                  uidx  = ui,                       # Unique distribution index (int)
                  idx   = idx,                      # Index vector (int)
                  tp    = t(as.matrix(x)),          # Transition probabilities
-                 bins  = as.numeric(bins),         # Point intersection of bins
-                 y     = NA_real_,                 # <- Dummy value
+                 bins  = bins,                     # Point intersection of bins
+                 y     = NA_integer_,              # <- Dummy value
+                 prob  = NA_real_,                 # <- Dummy value
                  type  = "mean", ncores = ncores,
                  elementwise = TRUE, discrete = FALSE) # <- Dummy values
     setNames(res, names(x))

@@ -147,6 +147,18 @@ transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose =
   return(result)
 }
 
+
+## Convert numeric values to bin index (integer). If x == NULL, NULL is returned.
+num2bin <- function(x, bins) {
+    if (is.null(x)) return(x)
+    if (any(is.na(x)))
+        stop("Response contains missing values (not allowed).")
+    if (any(x < min(bins) | x > max(bins)))
+        stop("Response values outside support (outside range defined by the bins).")
+    cut(x, breaks = bins, labels = FALSE, include.lowest = TRUE) - 1L
+}
+
+
 ## Predict function.
 predict_tp <- function(object, newdata = NULL,
         type = c("pdf", "cdf", "quantile", "pmax"),
@@ -189,16 +201,6 @@ predict_tp <- function(object, newdata = NULL,
     "'ncores' must be NULL or numeric >= 1" = is.null(ncores) || (ncores >= 1)
   )
   ## TODO(R) Not all arguments are checked above
-
-  ## Convert numeric values to bin index. If x == NULL, NULL is returned.
-  num2bin <- function(x, bins) {
-      if (is.null(x)) return(x)
-      if (any(is.na(x)))
-          stop("Response contains missing values (not allowed).")
-      if (any(x < min(bins) | x > max(bins)))
-          stop("Response values outside support (outside range defined by the bins).")
-      cut(x, breaks = bins, labels = FALSE, include.lowest = TRUE) - 1L
-  }
 
   ## If 'newdata' is NULL we take the existing model.frame
   ## which already contains the response as 'bin index'.
@@ -390,7 +392,7 @@ transitreg <- function(formula, data, subset, na.action,
   mf <- eval(mf, parent.frame())
 
   ## Response name.
-  rn <- response_name(formula)
+  response <- response_name(formula)
 
   yscale <- NULL
 
@@ -405,7 +407,7 @@ transitreg <- function(formula, data, subset, na.action,
     #bins[length(bins)] <- Inf
 
     ## Discretize numeric response into counts.
-    yc <- cut(model.response(mf), breaks = bins, labels = FALSE, include.lowest = TRUE) - 1
+    yc <- num2bin(model.response(mf), bins)
     ym <- (bins[-1] + bins[-length(bins)]) / 2
 
     lower <- list(...)$lower
@@ -416,8 +418,14 @@ transitreg <- function(formula, data, subset, na.action,
     if (!is.null(upper))
       ym[ym > upper] <- upper
 
-    mf[[rn]] <- yc
+    mf[[response]] <- yc
   } else {
+    ## For the model we need an integer response; check if the response
+    ## is integer. If not, break.
+    if (!all(mf[[response]] %% 1 < sqrt(.Machine$double.eps)))
+        stop("Response is not looking like count data (integers); binning may be required.")
+    mf[[response]] <- as.integer(mf[[response]])
+
     ## TODO(R): Niki, I do need bins to evaluate the cdf. Adjusted this part
     ##          quick'n'dirty to auto-generate bins for count data if that
     ##          can be detected. This, however, can create thousands of bins
@@ -449,11 +457,11 @@ transitreg <- function(formula, data, subset, na.action,
   }
 
   ## Max. counts.
-  ymax <- max(mf[[rn]], na.rm = TRUE)
+  ymax <- max(mf[[response]], na.rm = TRUE)
   k <- min(c(ymax - 1L, 20L))
 
   ## Transform data.
-  tmf <- transitreg_data(mf, response = rn, verbose = verbose)
+  tmf <- transitreg_data(mf, response = response, verbose = verbose)
 
   if (!is.null(scaler)) {
     scaler$theta <- list("mean" = mean(tmf$theta), "sd" = sd(tmf$theta))
@@ -498,12 +506,12 @@ transitreg <- function(formula, data, subset, na.action,
   options("warn" = warn)
 
   ## Additional info.
-  rval$response <- rn
-  rval$model.frame <- mf
-  rval$scaler <- scaler
-  rval$maxcounts <- max(mf[[rn]])
-  rval$theta_vars <- tv
-  rval$factor <- isTRUE(list(...)$factor)
+  rval$response    <- response # Name of the response variable
+  rval$model.frame <- mf       # Model frame (with 'binned' response)
+  rval$scaler      <- scaler
+  rval$maxcounts   <- max(mf[[response]]) # Highest count in response
+  rval$theta_vars  <- tv
+  rval$factor      <- isTRUE(list(...)$factor)
 
   if (inherits(rval$model, "nnet")) {
     tp <- predict(rval$model, type = "raw")
@@ -521,15 +529,11 @@ transitreg <- function(formula, data, subset, na.action,
 
   ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.
-  str(list(uidx = ui, idx = tmf$index,
-                  tp = tp, bins = bins, ncores = ncores))
-  print(bins)
   tmp    <- .Call("treg_predict_pdfcdf", uidx = ui, idx = tmf$index,
-                  tp = tp, bins = bins, ncores = ncores)
+                  tp = tp, y = mf[[response]], bins = bins, ncores = ncores)
 
-  eps <- abs(.Machine$double.eps)
-  #####tmp$pdf[tmp$pdf < eps]     <- eps
-  #####tmp$pdf[tmp$pdf > 1 - eps] <- 1 - eps
+  eps <- sqrt(.Machine$double.eps)
+  tmp$pdf[tmp$pdf < eps]     <- eps
   tmp$cdf[tmp$cdf < eps]     <- eps
   tmp$cdf[tmp$cdf > 1 - eps] <- 1 - eps
 
