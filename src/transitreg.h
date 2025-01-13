@@ -69,7 +69,7 @@ typedef struct {
  */
 integerVec find_positions(int x, int* y, int n);
 
-void eval_bins_pdf_cdf(double* res, double* tmp, int* positions, int count, double* binsptr, double* y, int ny);
+void eval_bins_pdf_cdf(double* res, double* tmp, int count, double* binsptr, double* y, int ny);
 void eval_bins_quantile(double* res, double* tmp, int* positions, int count, double* binsptr, double* prob, int np, bool disc);
 
 double interpolate_linear(double x1, double y1, double x2, double y2, double p);

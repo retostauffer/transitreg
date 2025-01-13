@@ -148,11 +148,18 @@ transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose =
 }
 
 ## Predict function.
-transitreg_predict <- function(object, newdata = NULL,
-  type = c("pdf", "cdf", "quantile", "pmax"),
-  newresponse = NULL, y = NULL, prob = 0.5, maxcounts = 1e+03,
-  verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
-  factor = FALSE, ncores = NULL) {
+predict_tp <- function(object, newdata = NULL,
+        type = c("pdf", "cdf", "quantile", "pmax"),
+        newresponse = NULL, y = NULL, prob = 0.5, maxcounts = 1e+03,
+        verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
+        factor = FALSE, ncores = NULL) {
+
+  ## This method is built on the 'transitreg' model as we need access
+  ## to the original model.frame, bins, ... although the prediction (TPs)
+  ## will be done on object$model, the internal probability model.
+  stopifnot(
+    "'object' must be of class 'transitreg'" = inherits(object, "transitreg")
+  )
 
   ## Pre-processing inputs
   type <- tolower(type)
@@ -196,13 +203,15 @@ transitreg_predict <- function(object, newdata = NULL,
   ## If 'newdata' is NULL we take the existing model.frame
   ## which already contains the response as 'bin index'.
   if (is.null(newdata)) {
-    newdata <- model.frame(object, inner = FALSE)
+    newdata <- model.frame(object)
   ## Else convert the response from numeric values to bins.
   ## If response not in data.frame this has no effect.
   } else {
     newdata[[object$response]] <- num2bin(newdata[[object$response]], object$bins)
   }
   ## Convert 'newresponse' to bin index (if NULL, stays NULL)
+  xxx <- newresponse
+  stop("RETO: Needs re-thinking here");
   newresponse <- num2bin(newresponse, object$bins)
 
   ## Preparing data
@@ -243,24 +252,16 @@ transitreg_predict <- function(object, newdata = NULL,
       prob <- NA_real_ # dummy value for C (not used if type != 'quantile')
   }
 
-  str(list(uidx  = ui,                       # Unique distribution index (int)
-           idx   = newdata$index,            # Index vector (int)
-           tp    = tp,                       # Transition probabilities
-           bins  = object$bins,              # Point intersections of bins
-           y     = NA_real_,                 # Where to evaluate the pdf
-           type  = type, ncores = ncores, elementwise = TRUE,
-           discrete = FALSE))
-  print(object$bins)
-  probs <- .Call("treg_predict",
-                 uidx  = ui,                       # Unique distribution index (int)
-                 idx   = newdata$index,            # Index vector (int)
-                 tp    = tp,                       # Transition probabilities
-                 bins  = object$bins,              # Point intersections of bins
-                 y     = NA_real_,                 # Where to evaluate the pdf
-                 type  = type, ncores = ncores, elementwise = TRUE,
-                 discrete = FALSE) # <- dummy value
+  res <- .Call("treg_predict",
+               uidx  = ui,                       # Unique distribution index (int)
+               idx   = newdata$index,            # Index vector (int)
+               tp    = tp,                       # Transition probabilities
+               bins  = object$bins,              # Point intersections of bins
+               y     = NA_real_,                 # Where to evaluate the pdf
+               type  = type, ncores = ncores, elementwise = TRUE,
+               discrete = FALSE) # <- dummy value
 
-  return(probs)
+  return(res)
 }
 
 transitreg_dist <- function(y, data = NULL, ...) {

@@ -81,6 +81,7 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
     doubleVec res;
     res.values = (double*)malloc(ny * sizeof(double));  // Allocate vector result
     res.length = ny;
+    for (int i = 0; i < ny; i++) { res.values[i] = NA_REAL; }
 
     // Temporary double vector to calculate PDF along i = 0, ..., count - 1
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
@@ -114,7 +115,7 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
     // into which bin each of the thresholds/values in y fall into,
     // and assign the corresponding PDF to res.values | y.
     } else {
-        eval_bins_pdf_cdf(res.values, tmp, positions, count, binsptr, y, ny);
+        eval_bins_pdf_cdf(res.values, tmp, count, binsptr, y, ny);
     }
 
     // Free allocated memory, return result
@@ -122,7 +123,7 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
     return res;
 }
 
-void eval_bins_pdf_cdf(double* res, double* tmp, int* positions, int count,
+void eval_bins_pdf_cdf(double* res, double* tmp, int count,
                        double* binsptr, double* y, int ny) {
 
     // Guesstimate/calculate bin width
@@ -153,6 +154,7 @@ doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
     doubleVec res;
     res.values = (double*)malloc(ny * sizeof(double));  // Allocate vector result
     res.length = ny;
+    for (int i = 0; i < ny; i++) { res.values[i] = NA_REAL; }
 
     // Temporary double vector to calculate PDF along i = 0, ..., count - 1
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
@@ -186,7 +188,7 @@ doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
     // into which bin each of the thresholds/values in y fall into,
     // and assign the corresponding PDF to res.values | y.
     } else {
-        eval_bins_pdf_cdf(res.values, tmp, positions, count, binsptr, y, ny);
+        eval_bins_pdf_cdf(res.values, tmp, count, binsptr, y, ny);
     }
 
     // Free allocated memory, return result
@@ -467,21 +469,32 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
     // Custom struct object to mimik "which()"
     integerVec which;
     doubleVec tmp;
-    double* na = malloc(sizeof(double)); // Single double pointer
+
+    double* na     = malloc(sizeof(double)); // Single double pointer
     na[0] = NA_REAL; // Assign missing value
+
+    double* yewise = malloc(sizeof(double)); // Single double pointer to store 'y'; used if ewise = true
 
     #if OPENMP_ON
     #pragma omp parallel for num_threads(nthreads) private(which, tmp, j)
     #endif
     for (i = 0; i < un; i++) {
         which = find_positions(uidxptr[i], idxptr, n);
+
         if (do_pdf | do_cdf | do_q) {
+            // Setting yewise which is used if ewise is true.
+            // If y is NA_REAL (i.e., if yptr[0] is a missing value) we set yewise to NA_REAL as well.
+            // This tells treg_calc_*() to return the CDF/PDF/quantile for the very last bin of each
+            // of the distributions provided via idx/tp.
+            // Else we store yptr[i] on yewise, the i'th element of the vector 'y' used to evaluate
+            // CDF/PDF/quantile for the i'th distribution.
+            yewise[0] = ISNAN(yptr[0]) ? na[0] : yptr[i];
             // --- Calculating probability density
             if (do_pdf) {
                 // Single PDF
                 if (ewise) {
-                    tmp = treg_calc_pdf(which.index, which.length, tpptr, binsptr, na, 1);
-                // Multiple PDFs (elementwise)
+                    tmp = treg_calc_pdf(which.index, which.length, tpptr, binsptr, yewise, 1);
+                // Multiple PDFs
                 } else {
                     tmp = treg_calc_pdf(which.index, which.length, tpptr, binsptr, yptr, LENGTH(y));
                 }
@@ -489,15 +502,15 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
             } else if (do_cdf) {
                 // Single CDF
                 if (ewise) {
-                    tmp = treg_calc_cdf(which.index, which.length, tpptr, binsptr, yptr, 1);
-                // Multiple CDFs (elementwise)
+                    tmp = treg_calc_cdf(which.index, which.length, tpptr, binsptr, yewise, 1);
+                // Multiple CDFs
                 } else {
                     tmp = treg_calc_cdf(which.index, which.length, tpptr, binsptr, yptr, LENGTH(y));
                 }
             } else {
                 // Single quantile
                 if (ewise) {
-                    tmp = treg_calc_quantile(which.index, which.length, tpptr, binsptr, &yptr[i], 1, discptr[i] == 1);
+                    tmp = treg_calc_quantile(which.index, which.length, tpptr, binsptr, yewise, 1, discptr[i] == 1);
                 // Multiple quantiles (elementwise)
                 } else {
                     tmp = treg_calc_quantile(which.index, which.length, tpptr, binsptr, yptr, LENGTH(y), discptr[i] == 1);
@@ -528,6 +541,9 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y,
         }
         free(which.index); // Free allocated memory
     }
+
+    free(na);
+    free(yewise);
 
     UNPROTECT(1); // Releasing protected objects
     return res;
