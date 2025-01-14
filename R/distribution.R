@@ -244,7 +244,7 @@ get_elementwise_colnames <- function(x, prefix = NULL, digits = 3) {
             x[idx] <- paste0(x[idx], c("", paste0("_", seq_len(length(idx) - 1))))
         }
     }
-    return(x)
+    return(trimws(x))
 }
 
 cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
