@@ -52,6 +52,7 @@ transitreg_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
 }
 
 
+
 ## Function to set up expanded data set.
 transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose = TRUE) {
 
@@ -163,6 +164,7 @@ transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose =
 }
 
 
+
 ## Convert numeric values to bin index (integer). If x == NULL, NULL is returned.
 num2bin <- function(x, bins) {
     if (is.null(x)) return(x)
@@ -174,13 +176,12 @@ num2bin <- function(x, bins) {
 }
 
 
+
 # Helper function for predictions on a transitreg model object.
 transitreg_predict <- function(object, newdata = NULL,
-        type = c("pdf", "cdf", "quantile", "pmax"),
-        newresponse = NULL, y = NULL, prob = 0.5,
+        type = c("pdf", "cdf", "quantile", "pmax"), y = NULL, prob = NULL,
         elementwise = NULL, maxcounts = 1e+03,
         verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
-        digits = pmax(3L, getOption("digits") - 3L),
         factor = FALSE, ncores = NULL) {
 
   ## This method is built on the 'transitreg' model as we need access
@@ -194,6 +195,9 @@ transitreg_predict <- function(object, newdata = NULL,
   type <- tolower(type)
   type <- match.arg(type)
 
+  if (type == "pmax")
+      stop("TODO(R): Partially implemented, but not yet tested.")
+
   if (is.null(ncores))
     ncores <- transitreg_get_number_of_cores(ncores, verbose = verbose)
 
@@ -201,8 +205,6 @@ transitreg_predict <- function(object, newdata = NULL,
   stopifnot(
     "'newdata' must be NULL or data.frame" = 
         is.null(newdata) || is.data.frame(newdata),
-    "'newresponse' must be NULL or numeric vector with length > 0" =
-        is.null(newresponse) || (is.numeric(newresponse) && length(newresponse) > 0),
     "'y' must be NULL or a vector" = is.null(y) || is.vector(y),
     "'elementwise' must be NULL, TRUE, or FALSE" =
         is.null(elementwise) || isTRUE(elementwise) || isFALSE(elementwise),
@@ -212,51 +214,104 @@ transitreg_predict <- function(object, newdata = NULL,
   )
   ## TODO(R) Not all arguments are checked above
 
-  ## Guessing elementwise if needed
+  ## Depending on 'type' we need to ensure y/prob is set correctly.
+  ## Quantile:
+  ## - prob must be not NULL, all values must be in [0, 1].
+  ## PDF/CDF:
+  ## - If 'newdata = NULL' we take the model frame, so y can be missing.
+  ## - Else y must be not NULL, all values must be within support of 'bins'.
+  if (type == "quantile") {
+    stopifnot(
+      "for 'type = \"quantile\"' argument 'prob' must be set" = !is.null(prob),
+      "'prob' must be numeric of length > 0" = is.numeric(prob) && length(prob) > 0,
+      "missing values in 'prob' not allowed" = all(!is.na(prob)),
+      "'prob' must be in [0, 1]" = all(prob >= 0.0) && all(prob <= 1.0)
+    )
+  } else if (type %in% c("cdf", "pdf") & !is.null(newdata)) {
+    stopifnot(
+      "for 'type = \"cdf\" or \"pdf\"' argument 'y' must be set if 'newdata' is given" =
+          !is.null(y),
+      "'y' must be numeric of length > 0" = is.numeric(y) && length(y) > 0,
+      "missing values in 'y' not allowed" = all(!is.na(y)),
+      "'y' must be in range of object$bins" =
+          all(y >= min(object$bins)) && all(y <= max(object$bins))
+    )
+  }
+
+  ## If 'y' was set by the user, we must convert all values in 'y' from
+  ## it's original numeric value to it's pseudo-observation (bin; int).
+  if (!is.null(y)) y <- num2bin(y, object$bins)
+
+  ## If newdata is empty, we are taking the model frame.
+  ## In addition, we take the pseudo-response from the model.frame
+  ## in case type %in% c("cdf", "pdf") and the user did not provide any 'y'.
+  ## Thus, we will evaluate the cdf/pdf a the observation used for fitting the model.
+  if (is.null(newdata)) {
+      newdata <- model.frame(object)
+      if (type %in% c("cdf", "pdf") && is.null(y))
+          y <- newdata[[object$response]] ## Integer in 0, 1, 2, ... Nbreaks
+  }
+
+  ## Guessing 'elementwise' if is NULL
   ##
-  ## elementwise = TRUE: We have one y/prob for each observation. Thus,
-  ## the result will be a vector of the same length as the number of observations
-  ## we predict for.
+  ## TRUE:  If set TRUE, the prdiction is done elementwise. In other words:
+  ##        element i in y/prob corresponds to observation newdata[i, ] and
+  ##        for each observation in newdata we will get one result in return.
   ##
-  ## If elementwise = FALSE, y/prob are not 'elementwise values' but are used
-  ## to evaluate cdf, pdf, quantile, ..., at each observation. Thus, the result
-  ## will be a matrix of dimension <number of obs> x <length p/y>.
+  ## FALSE: Each observation in newdata will be evaluated at every value in
+  ##        y/prob. The return will therefore be a matrix of dimension
+  ##        ncol(newdata) times (length(y) | length(probs)) depending on type.
   if (is.null(elementwise)) {
       if (type == "quantile") {
-          elementwise <- length(prob) == 1L | length(prob) == length(newresponse)
+
+          elementwise <- length(prob) == 1L | length(prob) == nrow(newdata)
+          ## Extending prob and sorting if !elementwise
+          if (elementwise & length(prob) == 1L)
+              prob <- rep(prob, length.out = nrow(newdata))
+
+      } else if (type %in% c("cdf", "pdf")) {
+
+          elementwise <- length(y) == 1L | length(y) == nrow(newdata)
+          ## Extending y and sorting if !elementwise
+          if (elementwise & length(y) == 1L)
+              y <- rep(y, length.out = nrow(newdata))
+
+      } else if (type == "pmax") {
+          elementwise <- TRUE # for 'pmax' elementwise is always TRUE
       } else {
-          elementwise <- length(y) == 1L | length(y) == length(newresponse)
+          stop("Mode for type = \"", type, "\" must be implemented!")
       }
   }
 
-  ## If 'newdata' is NULL we take the existing model.frame
-  ## which already contains the response as 'bin index'.
-
-  # If 'newresponse' is given, convert to bins (integer, the bin the
-  # observation will fall into).
-  if (!is.null(newresponse)) {
-    newresponse <- num2bin(newresponse, object$bins)
-  } else if (!is.null(newdata)) {
-    newresponse <- num2bin(newdata[[object$response]], object$bins)
-  # Else 'newdata' was empty, take model.frame
+  ## Setting dummy values (required by C later on)
+  if (type == "quantile") {
+      ## Sorting 'prob'. This is important for the .C routine!
+      if (!elementwise) prob <- sort(unique(prob))
+      y    <- NA_integer_ ## Dummy value required for .C call
+  } else if (type %in% c("cdf", "pdf")) {
+      ## Sorting 'y'. This is important for the .C routine!
+      if (!elementwise) y <- sort(unique(y))
+      prob <- NA_real_    ## Dummy value required for .C call
   } else {
-    newdata <- model.frame(object)
-    ## These are already integers
-    newresponse <- unname(model.response(model.frame(object)))
+      y    <- NA_integer_ ## Dummy value required for .C call
+      prob <- NA_real_    ## Dummy value required for .C call
   }
 
-  ## For safety: Ensure the newresponse is a proper integer vector
-  ## with all elements in {0, 1, 2, ...}.
-  stopifnot(
-    "'newresponse' must be integers > 0 (pseudo-observations)" =
-        is.integer(newresponse) && all(newresponse > 0) && all(!is.na(newresponse))
-  )
 
-  ## Probs
-  if (type == "quantile") {
-      prob <- as.numeric(prob)
-      stopifnot("'prob' must be numeric in [0, 1]" =
-                all(prob) >= 0 && all(prob) <= 1 && all(!is.na(prob)))
+  ## Setting up 'newresponse'.
+  ## Quantile, pmax:
+  ##  - Setting the pseudo-response to the highest bin. This ensures
+  ##    that the entire Transition distribution is evaluated.
+  ## CDF/PDF:
+  ##  - If elementwise = TRUE: We only need to evaluate each distribution
+  ##    up to 'y[i]'.
+  ##  - If elementwise = FALSE: We must evaluate each distribution up to
+  ##    max(y).
+  if (type %in% c("quantile", "pmax")) {
+    ## -2: N bins equal (N - 1) bin widths, and we start with bin 0 (thus -1 again)
+    newresponse <- rep(length(object$bins - 2), nrow(newdata))
+  } else {
+    newresponse <- if (elementwise) y else rep(max(y), nrow(newdata))
   }
 
 
@@ -289,20 +344,6 @@ transitreg_predict <- function(object, newdata = NULL,
   ## Extract unique indices
   ui   <- unique(newdata$index)
 
-  ## Set y/prob required to call the .C function treg_predict.
-  ## If type == quantile we need to populate 'prob', if type == 'cdf/pdf'
-  ## we need 'y', else both will be set NA_<type>_.
-  if (type == "quantile") {
-      prob <- if (length(prob) == 1L) rep(prob, length(ui)) else prob
-      y <- NA_integer_ # Dummy value for C (unused)
-      # Important
-      if (!elementwise) prob <- sort(prob)
-  } else {
-      prob <- NA_real_ # Dummy value for C (unused)
-      y <- as.integer(newresponse) # Binary (pseudo-)response
-      if (!elementwise) y <- sort(y)
-  }
-
   args <- list(uidx  = ui,                        # int; Unique distribution index (int)
                idx   = newdata$index,             # int; Index vector (int)
                tp    = tp,                        # num; Transition probabilities
@@ -320,6 +361,7 @@ transitreg_predict <- function(object, newdata = NULL,
     cat("Arguments passed to C 'treg_predict' in R 'transitreg_predict()':\n")
     str(args)
   }
+  check_args_for_treg_predict(args)
 
   # Calling C
   res  <- do.call(function(...) .Call("treg_predict", ...), args)
@@ -335,9 +377,52 @@ transitreg_predict <- function(object, newdata = NULL,
                   dimnames = list(NULL, get_elementwise_colnames(y, prefix)))
   }
 
-
   return(res)
 }
+
+
+
+# Helper function to check the arguments we hand over to C. This
+# helps identifying potential problems easier. Input 'x' is a named
+# list with all the elements required when calling "treg_predict" in C.
+#
+# The function ensures that (i) all the objects are of the correct type,
+# and that some elements do show the correct (expected) length. Else
+# it is possible that C returns 'garbage' results as it tries to read
+# elemnets outside of memory, resulting in either segfaults or werid
+# results.
+check_args_for_treg_predict <- function(x) {
+    ## Checking types first
+    tmp <- list("integer" = c("uidx", "idx", "y", "ncores"),
+                "double"  = c("tp", "bins", "prob"),
+                "logical" = c("elementwise", "discrete"))
+    for (n in names(tmp)) {
+        fn <- get(sprintf("is.%s", n))
+        for (e in tmp[[n]]) {
+            if (!fn(x[[e]])) stop("Element '", e, "' in args list is not \"", n, "\"")
+        }
+    }
+
+    ## Checking length of some of the elements
+    tryCatch(
+        {stopifnot(
+            "'args$elementwise' must be of length 1" = length(x$elementwise) == 1L,
+            "length of 'args$idx' and 'args$tp' must be identical" = 
+                length(x$idx) == length(x$tp),
+            "length of 'args$type' must be 1" = length(x$type) == 1L,
+            "length of 'args$discrete' and 'args$uidx' must be identical" =
+                length(x$uidx) == length(x$discrete)
+        )},
+        error = function(e) {
+            cat("\nDebugging output (str(args)):\n")
+            str(x)
+            stop(e)
+        }
+    )
+    invisible(TRUE)
+}
+
+
 
 transitreg_dist <- function(y, data = NULL, ...) {
   if (is.null(y))
@@ -408,6 +493,8 @@ transitreg_dist <- function(y, data = NULL, ...) {
   return(invisible(b))
 }
 
+
+
 ## Function to create bins.
 make_bins <- function(y, breaks = 30, scale = FALSE , ...) {
   if(scale) {
@@ -422,6 +509,8 @@ make_bins <- function(y, breaks = 30, scale = FALSE , ...) {
   }
   return(bins)
 }
+
+
 
 ## Wrapper function to estimate CTMs.
 transitreg <- function(formula, data, subset, na.action,
@@ -636,6 +725,8 @@ transitreg <- function(formula, data, subset, na.action,
   return(rval)
 }
 
+
+
 ## Plotting method.
 plot.transitreg <- function(x, which = "effects", spar = TRUE, k = 5, ...)
 {
@@ -685,21 +776,17 @@ plot.transitreg <- function(x, which = "effects", spar = TRUE, k = 5, ...)
 }
 
 ## Summary method.
-summary.transitreg <- function(object, ...)
-{
+summary.transitreg <- function(object, ...) {
   summary(object$model)
 }
 
 ## formula method.
-formula.transitreg <- function(x, ...)
-{
+formula.transitreg <- function(x, ...) {
   formula(x$model)
 }
 
-
 ## Coef method.
-coef.transitreg <- function(object, ...)
-{
+coef.transitreg <- function(object, ...) {
   coef(object$model)
 }
 
@@ -876,7 +963,7 @@ rootogram.transitreg <- function(object, newdata = NULL, plot = TRUE,
   if (isTRUE(list(...)$verbose))
     cat("\n")
 
-  e <- colMeans(p) * n  
+  e <- colMeans(p) * n
 
   rg <- data.frame("observed" = obs, "expected" = e,
     "mid" = counts, "width" = width)

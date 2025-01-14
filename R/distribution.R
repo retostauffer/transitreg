@@ -190,9 +190,8 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     ui  <- seq_along(d) # Unique index
     idx <- rep(ui, each = length(bins) - 1) # Index of distribution
 
-    ## Calling C to calculate the required values.
-    res <- .Call("treg_predict",
-                 uidx  = ui,                       # Unique distribution index (int)
+    # Setting up arguments to call .C predict function
+    args <- list(uidx  = ui,                       # Unique distribution index (int)
                  idx   = idx,                      # Index vector (int)
                  tp    = t(as.matrix(d)),          # Transition probabilities
                  bins  = bins,                     # Point intersection of bins
@@ -200,6 +199,10 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
                  prob  = NA_real_,                 # Dummy, only used for 'quantile'
                  type  = "pdf", ncores = ncores, elementwise = elementwise,
                  discrete = FALSE) # <- dummy value
+
+    # Calling C
+    check_args_for_treg_predict(args)
+    res  <- do.call(function(...) .Call("treg_predict", ...), args)
 
     # If elementwise: Return named vector
     if (elementwise) {
@@ -269,8 +272,7 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     idx <- rep(ui, each = length(bins) - 1) # Index of distribution
 
     ## Calling C to calculate the required values.
-    res <- .Call("treg_predict",
-                 uidx  = ui,                       # Unique distribution index (int)
+    args <- list(uidx  = ui,                       # Unique distribution index (int)
                  idx   = idx,                      # Index vector (int)
                  tp    = t(as.matrix(d)),          # Transition probabilities
                  bins  = bins,                     # Point intersection of bins
@@ -278,6 +280,10 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
                  prob  = NA_real_,                 # Dummy, only used for 'quantile'
                  type  = "cdf", ncores = ncores, elementwise = elementwise,
                  discrete = FALSE) # <- dummy value
+
+    # Calling C
+    check_args_for_treg_predict(args)
+    res  <- do.call(function(...) .Call("treg_predict", ...), args)
 
     # If elementwise: Return named vector
     if (elementwise) {
@@ -331,8 +337,7 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
     idx <- rep(ui, each = length(bins) - 1) # Index of distribution
 
     ## Calling C to calculate the required values.
-    res <- .Call("treg_predict",
-                 uidx  = ui,                       # Unique distribution index (int)
+    args <- list(uidx  = ui,                       # Unique distribution index (int)
                  idx   = idx,                      # Index vector (int)
                  tp    = t(as.matrix(x)),          # Transition probabilities
                  bins  = bins,                     # Point intersection of bins
@@ -340,6 +345,10 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
                  prob  = probs,                    # Probabilities where to evaluate the distribution
                  type  = "quantile", ncores = ncores, elementwise = elementwise,
                  discrete = as.logical(discrete))
+
+    # Calling C
+    check_args_for_treg_predict(args)
+    res  <- do.call(function(...) .Call("treg_predict", ...), args)
 
     # If elementwise: Return named vector
     if (elementwise) {
@@ -374,17 +383,23 @@ mean.Transition <- function(x, ncores = NULL, ...) {
     bins <- attr(x, "bins")
     ui   <- seq_along(x) # Unique index
     idx  <- rep(ui, each = length(bins) - 1) # Index of distribution
+    discrete <- rep(FALSE, length(ui))
+    warning("TODO(R): Currently assuming discrete = TRUE in mean.Transition")
 
     ## Calling C to calculate the required values.
-    res <- .Call("treg_predict",
-                 uidx  = ui,                       # Unique distribution index (int)
+    args <- list(uidx  = ui,                       # Unique distribution index (int)
                  idx   = idx,                      # Index vector (int)
                  tp    = t(as.matrix(x)),          # Transition probabilities
                  bins  = bins,                     # Point intersection of bins
                  y     = NA_integer_,              # <- Dummy value
                  prob  = NA_real_,                 # <- Dummy value
                  type  = "mean", ncores = ncores,
-                 elementwise = TRUE, discrete = FALSE) # <- Dummy values
+                 elementwise = TRUE, discrete = discrete) # <- Dummy values
+
+    # Calling C
+    check_args_for_treg_predict(args)
+    res  <- do.call(function(...) .Call("treg_predict", ...), args)
+
     setNames(res, names(x))
 }
 
