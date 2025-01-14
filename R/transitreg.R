@@ -53,7 +53,58 @@ transitreg_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
 
 
 
-## Function to set up expanded data set.
+#' Transition Model Data Preparer
+#'
+#' Transforms a data frame into the format required for estimating transition models.
+#' The function generates binary response data for fitting GLM-type models,
+#' specifically designed to represent transitions between counts or states in
+#' a probabilistic framework.
+#'
+#' @param data A data frame containing the raw input data.
+#' @param response Character string specifying the name of the response variable
+#'        to be used for transition modeling. This variable must represent
+#'        counts or categorical states.
+#' @param verbose Logical value indicating whether information about the transformation
+#'        process should be printed to the console. Default is `TRUE`.
+#'
+#' @details
+#' Transition models focus on modeling the conditional probabilities of transitions
+#' between states or counts. This function converts the input data into a long format
+#' suitable for such models. Each row in the resulting data frame corresponds to a
+#' binary transition indicator, representing whether a transition to a higher category
+#' occurred. For details on the modeling framework, see Berger and Tutz (2021).
+#'
+#' @return
+#'   A transformed data frame in the long format. Each row represents a binary transition
+#'   indicator (\code{Y}) for the response variable. Additional columns in the output include:
+#'
+#' * `index`: The original row index from the input data.
+#' * `Y`: The binary indicator for whether a transition to a higher
+#'       category occurred.
+#' * `theta`: The level corresponding to the current transition.
+#'
+#' This format is required for fitting transition models using GLM or GAM frameworks.
+#' For instance, a response variable with a value of 3 will generate rows with
+#' transitions up to its value (0, 1, 2, and 3).
+#'
+#' @seealso [transitreg()], [transitreg_dist()]
+#'
+#' @examples
+#' ## Raw data frame.
+#' d <- data.frame(
+#'   "id" = 1:5,
+#'   "counts" = c(1, 0, 2, 3, 1),
+#'   "x" = 1:5 * 10
+#' )
+#'
+#' ## Transformed data frame.
+#' dtm <- transitreg_data(d, response = "counts", verbose = TRUE)
+#' print(dtm)
+#'
+#' @keywords data transformation
+#' @concept transition modeling
+#'
+#' @author Niki
 transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose = TRUE) {
 
   stopifnot(
@@ -424,6 +475,63 @@ check_args_for_treg_predict <- function(x) {
 
 
 
+#' Transition Model Probability Density Visualization
+#'
+#' Visualizes the probability density function (PDF) and raw count or continuous data
+#' based on transition models estimated using [transitreg()]. This function provides
+#' an intuitive way to understand the distribution of the modeled response.
+#'
+#' @param y A response vector or a formula specifying the relationship between the
+#'        response and covariates. For count data, this is typically a vector of counts.
+#'        For continuous data, this can be paired with the \code{breaks} argument to
+#'        discretize the response.
+#' @param data Optional. If `y` is a formula, this specifies the data frame to
+#'        be used for model fitting.
+#' @param \dots Additional arguments to be passed to [transitreg()], including
+#'        settings for the estimation engine, formula, and other relevant parameters.
+#'
+#' @details
+#' This function estimates and visualizes the underlying probability density function
+#' (PDF) for count or continuous response data using transition models. For continuous
+#' data, the response is discretized based on the \code{breaks} argument passed through
+#' \dots
+#'
+#' The function supports visualizations for raw counts, zero-inflated data, and transformed
+#' distributions, providing insights into the modeled distribution of the response variable.
+#'
+#' @return
+#' An object of class \code{"transitreg"}, as described in \code{\link{transitreg}}. This includes:
+#'
+#' * Fitted transition model details.
+#' * Model diagnostics and parameters.
+#' * Visualization-ready data for plotting PDFs or transformed distributions.
+#'
+#' @seealso [transitreg()], [transitreg_data()].
+#'
+#' @examples
+#' ## Example 1: Count data.
+#' set.seed(123)
+#' n <- 3000
+#' y <- rpois(n, 10)
+#'
+#' # Visualize PDF for count data.
+#' transitreg_dist(y)
+#'
+#' ## Example 2: Zero-inflated data.
+#' y <- c(y, rep(0, 500))
+#'
+#' ## Include a zero-inflation term.
+#' transitreg_dist(y ~ s(theta) + theta0)
+#'
+#' ## Example 3: Continuous data.
+#' set.seed(123)
+#' n <- 1000
+#' y <- rgamma(n, shape = 10, rate = 0.1)
+#'
+#' ## Visualize PDF for continuous data with discretization.
+#' transitreg_dist(y, breaks = 50)
+#'
+#' @keywords distribution visualization
 transitreg_dist <- function(y, data = NULL, ...) {
   if (is.null(y))
     stop("argument y is NULL!")
@@ -512,7 +620,160 @@ make_bins <- function(y, breaks = 30, scale = FALSE , ...) {
 
 
 
-## Wrapper function to estimate CTMs.
+#' Transition Models Estimation
+#'
+#' Fits transition models to count or continuous response data. The method leverages
+#' transition probabilities to construct flexible probabilistic models without assuming
+#' a fixed distribution for the response variable. Estimation relies on \pkg{mgcv}
+#' infrastructure for GLM-type binary modeling.
+#'
+#' @param formula A GAM formula, see [mgcv::gam()]. This formula should specify
+#'        the covariates and their interactions, as well as any special terms involving `theta`
+#'        for transition modeling.
+#' @param data A data frame containing the data for modeling.
+#' @param subset An optional vector specifying a subset of observations to be used in the
+#'        fitting process.
+#' @param na.action A function that determines how `NA` values in the data should be handled.
+#' @param engine Character string specifying the estimation engine. Options include
+#'        `"bam"`, `"gam"`, `"nnet"`, or `"glmnet"` (experimental).
+#'        Default is `"bam"`.
+#' @param scale.x Logical value indicating whether covariates should be scaled before estimation.
+#' @param breaks Controls the splitting of continuous responses into intervals to mimic a
+#'        count response. If a single number is provided, equidistant intervals are used. If a
+#'        numeric vector is provided, it is used directly as the breakpoints. This argument is
+#'        critical for continuous responses.
+#' @param model Logical value indicating whether the model frame should be included in
+#'        the return object.
+#' @param ncores `NULL` (default) or single numeric. See 'OpenMP' for more information.
+#' @param verbose Logical value indicating whether progress and diagnostic messages
+#'        should be printed. Default is `FALSE`.
+#' @param \dots Additional arguments to be passed to the estimation engine.
+#' @param formula Object of class `transitreg`.
+#' @param inner Logical, if `FALSE` the 'outer' model frame is returned,
+#'        else the 'inner' model frame, the one used by the estimation engine.
+#'
+#' @details
+#' The function transforms the input data using [transitreg_data()] to a format
+#' compatible with transition models. Estimation relies on binary GLM-type techniques
+#' to model conditional transition probabilities. Note that the `theta` variable, representing
+#' the current transition level, must be included in the model by the user, please
+#' see the examples. Additional transition-specific covariates, such as those addressing excess
+#' zeros, can be included by adding `theta0`, `theta1`, etc., to the formula.
+#'
+#' For continuous responses, the `breaks` argument specifies the intervals for
+#' discretizing the response, enabling the application of count-based transition models.
+#'
+#' @section OpenMP:
+#' For improved performance `"transitreg"` is partially implemented in `C`, making
+#' use of the OpenMP library for parallelization. The argument `ncores` allows
+#' the user to control how many cores to be used for the `C` functions shipped
+#' with this package. By default, the number of cores will be detected
+#' automatically (`ncores = NULL`). The following rules are applied:
+#'
+#' * If OpenMP is not available, the number of cores is set to `1L` in all cases.
+#' * If `ncores = NULL` the total number of cores (`N`) is detected
+#'         automatically, and `ncores` is set to `N - 2L`.
+#' * If `ncores < 1L`, one core will be used (single-core processing).
+#' * If `ncores > 1L` all available cores will be utilized.
+#'
+#' @return
+#' An object of class \code{"transitreg"`, which includes the following components:
+#'
+#' * Fitted model results compatible with \pkg{mgcv`-style outputs.
+#' * Methods for \code{plot`, \code{summary`, \code{residuals`, and \code{predict`.
+#' * Model diagnostics and transformation details.
+#'
+#' See [transitreg_detect_cores()] for some more details.
+#'
+#' @seealso [transitreg_data()], [transitreg_dist()], [mgcv::gam()]
+#'
+#' @examples
+#' ## Example 1: Count data.
+#' set.seed(123)
+#' n <- 1000
+#' x <- runif(n, -3, 3)
+#' y <- rpois(n, exp(2 + sin(x)))
+#'
+#' ## Fit transition count response model.
+#' b <- transitreg(y ~ s(theta) + s(x))
+#'
+#' ## GAM summary.
+#' summary(b)
+#'
+#' ## GAM coefficients
+#' coef(b)
+#'
+#' ## Effect plots.
+#' plot(b)
+#'
+#' ## Quantile residuals.
+#' plot(b, which = 2:4)
+#'
+#' ## Predictions and plotting.
+#' nd <- data.frame(x = seq(-3, 3, length = 100))
+#' fit <- cbind(
+#'   predict(b, nd, type = "pmax"),
+#'   predict(b, nd, type = "quantile", p = 0.05/2),
+#'   predict(b, nd, type = "quantile", p = 0.5),
+#'   predict(b, nd, type = "quantile", p = 1 - 0.05/2)
+#' )
+#'
+#' ## Plot data and fitted counts.
+#' plot(y ~ x, pch = 16, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
+#' matplot(nd$x, fit, type = "l", lty = 1, lwd = 2,
+#'   col = c(2, 4, 4, 4), add = TRUE)
+#'
+#' ## Example 2: Continuous response.
+#' set.seed(123)
+#' n <- 1000
+#' x <- runif(n, -3, 3)
+#' y <- sin(x) + rnorm(n, sd = exp(-1 + cos(x)))
+#'
+#' ## Fit model with continuous response.
+#' b <- transitreg(y ~ s(theta) + s(x) + te(x, theta), breaks = 200)
+#'
+#' ## Predictions and plotting
+#' nd <- data.frame(x = seq(-3, 3, length = 100))
+#' fit <- cbind(
+#'   predict(b, nd, type = "pmax"),
+#'   predict(b, nd, type = "quantile", p = 0.05/2),
+#'   predict(b, nd, type = "quantile", p = 0.5),
+#'   predict(b, nd, type = "quantile", p = 1 - 0.05/2)
+#' )
+#'
+#' ## Plot data and fitted curves.
+#' plot(y ~ x, pch = 16, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
+#' matplot(nd$x, fit, type = "l", lty = 1, lwd = 2,
+#'   col = c(2, 4, 4, 4), add = TRUE)
+#'
+#' ## Example 3: Count response with neural network.
+#' set.seed(123)
+#' n <- 1000
+#' x <- runif(n, -3, 3)
+#' y <- rpois(n, exp(2 + sin(x)))
+#'
+#' ## Fit NN transition count response model.
+#' b <- transitreg(y ~ theta + x, scale.x = TRUE, engine = "nnet",
+#'                 size = 5, maxit = 1000, decay = 0.001)
+#'
+#' ## Predictions and plotting.
+#' nd <- data.frame(x = seq(-3, 3, length = 100))
+#' fit <- cbind(
+#'   predict(b, nd, type = "pmax"),
+#'   predict(b, nd, type = "quantile", p = 0.05/2),
+#'   predict(b, nd, type = "quantile", p = 0.5),
+#'   predict(b, nd, type = "quantile", p = 1 - 0.05/2)
+#' )
+#'
+#' ## Plot data and fitted counts.
+#' plot(y ~ x, pch = 16, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
+#' matplot(nd$x, fit, type = "l", lty = 1, lwd = 2,
+#'   col = c(2, 4, 4, 4), add = TRUE)
+#'
+#' @keywords models regression
+#'
+#' @author Niki
+#' @export
 transitreg <- function(formula, data, subset, na.action,
                        engine = "bam", scale.x = FALSE, breaks = NULL,
                        model = TRUE, ncores = NULL, verbose = FALSE, ...) {
@@ -727,7 +988,68 @@ transitreg <- function(formula, data, subset, na.action,
 
 
 
-## Plotting method.
+#' Plot Method for Transition Model Fits
+#'
+#' Provides diagnostic and visualization plots for transition models fitted using
+#' the [transitreg()] function. The method supports plotting effects and quantile
+#' residual diagnostic plots.
+#'
+#' @param x An object of class `"transitreg"` resulting from a call to [transitreg()]
+#' @param which A character string or integer specifying the type of plot(s) to
+#'        generate (See 'Details').
+#' @param spar Logical. If `TRUE`, multiple plots are arranged in a
+#'        single window. Default is `TRUE`.
+#' @param k Integer, TODO(N): Describe argument. Defaults to `5`.
+#' @param \dots Additional arguments passed to the underlying plotting functions.
+#'
+#' @details
+#' The function allows to control what to plot via the argument `which`.
+#' Options include:
+#'
+#' * `"effects"` Plots the effects of the predictors on the response.
+#'   Requires that the model is estimated by [mgcv::gam()]
+#'   or [mgcv::bam()].
+#' * `"hist-resid"` Plots a histogram of the qauntile residuals.
+#' * `"qq-resid"` Generates a Q-Q plot of the quantile residuals.
+#' * `"wp-resid"` Creates a worm plot of the quantile residuals.
+#'
+#' Multiple options can be specified as a character vector or numeric indices.
+#'
+#' The [plot.transitreg()] method provides flexible visualization options for
+#' evaluating transition model fits. Users can choose to:
+#'
+#' * Visualize the effects of predictors on the response variable
+#'   (if the model is a GAM, see [mgcv::gam()]).
+#' * Evaluate quantile residuals through histograms, Q-Q plots, or worm plots.
+#'
+#' The `which` argument controls the type of plots generated. By default, the
+#' `"effects"` plot is shown if the model supports it. Residual-based plots
+#' (`"hist-resid"`, `"qq-resid"`, `"wp-resid"`) provide insights into model
+#' calibration.
+#'
+#' @return Returns `NULL` invisibly. Generates plots as a side effect.
+#'
+#' @seealso [transitreg()], [transitreg_dist()], [transitreg_data()], [predict.transitreg()].
+#'
+#' @examples
+#' ## Example: Fit a transition model and generate plots.
+#' set.seed(123)
+#' n <- 500
+#' x <- runif(n, -3, 3)
+#' y <- rpois(n, exp(2 + sin(x)))
+#' b <- transitreg(y ~ s(theta) + s(x))
+#'
+#' ## Plot effects.
+#' plot(b, which = "effects")
+#'
+#' ## Plot residuals.
+#' plot(b, which = c("hist-resid", "qq-resid"))
+#'
+#' ## Custom plot layout.
+#' par(mfrow = c(2, 1))
+#' plot(b, which = 3:4, spar = FALSE)
+#'
+#' @keywords methods models visualization
 plot.transitreg <- function(x, which = "effects", spar = TRUE, k = 5, ...)
 {
   ## What should be plotted?
@@ -775,39 +1097,124 @@ plot.transitreg <- function(x, which = "effects", spar = TRUE, k = 5, ...)
   }
 }
 
-## Summary method.
+#' @method transitreg summary
 summary.transitreg <- function(object, ...) {
   summary(object$model)
 }
 
-## formula method.
+#' @method transitreg formula
 formula.transitreg <- function(x, ...) {
   formula(x$model)
 }
 
-## Coef method.
+#' @method transitreg coef
 coef.transitreg <- function(object, ...) {
   coef(object$model)
 }
 
-## Model frame extractor.
-## If inner == FALSE the model.frame from the transitreg model
-## is returned. If TRUE, the model.frame from estimation model
-## (controlled via the 'engine' argument) is returned.
-model.frame.transitreg <- function(formula, inner = FALSE, ...) {
-  stopifnot("'engine' must be logical TRUE or FALSE" =
-            isTRUE(inner) || isFALSE(inner))
 
-  return(if (!inner) formula$model.frame else model.frame(formula$model))
+#' @author Reto
+#' @method transitreg model.frame
+model.frame.transitreg <- function(formula, ...) {
+  formula$model.frame
 }
 
-## Printing method.
+#' @author Niki
+#' @method transitreg print
 print.transitreg <- function(x, ...) {
   cat("Count Transition Model\n---")
   print(x$model)
 }
 
-## Predict method.
+
+
+#' Predict Method for Transition Model Fits
+#'
+#' Provides predictions for transition models fitted using the \code{\link{transitreg}} function.
+#' Predictions can be generated for the probability density function (PDF), cumulative
+#' distribution function (CDF), maximum probability, or specific quantiles of the response
+#' distribution.
+#'
+#'
+#' @param object An object of class `transitreg` resulting from a call to \code{\link{transitreg}}.
+#' @param newdata Optional. A data frame containing new predictor values.
+#'        If not provided, predictions are made for the data used in fitting the model.
+#' @param y Optional. A vector of response values for which the PDF or CDF should
+#'        be computed. Required if `type` is `"pdf"` or `"cdf"`.
+#' @param prob Optional. A numeric value specifying the quantile to compute when
+#'        `type = "quantile"`. Default is `0.5` (median). If provided,
+#'        argument `type` is set to `type = "quantile"`.
+#' @param `type` Character. Specifies the type of prediction to return (see Section 'Details').
+#' @param ncores `NULL` (default) or single numeric. See section 'OpenMP'
+#'        of the [transitreg()] man page for more details.
+#' @param \dots Additional arguments passed to the prediction function.
+#'
+#' @details
+#' The `predict.transitreg` method computes predictions based on the transition
+#' model fit. Predictions can be made for the original training data or for new
+#' data provided via `newdata`. The method also supports scaling of covariates if
+#' scaling was applied during model fitting (argument `scale.x` in function
+#' [transitreg()]).
+#'
+#' The argument `type` controls the return, the following types are allowed:
+#'
+#' * `"pdf"`: The predicted probability density function (PDF).
+#' * `"cdf"`: The cumulative distribution function (CDF).
+#' * `"pmax"`: The expected value of the response (maximum probability).
+#' * `"quantile"`: The quantile of the response specified by \code{prob}.
+#'
+#' For `"pdf"` and `"cdf"`, the response values (`y`) must be provided unless the
+#' model was fit with those values already included. For `"quantile"`, a specific
+#' quantile(s) are computed based on `prob`.
+#'
+#' @return
+#' Returns predictions of the specified type:
+#'
+#' * For `"pdf"` and `"cdf"`, a vector or matrix of probabilities evaluated at `y`.
+#' * For `"pmax"`, the expected value of the response.
+#' * For `"quantile"`, the quantile of the response distribution at the specified `prob`.
+#'
+#' @seealso [transitreg()], [transitreg_data()], [transitreg_dist()].
+#'
+#' @examples:
+#' ## Example: Predicting PDF and CDF.
+#' set.seed(123)
+#' n <- 500
+#' x <- runif(n, -3, 3)
+#' y <- rpois(n, exp(2 + sin(x)))
+#' b <- transitreg(y ~ s(theta) + s(x))
+#'
+#' ## Predict PDF and CDF.
+#' p <- list()
+#' p$pdf <- predict(b, type = "pdf", y = 3)
+#' p$cdf <- predict(b, type = "cdf", y = 3)
+#'
+#' ## Predict maximum probability (expected value).
+#' p$pmax <- predict(b, type = "pmax")
+#'
+#' ## Predict quantiles.
+#' p$qu95 <- predict(b, prob = 0.95)
+#'
+#' print(head(as.data.frame(p)))
+#'
+#' ## Visualize predictions.
+#' nd <- data.frame(x = seq(-3, 3, length = 100))
+#'
+#' ## Predict quantiles.
+#' qu <- c(0.01, 0.05, 0.1, 0.2, 0.5, 0.7, 0.9, 0.95, 0.99)
+#' p <- lapply(qu, function(prob) {
+#'   predict(b, newdata = nd, prob = prob)
+#' })
+#'
+#' ## Plot data and fitted quantiles.
+#' plot(y ~ x, pch = 16, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
+#' matplot(nd$x, do.call("cbind", p),
+#'   type = "l", col = 4, lwd = 2, lty = 1,
+#'   add = TRUE)
+#'
+#' @keywords methods, model
+#'
+#' @author Niki
 predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
         type = c("pdf", "cdf", "pmax", "quantile"), ncores = NULL, ...) {
 
@@ -884,7 +1291,9 @@ predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
   return(pred)
 }
 
-## logLik method.
+#' @author Niki
+#' @rdname transitreg
+#' @method transitreg logLik
 logLik.transitreg <- function(object, newdata = NULL, ...) {
   if (is.null(newdata)) {
     p <- object$probs$pdf
@@ -898,7 +1307,9 @@ logLik.transitreg <- function(object, newdata = NULL, ...) {
   return(ll)
 }
 
-## Residuals method.
+#' @author Niki
+#' @rdname transitreg
+#' @method transitreg residuals
 residuals.transitreg <- function(object, newdata = NULL, y = NULL, ...) {
   if (is.null(newdata)) {
     if (is.null(object$model.frame))
@@ -936,6 +1347,10 @@ residuals.transitreg <- function(object, newdata = NULL, y = NULL, ...) {
 
 
 ## Rootogram method.
+
+#' @author Niki
+#' @rdname transitreg
+#' @method transitreg rootogram
 rootogram.transitreg <- function(object, newdata = NULL, plot = TRUE,
   width = 0.9, style = c("hanging", "standing", "suspended"),
   scale = c("sqrt", "raw"), expected = TRUE, confint = TRUE,
@@ -997,7 +1412,9 @@ rootogram.transitreg <- function(object, newdata = NULL, plot = TRUE,
   return(invisible(rg))
 }
 
-## Rootogram method.
+#' @author Niki
+#' @rdname tmdist
+#' @method tmdist  rootogram
 rootogram.tmdist <- function(object, newdata = NULL, plot = TRUE,
   width = 0.9, style = c("hanging", "standing", "suspended"),
   scale = c("sqrt", "raw"), expected = TRUE, confint = TRUE,

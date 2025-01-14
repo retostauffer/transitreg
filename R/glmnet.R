@@ -1,6 +1,9 @@
 
 
+#' @rdname transitreg_glmnet
+#' @export
 transitreg_glmnet <- function(formula, data, nfolds = 10, ...) {
+    warning("TODO(R): Experimental implementation")
     stopifnot(requireNamespace("glmnet"))
 
     # Extract smooth terms
@@ -36,6 +39,8 @@ transitreg_glmnet <- function(formula, data, nfolds = 10, ...) {
     return(mod)
 }
 
+#' @method transitreg_glmnet predict
+#' @rdname transitreg_glmnet
 predict.transietreg_glmnet <- function(object, type = "response", s = "lambda.min", ...) {
     # Removing custom class and call predict.glmnet below
     class(object) <- class(object)[!class(object) == "transitreg_glmnet"]

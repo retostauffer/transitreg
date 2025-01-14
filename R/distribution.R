@@ -11,8 +11,19 @@
 #'        monotonically increasing.
 #'
 #' @return Returns an object of class \code{c("Transition", "distribution")}.
+#' TODO(R): Missing.
+#'
+#' @details
+#' TODO(R): Missing
+#'
+#' @examples
+#' # TODO(R) Write example
+#'
+#' @concept Transition distribution, Normal distribution, distributions
 #'
 #' @author Reto
+#' @rdname Transition
+#' @export
 Transition <- function(x, bins) {
 
     # Sanity checks
@@ -43,8 +54,12 @@ Transition <- function(x, bins) {
     structure(res, class = c("Transition", "distribution"), bins = bins)
 }
 
-# Combine Transition objects, only allowed if they have the very same bins
-# (come from the same distribution; same number of transition probabilities).
+#' @param \dots objects to be concatenated. Must all come from the same
+#'        transition distribution (i.e., be based on the same binning).
+#'
+#' @author Reto
+#' @rdname Transition
+#' @method Transition c
 c.Transition <- function(...) {
     x <- list(...)
     if (length(x) == 1) return(x[[1]])
@@ -62,6 +77,9 @@ c.Transition <- function(...) {
     Transition(res, attr(x[[1]], "bins"))
 }
 
+#' @author Reto
+#' @method transitreg prodist
+#' @rdname transitreg
 prodist.transitreg <- function(object, newdata = NULL, ...) {
     # Extracting covariable names to create newdata
     covars <- attr(terms(fake_formula(formula(object))), "term.labels")
@@ -119,7 +137,7 @@ prodist.transitreg <- function(object, newdata = NULL, ...) {
 #' \code{c(length(x), <ncol>)}.
 #'
 #' If \code{expand = TRUE} the returned matrix is of dimension
-#' \code{c(length(x) * <ncol>, 3L)} where the four columns contain 
+#' \code{c(length(x) * <ncol>, 3L)} where the four columns contain
 #' \code{index} (1, ..., length(x)) where each index corresponds to the
 #' row-index of the original input \code{x} (distribution identifier),
 #' \code{theta} which is the 'bin' the transition probability belongs to,
@@ -127,6 +145,8 @@ prodist.transitreg <- function(object, newdata = NULL, ...) {
 #' This expanded version is used when calling the .C functions.
 #'
 #' @author Reto
+#' @rdname Transition
+#' @method Transition as.matrix
 as.matrix.Transition <- function(x, expand = FALSE, ...) {
     stopifnot("'expand' must be logical TRUE or FALSE" = isTRUE(expand) || isFALSE(expand))
 
@@ -150,7 +170,7 @@ as.matrix.Transition <- function(x, expand = FALSE, ...) {
 }
 
 
-# Format
+#' @method Transition format
 format.Transition <- function(x, digits = pmax(3L, getOption("digits") - 3L), ...) {
     if (length(x) < 1L) return(character(0))
     xnames <- names(x) # Keep for later
@@ -166,6 +186,20 @@ format.Transition <- function(x, digits = pmax(3L, getOption("digits") - 3L), ..
 }
 
 
+#' @param d An object of class `Transition`.
+#' @param x Numeric, vector of quantiles.
+#' @param drop Logical. Should the result be simplified to a vector if possible?
+#' @param elementwise Logical. Should each distribution in `x` be evaluated at
+#'        all elements of `probs` (`elementwise = FALSE`, yielding a matrix)? Or, if
+#'        `x` and `probs` have the same length, should the evaluation be done element
+#'        by element (`elementwise = TRUE` yielding a vector)? The default of `NULL`
+#'        means that `elementwise = TRUE` is used if the lengths match and otherwise
+#'        `elementwise = FALSE` is used.
+#' @param ncores Number of cores to be used (see [transitreg()] for details).
+#'
+#' @author Reto
+#' @rdname Transition
+#' @method Transition pdf
 pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
 
     ## Get number of cores for OpenMP parallelization
@@ -218,35 +252,16 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     }
 }
 
-## Just returns log(pdf(...))
+#' @author Reto
+#' @rdname Transition
+#' @method Transition log_pdf
 log_pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
     return(log(pdf(d, x, drop = drop, elementwise = elementwise, ncores = ncores, ...)))
 }
 
-#' Create Column Names for Return Matrix
-#'
-#' Used in the S3 methods pdf, cdf, and quantile. If `elementwise = FALSE`
-#' the return is a matrix; this helper function creates the names based
-#' on the thresholds/probabilities used.
-#'
-#' @param x numeric, thresholds (pdf, cdf) or probabilities (quantile).
-#' @param prefix If \code{NULL} (quantiles) the result is in percent,
-#'        else this prefix is used for each 'x'.
-get_elementwise_colnames <- function(x, prefix = NULL, digits = 3) {
-    if (is.null(prefix)) {
-        x <- paste0(format(1e2 * x), "%")
-    } else {
-        x <- paste(prefix, trimws(format(x, digits = digits)), sep = "_")
-    }
-    if (anyDuplicated(x)) {
-        for (d in unique(x[duplicated(x)])) {
-            idx <- which(x == d)
-            x[idx] <- paste0(x[idx], c("", paste0("_", seq_len(length(idx) - 1))))
-        }
-    }
-    return(trimws(x))
-}
-
+#' @author Reto
+#' @rdname Transition
+#' @method Transition cdf
 cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
 
     ## Get number of cores for OpenMP parallelization
@@ -309,6 +324,13 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     }
 }
 
+#' @param probs numeric vector of probabilities with values in [0,1].
+#'        (Values up to ‘2e-14’ outside that range are accepted and
+#'        moved to the nearby endpoint.) TODO(R): SURE?
+#'
+#' @author Reto
+#' @rdname Transition
+#' @method Transition quantile
 quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
     ## Get number of cores for OpenMP parallelization
     ncores <- transitreg_get_number_of_cores(ncores, FALSE)
@@ -364,11 +386,16 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
 }
 
 
+#' @param na.rm Unused.
+#' @rdname Transition
+#' @method Transition median
 median.Transition <- function(x, na.rm = NULL, ncores = NULL, ...) {
     quantile(x, probs = 0.5, ncores = ncores, ...)
 }
 
 
+#' @rdname Transition
+#' @method Transition mean
 mean.Transition <- function(x, ncores = NULL, ...) {
 
     ## TODO(R): Not correct if the distribution does not cover
@@ -404,7 +431,9 @@ mean.Transition <- function(x, ncores = NULL, ...) {
 }
 
 
-## Draw random values
+#' @param n Integer `>0`, number of random values to be drawn per distribution.
+#' @rdname Transition
+#' @method Transition random
 random.Transition <- function(x, n = 1L, drop = TRUE, ...) {
 
     # Calculating 'bin mids'
@@ -443,7 +472,9 @@ random.Transition <- function(x, n = 1L, drop = TRUE, ...) {
     }
 }
 
-## Check if distribution is discrete
+#' @author Reto
+#' @rdname Transition
+#' @method Transition is_discrete
 is_discrete.Transition <- function(d, ...) {
     x <- attr(d, "bins")
     # Calculating mid of bins
@@ -453,12 +484,16 @@ is_discrete.Transition <- function(d, ...) {
     rep(all(abs(x %% 1) < sqrt(.Machine$double.eps)), length(d))
 }
 
-## Check if distribution is continuous
+#' @author Reto
+#' @rdname Transition
+#' @method Transition is_continuous
 is_continuous.Transition <- function(d, ...) {
     return(!is_discrete(d))
 }
 
-## Support (bin range) of the distributions
+#' @author Reto
+#' @rdname Transition
+#' @method Transition support
 support.Transition <- function(d, drop = NULL, ...) {
     x <- setNames(range(attr(d, "bins")), c("min", "max"))
     if (length(x) > 1) {
@@ -469,6 +504,11 @@ support.Transition <- function(d, drop = NULL, ...) {
 }
 
 
+# TODO(R): Used?
+
+#' @author Reto
+#' @rdname transitreg
+#' @method transitreg newresponse
 newresponse.transitreg <- function(object, newdata = NULL, ...) {
     ## Response name
     yn <- object$response

@@ -275,8 +275,59 @@ plot_wp <- function(x, ...)
 # as for demonstration purposes; not part of the rest of the software.
 # -------------------------------------------------------------------
 
-# Allows to convert from transition probabilities to
-# PDF/CDF and vice versa (not all combinations are allowed).
+#' Converting between Densities, Probabilities, and Transition Probabilities
+#'
+#' A transiton model consists of a series of transition probabilities (TP)
+#' which define the probability that an observation falls into the next hither
+#' bin. Based on these transition probabilities, the cummulative distribution
+#' function (CDF) as well as the density (PDF) can be calculated.
+#' This utility function allows to convert from CDF to TPs, and from TPs
+#' back to CDF/PDF.
+#'
+#' @param x Numeric vector with density, probabilities, or transition probabilities.
+#' @param from Character, current type of data in `x`.
+#' @param to  Character, type into which `x` should be converted.
+#' @param width `NULL` or numeric (either length `1` or same length as `x`.
+#'        Width of the individual bins represented in `x`.
+#' @param drop If `TRUE` (default) the result is simplified if possible.
+#'
+#' @return If `to` is a single character and `drop = TRUE`, the return is a numeric vector
+#' of the same length as the input argument `x`. Else the return is
+#' a `data.frame` with the same number of rows as `length(x)`.
+#'
+#' @examples
+#' ## For testing:
+#' ## Draw PDF and CDF from Poisson distribution
+#' p <- ppois(0:10, lambda = 4)
+#' d <- dpois(0:10, lambda = 4)
+#' 
+#' ## Convert Poisson CDF to transition probabilities
+#' tp <- convert_tp(p, from = "cdf", to = "tp")
+#' round(tp, 2)
+#' 
+#' pd <- convert_tp(tp, from = "tp", to = c("pdf", "cdf"))
+#' 
+#' ## Convert transition probabilities back to CDF
+#' p2 <- convert_tp(tp, from = "tp", to = "cdf")
+#' all.equal(p, p2) # Must be equal
+#' 
+#' ## Convert transition probabilities to PDF
+#' d2 <- convert_tp(tp, from = "tp", to = "pdf")
+#' all.equal(d, d2) # Must be equal
+#' 
+#' ## Or directly from tp to both, CDF and PDF
+#' d2 <- convert_tp(tp, from = "tp", to = c("cdf", "pdf"))
+#' all.equal(p, d2$cdf)
+#' all.equal(d, d2$pdf)
+#' 
+#' ## Quick visual representation
+#' barplot(tp, col = "steelblue", main = "Transition Probabilities")
+#' col <- c("gray80", "tomato")
+#' barplot(rbind(p, p2), beside = TRUE, main = "CDF Comparison", col = col)
+#' barplot(rbind(d, d2), beside = TRUE, main = "PDF Comparison", col = col)
+#'
+#' @author Reto
+#' @export
 convert_tp <- function(x, from, to, width = NULL, drop = TRUE) {
     stopifnot(
         "'x' must be numeric of length > 0" = is.numeric(x) && length(x) > 0,
@@ -387,3 +438,30 @@ tp_to_pdf <- function(tp) {
     }
     return(res)
 }
+
+
+
+#' Create Column Names for Return Matrix
+#'
+#' Used in the S3 methods pdf, cdf, and quantile. If `elementwise = FALSE`
+#' the return is a matrix; this helper function creates the names based
+#' on the thresholds/probabilities used.
+#'
+#' @param x numeric, thresholds (pdf, cdf) or probabilities (quantile).
+#' @param prefix If \code{NULL} (quantiles) the result is in percent,
+#'        else this prefix is used for each 'x'.
+get_elementwise_colnames <- function(x, prefix = NULL, digits = 3) {
+    if (is.null(prefix)) {
+        x <- paste0(format(1e2 * x), "%")
+    } else {
+        x <- paste(prefix, trimws(format(x, digits = digits)), sep = "_")
+    }
+    if (anyDuplicated(x)) {
+        for (d in unique(x[duplicated(x)])) {
+            idx <- which(x == d)
+            x[idx] <- paste0(x[idx], c("", paste0("_", seq_len(length(idx) - 1))))
+        }
+    }
+    return(trimws(x))
+}
+

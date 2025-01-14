@@ -3,13 +3,16 @@
 # 
 VERSION := $(shell grep '^Version:' DESCRIPTION | awk '{print $$2}')
 
+.PHONY: document
+document:
+	Rscript -e "devtools::document()"
 
 .PHONY: test
 test: install
 	Rscript -e "library('transitreg'); tinytest::test_all()"
 
 .PHONY: install
-install:
+install: document
 	@echo Installing current version: $(VERSION)
 	(cd ../ && \
 		R CMD build --no-build-vignettes transitreg && \
