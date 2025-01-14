@@ -33,7 +33,7 @@
 integerVec find_positions(int x, int* y, int n) {
     integerVec which;
     which.index = (int*)malloc(n * sizeof(int));  // Allocate max possible size
-    if (which.index == NULL) { error("Memory allocation failed for integerVec.index."); }
+    if (which.index == NULL) { Rf_error("Memory allocation failed for integerVec.index."); }
 
     which.length = 0;
     for (int i = 0; i < n; i++) {
@@ -60,7 +60,7 @@ double treg_calc_mean(int* positions, int count, double* tpptr, double* binsptr)
     double prod = 1.0; // Initialize product
     for (int i = 0; i < count; i++) {
         if (ISNAN(tpptr[positions[i]])) {
-            error("TODO(R): Found missing value in tpptr, must be adressed in C");
+            Rf_error("TODO(R): Found missing value in tpptr, must be adressed in C");
             //return R_NaReal; 
         }
         // Updating weighted sum, simply "binmid * pdf(bin)" summed up
@@ -86,7 +86,7 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
     double prod = 1.0; // Initialize product
     for (i = 0; i < count; i++) {
         if (ISNAN(tpptr[positions[i]])) {
-            error("TODO(R): First element ISNAN, must be adressed in C");
+            Rf_error("TODO(R): First element ISNAN, must be adressed in C");
             //return R_NaReal; 
         }
         // Updating temporary PDF vector
@@ -125,7 +125,7 @@ doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
         // Looping over all elements except first
         for (int i = 1; i < count; i++) {
             if (ISNAN(tpptr[positions[i - 1]])) {
-                error("TODO(R): ISNAN must be implemented first (doubleVec; in cdf)");
+                Rf_error("TODO(R): ISNAN must be implemented first (doubleVec; in cdf)");
                 //return R_NaReal;
             }
             pprod *= tpptr[positions[i - 1]]; // Multiply with previous element
@@ -179,10 +179,10 @@ doubleVec treg_calc_quantile(int* positions, int count, double* tpptr,
     // Temporary double vector to store calculated quantiles
     double* tmp;
     tmp = (double*)malloc(count * sizeof(double)); // Allocate max possible size
-    if (res.values == NULL) { error("Memory allocation failed for doubleVec.values."); }
+    if (res.values == NULL) { Rf_error("Memory allocation failed for doubleVec.values."); }
 
     if (ISNAN(tpptr[positions[0]])) {
-        error("TODO(R): First element ISNAN, must be adressed in C"); //return R_NaReal; 
+        Rf_error("TODO(R): First element ISNAN, must be adressed in C"); //return R_NaReal; 
     }
 
     // Initialize with (1 - p[0])
@@ -198,7 +198,7 @@ doubleVec treg_calc_quantile(int* positions, int count, double* tpptr,
         double pprod = 1.0; // Initialize with 1.0 for product
         for (i = 1; i < count; i++) {
             if (ISNAN(tpptr[positions[i - 1]])) {
-                error("TODO(R): ISNAN must be implemented first (doubleVec; in cdf)");
+                Rf_error("TODO(R): ISNAN must be implemented first (doubleVec; in cdf)");
             }
 
             // Update product of transition probabilities
@@ -382,11 +382,11 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y, SEXP prob,
     // evaluated).
     SEXP res;
     if (do_pdf | do_cdf) {
-        if (ewise & (LENGTH(y) != un)) { error("[C]: Length of 'y' must be equal to length of 'u'."); }
+        if (ewise & (LENGTH(y) != un)) { Rf_error("[C]: Length of 'y' must be equal to length of 'u'."); }
         np = (ewise) ? 1 : LENGTH(y);
         PROTECT(res = allocVector(REALSXP, un * np));
     } else if (do_q) {
-        if (LENGTH(discrete) != un) { error("[C]: Length of 'discrete' must be equal to length of 'ui'."); }
+        if (LENGTH(discrete) != un) { Rf_error("[C]: Length of 'discrete' must be equal to length of 'ui'."); }
         np = (ewise) ? 1 : LENGTH(prob);
         PROTECT(res = allocVector(REALSXP, un * np));
     // Else it is type = "pmax", so length of res is equal to 'un'.
@@ -402,8 +402,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y, SEXP prob,
     // Else we throw an error here. That is for pmax where elementwise
     // makes no sense.
     if (!do_pdf & !do_cdf & !do_q & !ewise) {
-        printf("Using \"%s\" with elementwise = false not allowed.\n", CHAR(STRING_ELT(type, 0)));
-        exit(99);
+        Rf_error("Using \"%s\" with elementwise = false not allowed.\n", CHAR(STRING_ELT(type, 0)));
     }
 
     // Custom struct object to mimik "which()"

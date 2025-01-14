@@ -1,10 +1,30 @@
 
 
+#' Estimat Transition Probabilities via `glmnet`
+#'
+#' Experimental engine used to estimate the transition probabilities
+#' in a [transitreg()] model.
+#'
+#' @param formula An object of class `formula`.
+#' @param data A data.frame containing the required data to fit a binomial
+#'        regression model (given `formula`) using [glmnet::cv.glmnet()].
+#' @param nfolds Integer, defaults to `10L`. Number of cross-folds for the
+#'        glmnet model.
+#'
+#' @importFrom mgcv interpret.gam smoothCon
+#'
 #' @rdname transitreg_glmnet
 #' @export
 transitreg_glmnet <- function(formula, data, nfolds = 10, ...) {
-    warning("TODO(R): Experimental implementation")
-    stopifnot(requireNamespace("glmnet"))
+    ## TODO(R): This is very experimental! Known issues:
+    ## - Nfolds = 10 splits the data into 10 folds, ignoring that
+    ##   each observation shows up 1-N times in 'data'.
+    ## - Users have no option to control glmnet.
+    ## - This is really just a test!
+    warning("TODO(R): Experimental implementation!")
+    if (!requireNamespace("glmnet", quietly = TRUE)) {
+        stop("Package 'glmnet' is required but not installed.")
+    }
 
     # Extract smooth terms
     smooth_terms <- interpret.gam(as.formula(formula))$smooth
@@ -39,9 +59,9 @@ transitreg_glmnet <- function(formula, data, nfolds = 10, ...) {
     return(mod)
 }
 
-#' @method transitreg_glmnet predict
+#' @exportS3Method predict transitreg_glmnet
 #' @rdname transitreg_glmnet
-predict.transietreg_glmnet <- function(object, type = "response", s = "lambda.min", ...) {
+predict.transitreg_glmnet <- function(object, type = "response", s = "lambda.min", ...) {
     # Removing custom class and call predict.glmnet below
     class(object) <- class(object)[!class(object) == "transitreg_glmnet"]
 

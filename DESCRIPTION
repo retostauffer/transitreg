@@ -1,7 +1,7 @@
 Package: transitreg
 Title: Flexible Transition Models for Probabilistic Learning
-Version: 0.1-9004
-Date: 2024-01-11
+Version: 0.1-9005
+Date: 2024-01-14
 Authors@R: c(person(
                given = "Nikolaus", 
                family = "Umlauf", 
@@ -22,7 +22,7 @@ Description: Provides infrastructure for estimating flexible transition models,
 License: GPL-2 | GPL-3
 Depends: R (>= 4.1.0), mgcv, topmodels, distributions3
 Imports: Formula
-Suggests: colorspace, nnet, quarto
+Suggests: colorspace, nnet, quarto, glmnet
 VignetteBuilder: quarto
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

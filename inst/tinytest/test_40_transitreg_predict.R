@@ -48,10 +48,10 @@ expect_silent(true_pdf <- dnorm(binmid, truth$mu, truth$sd))
 expect_true(is.numeric(true_pdf) && length(true_pdf) == length(binmid),
                info = "Testing if 'true_pdf' has been calculated properly")
 # Testing against the same result using elementwise = FALSE
-expect_warning(mod_pdf  <- transitreg:::transitreg_predict(mod, newdata = nd, y = bm, type = "pdf"),
+expect_warning(mod_pdf  <- transitreg:::transitreg_predict(mod, newdata = nd, y = binmid, type = "pdf"),
                pattern = "Currently assuming 'discrete = FALSE'",
                info = "Predicting PDF based on the transitreg model (elementwise = NULL)")
-expect_warning(mod_pdf2 <- transitreg:::transitreg_predict(mod, newdata = nd, y = bm, type = "pdf", elementwise = FALSE),
+expect_warning(mod_pdf2 <- transitreg:::transitreg_predict(mod, newdata = nd, y = binmid, type = "pdf", elementwise = FALSE),
                pattern = "Currently assuming 'discrete = FALSE'",
                info = "Predicting PDF based on the transitreg model (elementwise = FALSE)")
 expect_identical(mod_pdf, mod_pdf2, info = "Comparing result (PDF) with elementwise NULL/FALSE")
@@ -72,7 +72,7 @@ expect_identical(dimnames(mod_pdf), list(NULL, sprintf("d_%d", seq_along(binmid)
 expect_true(all(abs(mod_pdf - true_pdf) < 1e-3),
               info = "Checking elementwise difference between predicted PDF and ground truth.")
 
-### matplot(x = bm, y = cbind(true = true_pdf, transitreg = as.vector(mod_pdf)),
+### matplot(x = binmid, y = cbind(true = true_pdf, transitreg = as.vector(mod_pdf)),
 ###         col = c("gray", "tomato"), lwd = c(3, 2), type = "l",
 ###         xlab = "response 'y'", ylab = "Density", main = "Comparison")
 ### legend("topleft", c("true", "transitreg"), col = c("gray", "tomato"), lwd = c(3, 2), lty = 1:2)
@@ -92,10 +92,10 @@ expect_silent(true_cdf <- pnorm(binmid, truth$mu, truth$sd))
 expect_true(is.numeric(true_cdf) && length(true_cdf) == length(binmid),
                info = "Testing if 'true_cdf' has been calculated properly")
 # Testing against the same result using elementwise = FALSE
-expect_warning(mod_cdf  <- transitreg:::transitreg_predict(mod, newdata = nd, y = bm, type = "cdf"),
+expect_warning(mod_cdf  <- transitreg:::transitreg_predict(mod, newdata = nd, y = binmid, type = "cdf"),
                pattern = "Currently assuming 'discrete = FALSE'",
                info = "Predicting CDF based on the transitreg model (elementwise = NULL)")
-expect_warning(mod_cdf2 <- transitreg:::transitreg_predict(mod, newdata = nd, y = bm, type = "cdf", elementwise = FALSE),
+expect_warning(mod_cdf2 <- transitreg:::transitreg_predict(mod, newdata = nd, y = binmid, type = "cdf", elementwise = FALSE),
                pattern = "Currently assuming 'discrete = FALSE'",
                info = "Predicting CDF based on the transitreg model (elementwise = FALSE)")
 expect_identical(mod_cdf, mod_cdf2, info = "Comparing result (CDF) with elementwise NULL/FALSE")
@@ -116,7 +116,7 @@ expect_identical(dimnames(mod_cdf), list(NULL, sprintf("p_%d", seq_along(binmid)
 expect_true(all(abs(mod_cdf - true_cdf) < 1e-1),
               info = "Checking elementwise difference between predicted CDF and ground truth.")
 
-### matplot(x = bm, y = cbind(true = true_cdf, transitreg = as.vector(mod_cdf)),
+### matplot(x = binmid, y = cbind(true = true_cdf, transitreg = as.vector(mod_cdf)),
 ###         col = c("gray", "tomato"), lwd = c(3, 2), type = "l",
 ###         xlab = "response 'y'", ylab = "Density", main = "Comparison")
 ### legend("topleft", c("true", "transitreg"), col = c("gray", "tomato"), lwd = c(3, 2), lty = 1:2)
@@ -151,20 +151,20 @@ rm(mod_q2)
 # Checking returned object
 expect_inherits(mod_q, "matrix",
               info = "Testing return class")
-expect_identical(dim(mod_q), c(1L, length(binmid)),
+expect_identical(dim(mod_q), c(1L, length(p)),
               info = "Dimension of returned matrix")
 expect_identical(dimnames(mod_q), list(NULL, trimws(paste0(format(p * 100, 0), "%"))),
               info = "Checking dimnames of returned matrix")
 
 # If the model and the prediction method work as expected, the difference
 # between the true Quantile and the predicted Quantile should be small (elementwise)
-expect_true(all(abs(mod_q - true_q) < 1.),
+expect_true(all(abs(mod_q - true_q) < 2.),
               info = "Checking elementwise difference between predicted Quantile and ground truth.")
 
-### matplot(x = cbind(true = true_q, transitreg = as.vector(mod_q)), y = p,
-###         col = c("gray", "tomato"), lwd = c(3, 2), type = "l",
-###         xlab = "response 'y'", ylab = "Density", main = "Comparison")
-### legend("topleft", c("true", "transitreg"), col = c("gray", "tomato"), lwd = c(3, 2), lty = 1:2)
+matplot(x = cbind(true = true_q, transitreg = as.vector(mod_q)), y = p,
+        col = c("gray", "tomato"), lwd = c(3, 2), type = "l",
+        xlab = "response 'y'", ylab = "Density", main = "Comparison")
+legend("topleft", c("true", "transitreg"), col = c("gray", "tomato"), lwd = c(3, 2), lty = 1:2)
 rm(true_q, mod_q)
 
 

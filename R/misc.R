@@ -1,11 +1,12 @@
-grep2 <- function(pattern, x, ...) 
-{
+grep2 <- function(pattern, x, ...) {
   i <- NULL
   for (p in pattern)
     i <- c(i, grep(p, x, ...))
   unique(i)
 }
 
+#' @importFrom stats formula
+#' @importFrom Formula as.Formula
 response_name <- function(formula) {
   if (is.list(formula)) {
     if (!is.null(formula$formula)) {
@@ -26,8 +27,10 @@ response_name <- function(formula) {
 ## as well as the parts that are needed to setup smooth term
 ## specification lists, or any type of special model terms
 ## that should be used for fitting.
-fake_formula <- function(formula, specials = NULL, nospecials = FALSE, onlyspecials = FALSE)
-{
+
+#' @importFrom stats formula terms update
+#' @importFrom Formula as.Formula
+fake_formula <- function(formula, specials = NULL, nospecials = FALSE, onlyspecials = FALSE) {
   if (is.list(formula))
     formula <- do.call("as.Formula", formula)
 
@@ -157,8 +160,7 @@ fake_formula <- function(formula, specials = NULL, nospecials = FALSE, onlyspeci
 }
 
 ## Replace * and : with +.
-ff_replace <- function(formula)
-{
+ff_replace <- function(formula) {
   n <- length(formula)
   if (length(n) > 1) {
     f <- formula[[max(n)]]
@@ -176,8 +178,10 @@ ff_replace <- function(formula)
 }
 
 ## Histogram and density plot.
-plot_hist <- function(x, ...)
-{
+#' @importFrom stats density na.omit
+#' @importFrom grDevices rgb
+#' @importFrom graphics hist lines rug
+plot_hist <- function(x, ...) {
   x <- na.omit(x)
   h <- hist(x, breaks = "Scott", plot = FALSE)
   d <- density(x)
@@ -197,8 +201,8 @@ plot_hist <- function(x, ...)
 }
 
 ## Q-Q plot.
-plot_qq <- function(x, ...)
-{
+#' @importFrom stats ppoints qqnorm
+plot_qq <- function(x, ...) {
   z <- qnorm(ppoints(length(x)))
   pch <- list(...)$pch
   if (is.null(pch))
@@ -211,8 +215,10 @@ plot_qq <- function(x, ...)
 }
 
 ## Wormplot.
-plot_wp <- function(x, ...)
-{
+#' @importFrom stats fitted lm na.omit
+#' @importFrom stats dnorm pnorm qnorm
+#' @importFrom graphics grid
+plot_wp <- function(x, ...) {
   x <- na.omit(x)
   d <- qqnorm(x, plot = FALSE)
   probs <- c(0.25, 0.75)
@@ -296,30 +302,30 @@ plot_wp <- function(x, ...)
 #' a `data.frame` with the same number of rows as `length(x)`.
 #'
 #' @examples
-#' ## For testing:
+#' ## For testing
 #' ## Draw PDF and CDF from Poisson distribution
 #' p <- ppois(0:10, lambda = 4)
 #' d <- dpois(0:10, lambda = 4)
-#' 
+#'
 #' ## Convert Poisson CDF to transition probabilities
 #' tp <- convert_tp(p, from = "cdf", to = "tp")
 #' round(tp, 2)
-#' 
+#'
 #' pd <- convert_tp(tp, from = "tp", to = c("pdf", "cdf"))
-#' 
+#'
 #' ## Convert transition probabilities back to CDF
 #' p2 <- convert_tp(tp, from = "tp", to = "cdf")
 #' all.equal(p, p2) # Must be equal
-#' 
+#'
 #' ## Convert transition probabilities to PDF
 #' d2 <- convert_tp(tp, from = "tp", to = "pdf")
 #' all.equal(d, d2) # Must be equal
-#' 
+#'
 #' ## Or directly from tp to both, CDF and PDF
 #' d2 <- convert_tp(tp, from = "tp", to = c("cdf", "pdf"))
 #' all.equal(p, d2$cdf)
 #' all.equal(d, d2$pdf)
-#' 
+#'
 #' ## Quick visual representation
 #' barplot(tp, col = "steelblue", main = "Transition Probabilities")
 #' col <- c("gray80", "tomato")
@@ -349,7 +355,7 @@ convert_tp <- function(x, from, to, width = NULL, drop = TRUE) {
         stopifnot(
             "'width' must be numeric" = is.numeric(width),
             "'width' must contain positive values" = all(width > 0),
-            "'width' must have length 1 or the same length as 'x'" = 
+            "'width' must have length 1 or the same length as 'x'" =
                 length(width) == 1L || length(width) == length(x)
         )
         width <- if (length(width) == 1L) rep(as.numeric(width), length(x)) else as.numeric(width)
@@ -450,7 +456,8 @@ tp_to_pdf <- function(tp) {
 #' @param x numeric, thresholds (pdf, cdf) or probabilities (quantile).
 #' @param prefix If \code{NULL} (quantiles) the result is in percent,
 #'        else this prefix is used for each 'x'.
-get_elementwise_colnames <- function(x, prefix = NULL, digits = 3) {
+#' @param digits Integer, number of significant digits for names.
+get_elementwise_colnames <- function(x, prefix = NULL, digits = pmax(3L, getOption("digits") - 3L)) {
     if (is.null(prefix)) {
         x <- paste0(format(1e2 * x), "%")
     } else {

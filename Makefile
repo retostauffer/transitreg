@@ -26,7 +26,7 @@ coverage: install
 clean:
 	-rm src/*.so
 	-rm src/*.o
-check: clean
+check: clean document
 	@echo Checking current version: $(VERSION)
 	(cd ../ && \
 		R CMD build --no-build-vignettes transitreg && \

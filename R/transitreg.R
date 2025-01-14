@@ -7,10 +7,10 @@
 #' for parallelization using OpenMP. This function detects how may
 #' cores are available in total (if OpenMP is available).
 #'
-#' @param verbose logical, if \code{TRUE} a message is shown.
+#' @param verbose logical, if `TRUE` a message is shown.
 #'
 #' @return Number of available cores (integer). If OpenMP is not
-#' available, \code{1L} is returned.
+#' available, `1L` is returned.
 #'
 #' @author Reto
 transitreg_detect_cores <- function(verbose = TRUE) {
@@ -29,12 +29,12 @@ transitreg_detect_cores <- function(verbose = TRUE) {
 #' Some parts of the package use C routines which allow for parallelization
 #' using OpenMP. This function is used to specify how many cores to be used.
 #'
-#' @param ncores \code{NULL} or a positive integer.
-#' @param verbose logical, if \code{TRUE} a message is shown.
+#' @param ncores `NULL` or a positive integer.
+#' @param verbose logical, if `TRUE` a message is shown.
 #'
 #' @return Number of cores to be used in OpenMP parallelization (integer).
 #'
-#' @details If \code{ncores} is \code{NULL} the number of available
+#' @details If `ncores` is `NULL` the number of available
 #' cores is auto-detected and set to 'total number of cores - 2'.
 #' If integer, it is checked if this number of cores is available,
 #' else set tot he 'total number of cores available'.
@@ -64,6 +64,8 @@ transitreg_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
 #' @param response Character string specifying the name of the response variable
 #'        to be used for transition modeling. This variable must represent
 #'        counts or categorical states.
+#' @param newresponse `NULL` or integer. New response vector to overwrite the one
+#'        in `data`.
 #' @param verbose Logical value indicating whether information about the transformation
 #'        process should be printed to the console. Default is `TRUE`.
 #'
@@ -76,7 +78,7 @@ transitreg_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
 #'
 #' @return
 #'   A transformed data frame in the long format. Each row represents a binary transition
-#'   indicator (\code{Y}) for the response variable. Additional columns in the output include:
+#'   indicator (`Y`) for the response variable. Additional columns in the output include:
 #'
 #' * `index`: The original row index from the input data.
 #' * `Y`: The binary indicator for whether a transition to a higher
@@ -102,7 +104,10 @@ transitreg_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
 #' print(dtm)
 #'
 #' @keywords data transformation
-#' @concept transition modeling
+#' @concept transition
+#' @concept modeling
+#'
+#' @importFrom stats setNames
 #'
 #' @author Niki
 transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose = TRUE) {
@@ -407,14 +412,8 @@ transitreg_predict <- function(object, newdata = NULL,
                discrete = rep(FALSE, length(ui))) # Discrete distribution?
   warning("TODO(R): transitreg_predict: Currently assuming 'discrete = FALSE'")
 
-  ## Verbose = TRUE, debugging output
-  if (verbose) {
-    cat("Arguments passed to C 'treg_predict' in R 'transitreg_predict()':\n")
-    str(args)
-  }
-  check_args_for_treg_predict(args)
-
   # Calling C
+  check_args_for_treg_predict(args)
   res  <- do.call(function(...) .Call("treg_predict", ...), args)
 
   # If 'ementwise = FALSE' we get length(y)/length(prob) results per
@@ -442,6 +441,7 @@ transitreg_predict <- function(object, newdata = NULL,
 # it is possible that C returns 'garbage' results as it tries to read
 # elemnets outside of memory, resulting in either segfaults or werid
 # results.
+#' @importFrom utils str
 check_args_for_treg_predict <- function(x) {
     ## Checking types first
     tmp <- list("integer" = c("uidx", "idx", "y", "ncores"),
@@ -483,7 +483,7 @@ check_args_for_treg_predict <- function(x) {
 #'
 #' @param y A response vector or a formula specifying the relationship between the
 #'        response and covariates. For count data, this is typically a vector of counts.
-#'        For continuous data, this can be paired with the \code{breaks} argument to
+#'        For continuous data, this can be paired with the `breaks` argument to
 #'        discretize the response.
 #' @param data Optional. If `y` is a formula, this specifies the data frame to
 #'        be used for model fitting.
@@ -493,14 +493,14 @@ check_args_for_treg_predict <- function(x) {
 #' @details
 #' This function estimates and visualizes the underlying probability density function
 #' (PDF) for count or continuous response data using transition models. For continuous
-#' data, the response is discretized based on the \code{breaks} argument passed through
+#' data, the response is discretized based on the `breaks` argument passed through
 #' \dots
 #'
 #' The function supports visualizations for raw counts, zero-inflated data, and transformed
 #' distributions, providing insights into the modeled distribution of the response variable.
 #'
 #' @return
-#' An object of class \code{"transitreg"}, as described in \code{\link{transitreg}}. This includes:
+#' An object of class `"transitreg"`, as described in [transitreg()]. This includes:
 #'
 #' * Fitted transition model details.
 #' * Model diagnostics and parameters.
@@ -532,6 +532,10 @@ check_args_for_treg_predict <- function(x) {
 #' transitreg_dist(y, breaks = 50)
 #'
 #' @keywords distribution visualization
+#'
+#' @importFrom stats model.response predict
+#' @importFrom grDevices rgb
+#' @importFrom graphics barplot lines points
 transitreg_dist <- function(y, data = NULL, ...) {
   if (is.null(y))
     stop("argument y is NULL!")
@@ -649,8 +653,6 @@ make_bins <- function(y, breaks = 30, scale = FALSE , ...) {
 #'        should be printed. Default is `FALSE`.
 #' @param \dots Additional arguments to be passed to the estimation engine.
 #' @param formula Object of class `transitreg`.
-#' @param inner Logical, if `FALSE` the 'outer' model frame is returned,
-#'        else the 'inner' model frame, the one used by the estimation engine.
 #'
 #' @details
 #' The function transforms the input data using [transitreg_data()] to a format
@@ -677,10 +679,9 @@ make_bins <- function(y, breaks = 30, scale = FALSE , ...) {
 #' * If `ncores > 1L` all available cores will be utilized.
 #'
 #' @return
-#' An object of class \code{"transitreg"`, which includes the following components:
-#'
-#' * Fitted model results compatible with \pkg{mgcv`-style outputs.
-#' * Methods for \code{plot`, \code{summary`, \code{residuals`, and \code{predict`.
+#' An object of class `"transitreg"`, which includes the following components:
+#' * Fitted model results compatible with \pkg{mgcv}-style outputs.
+#' * Methods for `plot`, `summary`, `residuals`, and `predict`.
 #' * Model diagnostics and transformation details.
 #'
 #' See [transitreg_detect_cores()] for some more details.
@@ -771,6 +772,9 @@ make_bins <- function(y, breaks = 30, scale = FALSE , ...) {
 #'   col = c(2, 4, 4, 4), add = TRUE)
 #'
 #' @keywords models regression
+#'
+#' @importFrom stats as.formula binomial predict sd update
+#' @importFrom mgcv gam bam
 #'
 #' @author Niki
 #' @export
@@ -1050,6 +1054,10 @@ transitreg <- function(formula, data, subset, na.action,
 #' plot(b, which = 3:4, spar = FALSE)
 #'
 #' @keywords methods models visualization
+#'
+#' @exportS3Method plot transitreg
+#' @importFrom stats residuals
+#' @importFrom graphics par
 plot.transitreg <- function(x, which = "effects", spar = TRUE, k = 5, ...)
 {
   ## What should be plotted?
@@ -1097,30 +1105,32 @@ plot.transitreg <- function(x, which = "effects", spar = TRUE, k = 5, ...)
   }
 }
 
-#' @method transitreg summary
+#' @exportS3Method summary transitreg
 summary.transitreg <- function(object, ...) {
   summary(object$model)
 }
 
-#' @method transitreg formula
+#' @importFrom stats formula
+#' @exportS3Method formula transitreg
 formula.transitreg <- function(x, ...) {
   formula(x$model)
 }
 
-#' @method transitreg coef
+#' @importFrom stats coef
+#' @exportS3Method coef transitreg
 coef.transitreg <- function(object, ...) {
   coef(object$model)
 }
 
 
 #' @author Reto
-#' @method transitreg model.frame
+#' @exportS3Method model.frame transitreg
 model.frame.transitreg <- function(formula, ...) {
   formula$model.frame
 }
 
 #' @author Niki
-#' @method transitreg print
+#' @exportS3Method print transitreg
 print.transitreg <- function(x, ...) {
   cat("Count Transition Model\n---")
   print(x$model)
@@ -1130,13 +1140,13 @@ print.transitreg <- function(x, ...) {
 
 #' Predict Method for Transition Model Fits
 #'
-#' Provides predictions for transition models fitted using the \code{\link{transitreg}} function.
+#' Provides predictions for transition models fitted using the [transitreg()] function.
 #' Predictions can be generated for the probability density function (PDF), cumulative
 #' distribution function (CDF), maximum probability, or specific quantiles of the response
 #' distribution.
 #'
 #'
-#' @param object An object of class `transitreg` resulting from a call to \code{\link{transitreg}}.
+#' @param object An object of class `transitreg` resulting from a call to [transitreg()].
 #' @param newdata Optional. A data frame containing new predictor values.
 #'        If not provided, predictions are made for the data used in fitting the model.
 #' @param y Optional. A vector of response values for which the PDF or CDF should
@@ -1144,7 +1154,7 @@ print.transitreg <- function(x, ...) {
 #' @param prob Optional. A numeric value specifying the quantile to compute when
 #'        `type = "quantile"`. Default is `0.5` (median). If provided,
 #'        argument `type` is set to `type = "quantile"`.
-#' @param `type` Character. Specifies the type of prediction to return (see Section 'Details').
+#' @param type Character. Specifies the type of prediction to return (see Section 'Details').
 #' @param ncores `NULL` (default) or single numeric. See section 'OpenMP'
 #'        of the [transitreg()] man page for more details.
 #' @param \dots Additional arguments passed to the prediction function.
@@ -1161,7 +1171,7 @@ print.transitreg <- function(x, ...) {
 #' * `"pdf"`: The predicted probability density function (PDF).
 #' * `"cdf"`: The cumulative distribution function (CDF).
 #' * `"pmax"`: The expected value of the response (maximum probability).
-#' * `"quantile"`: The quantile of the response specified by \code{prob}.
+#' * `"quantile"`: The quantile of the response specified by `prob`.
 #'
 #' For `"pdf"` and `"cdf"`, the response values (`y`) must be provided unless the
 #' model was fit with those values already included. For `"quantile"`, a specific
@@ -1176,7 +1186,7 @@ print.transitreg <- function(x, ...) {
 #'
 #' @seealso [transitreg()], [transitreg_data()], [transitreg_dist()].
 #'
-#' @examples:
+#' @examples
 #' ## Example: Predicting PDF and CDF.
 #' set.seed(123)
 #' n <- 500
@@ -1212,7 +1222,9 @@ print.transitreg <- function(x, ...) {
 #'   type = "l", col = 4, lwd = 2, lty = 1,
 #'   add = TRUE)
 #'
-#' @keywords methods, model
+#' @keywords methods model
+#'
+#' @importFrom stats model.frame
 #'
 #' @author Niki
 predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
@@ -1291,9 +1303,11 @@ predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
   return(pred)
 }
 
+#' @importFrom stats runif
+#'
 #' @author Niki
 #' @rdname transitreg
-#' @method transitreg logLik
+#' @exportS3Method logLik transitreg
 logLik.transitreg <- function(object, newdata = NULL, ...) {
   if (is.null(newdata)) {
     p <- object$probs$pdf
@@ -1309,7 +1323,7 @@ logLik.transitreg <- function(object, newdata = NULL, ...) {
 
 #' @author Niki
 #' @rdname transitreg
-#' @method transitreg residuals
+#' @exportS3Method residuals transitreg
 residuals.transitreg <- function(object, newdata = NULL, y = NULL, ...) {
   if (is.null(newdata)) {
     if (is.null(object$model.frame))
@@ -1348,9 +1362,11 @@ residuals.transitreg <- function(object, newdata = NULL, y = NULL, ...) {
 
 ## Rootogram method.
 
+#' @importFrom topmodels rootogram
+#'
 #' @author Niki
 #' @rdname transitreg
-#' @method transitreg rootogram
+#' @exportS3Method rootogram transitreg
 rootogram.transitreg <- function(object, newdata = NULL, plot = TRUE,
   width = 0.9, style = c("hanging", "standing", "suspended"),
   scale = c("sqrt", "raw"), expected = TRUE, confint = TRUE,
@@ -1414,7 +1430,7 @@ rootogram.transitreg <- function(object, newdata = NULL, plot = TRUE,
 
 #' @author Niki
 #' @rdname tmdist
-#' @method tmdist  rootogram
+#' @exportS3Method rootogram tmdist
 rootogram.tmdist <- function(object, newdata = NULL, plot = TRUE,
   width = 0.9, style = c("hanging", "standing", "suspended"),
   scale = c("sqrt", "raw"), expected = TRUE, confint = TRUE,

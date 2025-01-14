@@ -1,4 +1,12 @@
 
+## Version 0.1-9004
+
+* Still in development, major changes to the C code (removing the
+  dependency to know the original (numeric) response), fixed a few
+  smaller bugs.
+* Migrated to roxygen2 documentation.
+* Updated the prediction methods and functions.
+
 ## Version 0.1-9003
 
 * Renamed the package from it's working title `TransitionModels`

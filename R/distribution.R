@@ -19,7 +19,10 @@
 #' @examples
 #' # TODO(R) Write example
 #'
-#' @concept Transition distribution, Normal distribution, distributions
+#' @concept Transition distribution
+#' @concept distributions
+#'
+#' @importFrom stats setNames
 #'
 #' @author Reto
 #' @rdname Transition
@@ -59,7 +62,7 @@ Transition <- function(x, bins) {
 #'
 #' @author Reto
 #' @rdname Transition
-#' @method Transition c
+#' @exportS3Method c Transition
 c.Transition <- function(...) {
     x <- list(...)
     if (length(x) == 1) return(x[[1]])
@@ -77,8 +80,12 @@ c.Transition <- function(...) {
     Transition(res, attr(x[[1]], "bins"))
 }
 
+#' @importFrom distributions3 prodist
+#' @importFrom stats setNames
+#' @importFrom utils head tail
+#'
 #' @author Reto
-#' @method transitreg prodist
+#' @exportS3Method prodist transitreg
 #' @rdname transitreg
 prodist.transitreg <- function(object, newdata = NULL, ...) {
     # Extracting covariable names to create newdata
@@ -146,7 +153,7 @@ prodist.transitreg <- function(object, newdata = NULL, ...) {
 #'
 #' @author Reto
 #' @rdname Transition
-#' @method Transition as.matrix
+#' @exportS3Method as.matrix Transition
 as.matrix.Transition <- function(x, expand = FALSE, ...) {
     stopifnot("'expand' must be logical TRUE or FALSE" = isTRUE(expand) || isFALSE(expand))
 
@@ -169,8 +176,9 @@ as.matrix.Transition <- function(x, expand = FALSE, ...) {
     structure(x, class = c("Transitionmatrix", class(x)), bins = bins)
 }
 
-
-#' @method Transition format
+#' @importFrom stats setNames
+#'
+#' @exportS3Method format Transition
 format.Transition <- function(x, digits = pmax(3L, getOption("digits") - 3L), ...) {
     if (length(x) < 1L) return(character(0))
     xnames <- names(x) # Keep for later
@@ -197,9 +205,12 @@ format.Transition <- function(x, digits = pmax(3L, getOption("digits") - 3L), ..
 #'        `elementwise = FALSE` is used.
 #' @param ncores Number of cores to be used (see [transitreg()] for details).
 #'
+#' @importFrom distributions3 pdf
+#' @importFrom stats setNames
+#'
 #' @author Reto
 #' @rdname Transition
-#' @method Transition pdf
+#' @exportS3Method pdf Transition
 pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
 
     ## Get number of cores for OpenMP parallelization
@@ -252,16 +263,21 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     }
 }
 
+#' @importFrom distributions3 log_pdf
+#'
 #' @author Reto
 #' @rdname Transition
-#' @method Transition log_pdf
+#' @exportS3Method log_pdf Transition
 log_pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
     return(log(pdf(d, x, drop = drop, elementwise = elementwise, ncores = ncores, ...)))
 }
 
+#' @importFrom distributions3 cdf
+#' @importFrom stats setNames
+#'
 #' @author Reto
 #' @rdname Transition
-#' @method Transition cdf
+#' @exportS3Method cdf Transition
 cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
 
     ## Get number of cores for OpenMP parallelization
@@ -324,13 +340,15 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     }
 }
 
-#' @param probs numeric vector of probabilities with values in [0,1].
+#' @param probs numeric vector of probabilities with values in `[0,1]`.
 #'        (Values up to ‘2e-14’ outside that range are accepted and
 #'        moved to the nearby endpoint.) TODO(R): SURE?
 #'
+#' @importFrom stats quantile setNames
+#'
 #' @author Reto
 #' @rdname Transition
-#' @method Transition quantile
+#' @exportS3Method quantile Transition
 quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
     ## Get number of cores for OpenMP parallelization
     ncores <- transitreg_get_number_of_cores(ncores, FALSE)
@@ -386,16 +404,19 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
 }
 
 
+#' @importFrom stats median
+#'
 #' @param na.rm Unused.
 #' @rdname Transition
-#' @method Transition median
+#' @exportS3Method median Transition
 median.Transition <- function(x, na.rm = NULL, ncores = NULL, ...) {
     quantile(x, probs = 0.5, ncores = ncores, ...)
 }
 
-
+#' @importFrom stats setNames
+#'
 #' @rdname Transition
-#' @method Transition mean
+#' @exportS3Method mean Transition
 mean.Transition <- function(x, ncores = NULL, ...) {
 
     ## TODO(R): Not correct if the distribution does not cover
@@ -430,10 +451,12 @@ mean.Transition <- function(x, ncores = NULL, ...) {
     setNames(res, names(x))
 }
 
-
+#' @importFrom distributions3 random
+#' @importFrom stats runif
+#'
 #' @param n Integer `>0`, number of random values to be drawn per distribution.
 #' @rdname Transition
-#' @method Transition random
+#' @exportS3Method random Transition
 random.Transition <- function(x, n = 1L, drop = TRUE, ...) {
 
     # Calculating 'bin mids'
@@ -472,9 +495,11 @@ random.Transition <- function(x, n = 1L, drop = TRUE, ...) {
     }
 }
 
+#' @importFrom distributions3 is_discrete
+#'
 #' @author Reto
 #' @rdname Transition
-#' @method Transition is_discrete
+#' @exportS3Method is_discrete Transition
 is_discrete.Transition <- function(d, ...) {
     x <- attr(d, "bins")
     # Calculating mid of bins
@@ -484,16 +509,21 @@ is_discrete.Transition <- function(d, ...) {
     rep(all(abs(x %% 1) < sqrt(.Machine$double.eps)), length(d))
 }
 
+#' @importFrom distributions3 is_continuous
+#'
 #' @author Reto
 #' @rdname Transition
-#' @method Transition is_continuous
+#' @exportS3Method is_continuous Transition
 is_continuous.Transition <- function(d, ...) {
     return(!is_discrete(d))
 }
 
+#' @importFrom distributions3 support
+#' @importFrom stats setNames
+#'
 #' @author Reto
 #' @rdname Transition
-#' @method Transition support
+#' @exportS3Method support Transition
 support.Transition <- function(d, drop = NULL, ...) {
     x <- setNames(range(attr(d, "bins")), c("min", "max"))
     if (length(x) > 1) {
@@ -506,9 +536,11 @@ support.Transition <- function(d, drop = NULL, ...) {
 
 # TODO(R): Used?
 
+#' @importFrom topmodels newresponse
+#'
 #' @author Reto
 #' @rdname transitreg
-#' @method transitreg newresponse
+#' @exportS3Method newresponse transitreg
 newresponse.transitreg <- function(object, newdata = NULL, ...) {
     ## Response name
     yn <- object$response
