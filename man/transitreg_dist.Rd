@@ -19,7 +19,7 @@ be used for model fitting.}
 settings for the estimation engine, formula, and other relevant parameters.}
 }
 \value{
-An object of class \code{"transitreg"}, as described in \code{\link{transitreg}}. This includes:
+An object of class \code{"transitreg"}, as described in \code{\link[=transitreg]{transitreg()}}. This includes:
 \itemize{
 \item Fitted transition model details.
 \item Model diagnostics and parameters.

@@ -9,9 +9,9 @@
 \alias{rootogram.transitreg}
 \title{Transition Models Estimation}
 \usage{
-\method{transitreg}{prodist}(object, newdata = NULL, ...)
+\method{prodist}{transitreg}(object, newdata = NULL, ...)
 
-\method{transitreg}{newresponse}(object, newdata = NULL, ...)
+\method{newresponse}{transitreg}(object, newdata = NULL, ...)
 
 transitreg(
   formula,
@@ -27,11 +27,11 @@ transitreg(
   ...
 )
 
-\method{transitreg}{logLik}(object, newdata = NULL, ...)
+\method{logLik}{transitreg}(object, newdata = NULL, ...)
 
-\method{transitreg}{residuals}(object, newdata = NULL, y = NULL, ...)
+\method{residuals}{transitreg}(object, newdata = NULL, y = NULL, ...)
 
-\method{transitreg}{rootogram}(
+\method{rootogram}{transitreg}(
   object,
   newdata = NULL,
   plot = TRUE,
@@ -78,15 +78,12 @@ the return object.}
 
 \item{verbose}{Logical value indicating whether progress and diagnostic messages
 should be printed. Default is \code{FALSE}.}
-
-\item{inner}{Logical, if \code{FALSE} the 'outer' model frame is returned,
-else the 'inner' model frame, the one used by the estimation engine.}
 }
 \value{
-An object of class \code{"transitreg"`, which includes the following components:
+An object of class \code{"transitreg"}, which includes the following components:
 \itemize{
-\item Fitted model results compatible with \pkg{mgcv`-style outputs.
-\item Methods for \code{plot\verb{, \code\{summary}, \code{residuals\verb{, and \code\{predict}.
+\item Fitted model results compatible with \pkg{mgcv}-style outputs.
+\item Methods for \code{plot}, \code{summary}, \code{residuals}, and \code{predict}.
 \item Model diagnostics and transformation details.
 }
 

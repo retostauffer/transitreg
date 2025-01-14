@@ -13,6 +13,9 @@ transitreg_data(data, response = NULL, newresponse = NULL, verbose = TRUE)
 to be used for transition modeling. This variable must represent
 counts or categorical states.}
 
+\item{newresponse}{\code{NULL} or integer. New response vector to overwrite the one
+in \code{data}.}
+
 \item{verbose}{Logical value indicating whether information about the transformation
 process should be printed to the console. Default is \code{TRUE}.}
 }
@@ -62,6 +65,7 @@ print(dtm)
 \author{
 Niki
 }
-\concept{transition modeling}
+\concept{modeling}
+\concept{transition}
 \keyword{data}
 \keyword{transformation}

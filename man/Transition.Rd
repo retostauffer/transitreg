@@ -18,29 +18,29 @@
 \usage{
 Transition(x, bins)
 
-\method{Transition}{c}(...)
+\method{c}{Transition}(...)
 
-\method{Transition}{as.matrix}(x, expand = FALSE, ...)
+\method{as.matrix}{Transition}(x, expand = FALSE, ...)
 
-\method{Transition}{pdf}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
+\method{pdf}{Transition}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
 
-\method{Transition}{log_pdf}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
+\method{log_pdf}{Transition}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
 
-\method{Transition}{cdf}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
+\method{cdf}{Transition}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
 
-\method{Transition}{quantile}(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
+\method{quantile}{Transition}(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
 
-\method{Transition}{median}(x, na.rm = NULL, ncores = NULL, ...)
+\method{median}{Transition}(x, na.rm = NULL, ncores = NULL, ...)
 
-\method{Transition}{mean}(x, ncores = NULL, ...)
+\method{mean}{Transition}(x, ncores = NULL, ...)
 
-\method{Transition}{random}(x, n = 1L, drop = TRUE, ...)
+\method{random}{Transition}(x, n = 1L, drop = TRUE, ...)
 
-\method{Transition}{is_discrete}(d, ...)
+\method{is_discrete}{Transition}(d, ...)
 
-\method{Transition}{is_continuous}(d, ...)
+\method{is_continuous}{Transition}(d, ...)
 
-\method{Transition}{support}(d, drop = NULL, ...)
+\method{support}{Transition}(d, drop = NULL, ...)
 }
 \arguments{
 \item{x}{Numeric, vector of quantiles.}
@@ -68,7 +68,7 @@ means that \code{elementwise = TRUE} is used if the lengths match and otherwise
 
 \item{ncores}{Number of cores to be used (see \code{\link[=transitreg]{transitreg()}} for details).}
 
-\item{probs}{numeric vector of probabilities with values in \link{0,1}.
+\item{probs}{numeric vector of probabilities with values in \verb{[0,1]}.
 (Values up to ‘2e-14’ outside that range are accepted and
 moved to the nearby endpoint.) TODO(R): SURE?}
 
@@ -105,4 +105,5 @@ TODO(R): Missing
 \author{
 Reto
 }
-\concept{Transition distribution, Normal distribution, distributions}
+\concept{Transition distribution}
+\concept{distributions}

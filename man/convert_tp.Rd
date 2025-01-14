@@ -32,7 +32,7 @@ This utility function allows to convert from CDF to TPs, and from TPs
 back to CDF/PDF.
 }
 \examples{
-## For testing:
+## For testing
 ## Draw PDF and CDF from Poisson distribution
 p <- ppois(0:10, lambda = 4)
 d <- dpois(0:10, lambda = 4)
