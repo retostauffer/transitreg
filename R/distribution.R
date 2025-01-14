@@ -211,7 +211,7 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     } else {
         # Create and return matrix
         return(matrix(res, byrow = TRUE, ncol = length(x),
-                      dimnames = list(xnames, get_mat_colnames(x, "d"))))
+                      dimnames = list(xnames, get_elementwise_colnames(x, "d"))))
     }
 }
 
@@ -229,7 +229,7 @@ log_pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = N
 #' @param x numeric, thresholds (pdf, cdf) or probabilities (quantile).
 #' @param prefix If \code{NULL} (quantiles) the result is in percent,
 #'        else this prefix is used for each 'x'.
-get_mat_colnames <- function(x, prefix = NULL, digits = 3) {
+get_elementwise_colnames <- function(x, prefix = NULL, digits = 3) {
     if (is.null(prefix)) {
         x <- paste0(format(1e2 * x), "%")
     } else {
@@ -299,7 +299,7 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
         }
         # Create and return matrix
         return(matrix(res, byrow = TRUE, ncol = length(x),
-                      dimnames = list(xnames, get_mat_colnames(x, "p"))))
+                      dimnames = list(xnames, get_elementwise_colnames(x, "p"))))
     }
 }
 
@@ -350,7 +350,7 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
     # Else return matrix
     } else {
         return(matrix(res, byrow = TRUE, ncol = length(probs),
-                      dimnames = list(xnames, get_mat_colnames(probs, NULL))))
+                      dimnames = list(xnames, get_elementwise_colnames(probs, NULL))))
     }
 }
 

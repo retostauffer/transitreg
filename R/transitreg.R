@@ -60,7 +60,9 @@ transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose =
         is.null(response) || (is.character(response) && length(response) == 1L),
     "'newresponse' must be NULL or a numeric vector with length > 0" =
         is.null(newresponse) || (is.numeric(newresponse) && length(newresponse > 0)),
-    "'verbose' must be TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose)
+    "'verbose' must be TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
+    "'newresponse' must be NULL or bins (0, 1, 2, ...)" =
+        is.null(newresponse) || (is.integer(newresponse) && all(newresponse >= 0))
   )
 
   ## Ensure data is a data frame.
@@ -70,6 +72,19 @@ transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose =
   ## Determine response column if not specified by user.
   if (is.null(response))
     response <- names(data)[1L]
+
+  ## If newresponse is give, it must be length == 1 or the same length
+  ## as the number of observations in 'data'. Required as we 'blow up'
+  ## the data for the binary model.
+  if (!is.null(newresponse)) {
+      if (length(newresponse) == 1L) {
+          newresponse <- rep(newresponse, nrow(data))
+      } else if (length(newresponse) != nrow(data)) {
+          stop("'newresponse' must be of length one (recycled for all observations) ",
+               "or a vector of the same length as number of observations (rows) ",
+               "in 'data'.")
+      }
+  }
 
   ## If 'response' is provided in 'data' and an additional 'newresponse'
   ## is provided, we will replace 'data[[response]]' with the newresponse.
@@ -159,11 +174,13 @@ num2bin <- function(x, bins) {
 }
 
 
-## Predict function.
-predict_tp <- function(object, newdata = NULL,
+# Helper function for predictions on a transitreg model object.
+transitreg_predict <- function(object, newdata = NULL,
         type = c("pdf", "cdf", "quantile", "pmax"),
-        newresponse = NULL, y = NULL, prob = 0.5, maxcounts = 1e+03,
+        newresponse = NULL, y = NULL, prob = 0.5,
+        elementwise = NULL, maxcounts = 1e+03,
         verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
+        digits = pmax(3L, getOption("digits") - 3L),
         factor = FALSE, ncores = NULL) {
 
   ## This method is built on the 'transitreg' model as we need access
@@ -177,15 +194,6 @@ predict_tp <- function(object, newdata = NULL,
   type <- tolower(type)
   type <- match.arg(type)
 
-  ## TODO(R): I assume this check is not correct
-  ##if (length(prob) > 1)
-  ##  warning("Argument 'prob' has length > 1, only first element will be used.")
-
-  ##if (type == "quantile") {
-  ##  prob <- as.numeric(prob)[1L]
-  ##  stopifnot("'prob' must be numeric in [0, 1]" = prob >= 0 & prob <= 1)
-  ##}
-
   if (is.null(ncores))
     ncores <- transitreg_get_number_of_cores(ncores, verbose = verbose)
 
@@ -196,25 +204,61 @@ predict_tp <- function(object, newdata = NULL,
     "'newresponse' must be NULL or numeric vector with length > 0" =
         is.null(newresponse) || (is.numeric(newresponse) && length(newresponse) > 0),
     "'y' must be NULL or a vector" = is.null(y) || is.vector(y),
+    "'elementwise' must be NULL, TRUE, or FALSE" =
+        is.null(elementwise) || isTRUE(elementwise) || isFALSE(elementwise),
     "'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
     "'factor' must be logical TRUE or FALSE" = isTRUE(factor) || isFALSE(factor),
     "'ncores' must be NULL or numeric >= 1" = is.null(ncores) || (ncores >= 1)
   )
   ## TODO(R) Not all arguments are checked above
 
+  ## Guessing elementwise if needed
+  ##
+  ## elementwise = TRUE: We have one y/prob for each observation. Thus,
+  ## the result will be a vector of the same length as the number of observations
+  ## we predict for.
+  ##
+  ## If elementwise = FALSE, y/prob are not 'elementwise values' but are used
+  ## to evaluate cdf, pdf, quantile, ..., at each observation. Thus, the result
+  ## will be a matrix of dimension <number of obs> x <length p/y>.
+  if (is.null(elementwise)) {
+      if (type == "quantile") {
+          elementwise <- length(prob) == 1L | length(prob) == length(newresponse)
+      } else {
+          elementwise <- length(y) == 1L | length(y) == length(newresponse)
+      }
+  }
+
   ## If 'newdata' is NULL we take the existing model.frame
   ## which already contains the response as 'bin index'.
-  if (is.null(newdata)) {
-    newdata <- model.frame(object)
-  ## Else convert the response from numeric values to bins.
-  ## If response not in data.frame this has no effect.
+
+  # If 'newresponse' is given, convert to bins (integer, the bin the
+  # observation will fall into).
+  if (!is.null(newresponse)) {
+    newresponse <- num2bin(newresponse, object$bins)
+  } else if (!is.null(newdata)) {
+    newresponse <- num2bin(newdata[[object$response]], object$bins)
+  # Else 'newdata' was empty, take model.frame
   } else {
-    newdata[[object$response]] <- num2bin(newdata[[object$response]], object$bins)
+    newdata <- model.frame(object)
+    ## These are already integers
+    newresponse <- unname(model.response(model.frame(object)))
   }
-  ## Convert 'newresponse' to bin index (if NULL, stays NULL)
-  xxx <- newresponse
-  stop("RETO: Needs re-thinking here");
-  newresponse <- num2bin(newresponse, object$bins)
+
+  ## For safety: Ensure the newresponse is a proper integer vector
+  ## with all elements in {0, 1, 2, ...}.
+  stopifnot(
+    "'newresponse' must be integers > 0 (pseudo-observations)" =
+        is.integer(newresponse) && all(newresponse > 0) && all(!is.na(newresponse))
+  )
+
+  ## Probs
+  if (type == "quantile") {
+      prob <- as.numeric(prob)
+      stopifnot("'prob' must be numeric in [0, 1]" =
+                all(prob) >= 0 && all(prob) <= 1 && all(!is.na(prob)))
+  }
+
 
   ## Preparing data
   newdata <- transitreg_data(newdata, response = object$response,
@@ -244,24 +288,53 @@ predict_tp <- function(object, newdata = NULL,
 
   ## Extract unique indices
   ui   <- unique(newdata$index)
-  prob <- rep(prob, length(ui))
 
-  ## Ensure we hand over the correct thing to C
+  ## Set y/prob required to call the .C function treg_predict.
+  ## If type == quantile we need to populate 'prob', if type == 'cdf/pdf'
+  ## we need 'y', else both will be set NA_<type>_.
   if (type == "quantile") {
-      stopifnot(is.numeric(prob), length(prob) == length(ui),
-                all(!is.na(prob)), all(prob >= 0 & prob <= 1))
-  } else if (is.null(prob)) {
-      prob <- NA_real_ # dummy value for C (not used if type != 'quantile')
+      prob <- if (length(prob) == 1L) rep(prob, length(ui)) else prob
+      y <- NA_integer_ # Dummy value for C (unused)
+      # Important
+      if (!elementwise) prob <- sort(prob)
+  } else {
+      prob <- NA_real_ # Dummy value for C (unused)
+      y <- as.integer(newresponse) # Binary (pseudo-)response
+      if (!elementwise) y <- sort(y)
   }
 
-  res <- .Call("treg_predict",
-               uidx  = ui,                       # Unique distribution index (int)
-               idx   = newdata$index,            # Index vector (int)
-               tp    = tp,                       # Transition probabilities
-               bins  = object$bins,              # Point intersections of bins
-               y     = NA_real_,                 # Where to evaluate the pdf
-               type  = type, ncores = ncores, elementwise = TRUE,
-               discrete = FALSE) # <- dummy value
+  args <- list(uidx  = ui,                        # int; Unique distribution index (int)
+               idx   = newdata$index,             # int; Index vector (int)
+               tp    = tp,                        # num; Transition probabilities
+               bins  = object$bins,               # num; Point intersections of bins
+               y     = y,                         # int; Response y, used for 'cdf/pdf'
+               prob  = prob,                      # num; Probabilities (used for 'quantile')
+               type  = type,                      # str; to predict/calculate
+               ncores = ncores,                   # int; Number of cores to be used (OpenMP)
+               elementwise = elementwise,         # Elementwise (one prob or y per ui)
+               discrete = rep(FALSE, length(ui))) # Discrete distribution?
+  warning("TODO(R): transitreg_predict: Currently assuming 'discrete = FALSE'")
+
+  ## Verbose = TRUE, debugging output
+  if (verbose) {
+    cat("Arguments passed to C 'treg_predict' in R 'transitreg_predict()':\n")
+    str(args)
+  }
+
+  # Calling C
+  res  <- do.call(function(...) .Call("treg_predict", ...), args)
+
+  # If 'ementwise = FALSE' we get length(y)/length(prob) results per
+  # observation and have to glue them back together into a matrix.
+  if (!elementwise && type == "quantile") {
+    res <- matrix(res, byrow = TRUE, ncol = length(prob),
+                  dimnames = list(NULL, get_elementwise_colnames(prob, NULL)))
+  } else if (!elementwise) {
+    prefix <- if (type == "pdf") "d" else "p"
+    res <- matrix(res, byrow = TRUE, ncol = length(y),
+                  dimnames = list(NULL, get_elementwise_colnames(y, prefix)))
+  }
+
 
   return(res)
 }
@@ -529,13 +602,22 @@ transitreg <- function(formula, data, subset, na.action,
 
   ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.
-  tmp    <- .Call("treg_predict_pdfcdf", uidx = ui, idx = tmf$index,
-                  tp = tp, y = mf[[response]], bins = bins, ncores = ncores)
+  args <- list(uidx = ui, idx = tmf$index,
+               tp = tp, y = mf[[response]], bins = bins, ncores = ncores)
 
-  eps <- sqrt(.Machine$double.eps)
-  tmp$pdf[tmp$pdf < eps]     <- eps
-  tmp$cdf[tmp$cdf < eps]     <- eps
-  tmp$cdf[tmp$cdf > 1 - eps] <- 1 - eps
+  ## Verbose = TRUE, debugging output
+  if (verbose) {
+    cat("Arguments passed to C 'treg_predict_pdfcdf' in R 'transitreg()':\n")
+    str(args)
+  }
+
+  # Calling C
+  tmp <- do.call(function(...) .Call("treg_predict_pdfcdf", ...), args)
+
+  # Fixing values close to 0/1
+  tmp$pdf[tmp$pdf < 1e-15]    <- 1e-15
+  tmp$cdf[tmp$cdf < 1e-15]    <- 1e-15
+  tmp$cdf[tmp$cdf > 0.999999] <- 0.999999
 
   rval$probs <- as.data.frame(tmp)
   rm(tmp)

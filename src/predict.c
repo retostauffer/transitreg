@@ -225,6 +225,7 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
                         double* binsptr, double* prob, int np, bool disc) {
 
     int i, j;
+    double eps = sqrt(DBL_EPSILON);
 
     // Assign correct quantile to each element in res.values.
     // i: Loops over the quantiles we are looking for
@@ -236,13 +237,13 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
             if (ISNAN(tmp[j])) { break; }
 
             // If prob[i] < tmp[0]: Store lowest value and break loop
-            if (prob[i] < tmp[0]) {
+            if (prob[i] < (tmp[0] + eps)) {
                 res[i] = disc ? (binsptr[1] + binsptr[0]) * 0.5 : binsptr[0];
                 break;
             }
 
             // Check if we fall into this bin
-            if ((prob[i] >= tmp[j - 1]) & (prob[i] < tmp[j])) {
+            if ((prob[i] >= (tmp[j - 1] - eps)) & (prob[i] < (tmp[j] + eps))) {
                 // If discrete: Store center of the bin
                 if (disc) {
                     res[i] = (binsptr[j + 1] + binsptr[j]) * 0.5;
@@ -258,7 +259,7 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
         // This means we reached the end of the loop above but could not find a
         // bin we fall into. Fill the results vector with "highest bin".
         if (j == count) {
-            res[i] = disc ? (binsptr[count] + binsptr[count - 1]) * 0.5 : binsptr[count];
+            res[i] = disc ? (binsptr[count] + binsptr[count + 1]) * 0.5 : binsptr[count];
         }
     }
     // void function, no return, we have updated/modified 'res'
@@ -381,9 +382,11 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y, SEXP prob,
     // evaluated).
     SEXP res;
     if (do_pdf | do_cdf) {
+        if (ewise & (LENGTH(y) != un)) { error("[C]: Length of 'y' must be equal to length of 'u'."); }
         np = (ewise) ? 1 : LENGTH(y);
         PROTECT(res = allocVector(REALSXP, un * np));
     } else if (do_q) {
+        if (LENGTH(discrete) != un) { error("[C]: Length of 'discrete' must be equal to length of 'ui'."); }
         np = (ewise) ? 1 : LENGTH(prob);
         PROTECT(res = allocVector(REALSXP, un * np));
     // Else it is type = "pmax", so length of res is equal to 'un'.
@@ -544,8 +547,8 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP bins, SEXP n
         //
         // Input arguments are (in this order)
         //     positions, count, tpptr, binsptr, y, ny
-        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, binsptr, yptr, 1);
-        tmpcdf = treg_calc_cdf(which.index, which.length, tpptr, binsptr, yptr, 1);
+        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, binsptr, &yptr[i], 1);
+        tmpcdf = treg_calc_cdf(which.index, which.length, tpptr, binsptr, &yptr[i], 1);
 
         // Store last value, that is the last bin provided for this distribution.
         pdfptr[i] = tmppdf.values[tmppdf.length - 1];
