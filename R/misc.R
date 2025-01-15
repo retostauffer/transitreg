@@ -457,6 +457,17 @@ tp_to_pdf <- function(tp) {
 #' @param prefix If \code{NULL} (quantiles) the result is in percent,
 #'        else this prefix is used for each 'x'.
 #' @param digits Integer, number of significant digits for names.
+#'
+#' @details If `prefix = NULL` it is expected that `x` contains probabilities
+#' in the range of `[0,1]`. The returned vector of names will therefore contain
+#' `"10%"`, `"20%"`, `"99%`" etc.
+#'
+#' When a `prefix` is set, `x` is interpreted as numeric value and the returned
+#' names will be a combination of the `prefix` and the numeric value of `x`.
+#' This will result in e.g, `p_-12.4`, `p_0`, `p_11.302`, ... .
+#'
+#' @author Reto
+#' @return A character vector with 'column names'.
 get_elementwise_colnames <- function(x, prefix = NULL, digits = pmax(3L, getOption("digits") - 3L)) {
     if (is.null(prefix)) {
         x <- paste0(format(1e2 * x), "%")

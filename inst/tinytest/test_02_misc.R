@@ -116,4 +116,49 @@ expect_silent(tmp <- transitreg:::ff_replace(f))
 #          does not throw any error, but does not return the intended result right?
 
 
+# -------------------------------------------------------------------
+# 'get_elementwise_colnames': A helper function to return proper
+# column names if cdf, pdf, quantile, ... are called with
+# elementwise = FALSE.
+# -------------------------------------------------------------------
+fn <- transitreg:::get_elementwise_colnames
+expect_true(is.function(fn), info = "Check if we can find 'get_elementwise_colnames'")
+
+# --------------- quantiles --------------
+# Testing return for quantiles; no prefix will convert the
+# input 'p' into percentages. 
+p <- seq(0.1, 0.9, by = 0.1)
+expect_silent(cnames <- fn(p),
+                info = "Create 'quantile' column names")
+# Testing defaults
+expect_silent(cnames2 <- fn(p, prefix = NULL),
+                info = "Create column names with defaults")
+expect_identical(cnames, cnames2,
+                info = "Testing return using function defaults")
+rm(cnames2)
+
+# Checking expected names
+expect_identical(cnames, paste0(seq.int(10, 90, by = 10), "%"),
+                info = "Checking 'quantile' column names")
+rm(cnames, p)
+
+# ------------------ cdf -----------------
+set.seed(6020)
+digits <- pmax(3L, getOption("digits") - 3L)
+y <- runif(100, -1000, 1000)
+
+# Single digit
+expect_silent(cnames <- fn(y, prefix = "x", digits = digits),
+                info = "Create column names")
+expect_identical(cnames, paste("x", trimws(format(y, digits = digits)), sep = "_"),
+                info = "Checking column names")
+
+
+
+
+
+
+
+
+
 

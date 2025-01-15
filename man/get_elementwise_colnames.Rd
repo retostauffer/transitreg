@@ -18,8 +18,23 @@ else this prefix is used for each 'x'.}
 
 \item{digits}{Integer, number of significant digits for names.}
 }
+\value{
+A character vector with 'column names'.
+}
 \description{
 Used in the S3 methods pdf, cdf, and quantile. If \code{elementwise = FALSE}
 the return is a matrix; this helper function creates the names based
 on the thresholds/probabilities used.
+}
+\details{
+If \code{prefix = NULL} it is expected that \code{x} contains probabilities
+in the range of \verb{[0,1]}. The returned vector of names will therefore contain
+\code{"10\%"}, \code{"20\%"}, \verb{"99\%}" etc.
+
+When a \code{prefix} is set, \code{x} is interpreted as numeric value and the returned
+names will be a combination of the \code{prefix} and the numeric value of \code{x}.
+This will result in e.g, \code{p_-12.4}, \code{p_0}, \code{p_11.302}, ... .
+}
+\author{
+Reto
 }
