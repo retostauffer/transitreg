@@ -1279,9 +1279,10 @@ print.transitreg <- function(x, ...) {
 #'
 #' @importFrom stats model.frame
 #'
+#' @exportS3Method predict transitreg
 #' @author Niki
 predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
-        type = c("pdf", "cdf", "pmax", "quantile"), ncores = NULL, ...) {
+        type = c("pdf", "cdf", "pmax", "quantile"), ncores = NULL, elementwise = NULL, verbose = FALSE, ...) {
 
   type <- tolower(type)
   type <- match.arg(type)
@@ -1323,18 +1324,23 @@ predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
   }
 
   ## Calling transitreg_predict to perform the actual prediction
-  pred <- transitreg_predict(object$model,
-                     breaks       = object$breaks,
-                     newdata      = newdata,
-                     ncores       = ncores,
-                     response     = object$response,
-                     type         = type,
-                     maxcounts    = object$maxcounts,
-                     prob         = prob,
-                     theta_scaler = object$scaler$theta,
-                     theta_vars   = object$theta_vars,
-                     factor       = object$factor,
-                     ...)
+  args <- list(object       = object,
+               newdata      = newdata,
+               type         = type,
+               y            = y,
+               prob         = prob,
+               elementwise  = elementwise,
+               maxcounts    = object$maxcounts,
+               verbose      = verbose,
+               theta_scaler = object$scaler$theta,
+               theta_vars   = object$theta_vars,
+               factor       = object$factor,
+               ncores       = ncores)
+  pred <- do.call(transitreg_predict, args)
+  print(pred)
+  print(length(pred))
+  str(args)
+  stop(" ----------- stop in predict.transitreg ------ ")
 
   if (type == "quantile") print(summary(pred))
 
