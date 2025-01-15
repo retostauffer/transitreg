@@ -413,6 +413,7 @@ transitreg_predict <- function(object, newdata = NULL,
     breaks   <- object$breaks
   }
 
+  ## Setting up arguments for the .C call
   args <- list(uidx   = ui,                # int; Unique distribution index (int)
                idx    = newdata$index,     # int; Index vector (int)
                tp     = tp,                # num; Transition probabilities
@@ -422,7 +423,7 @@ transitreg_predict <- function(object, newdata = NULL,
                type   = type,              # str; to predict/calculate
                ncores = ncores,            # int; Number of cores to be used (OpenMP)
                elementwise = elementwise,  # Elementwise (one prob or y per ui)
-               discrete = discrete)        # Discrete distribution?
+               discrete    = discrete)     # Discrete distribution?
 
   # Calling C
   check_args_for_treg_predict(args)

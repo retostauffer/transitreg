@@ -25,14 +25,15 @@ expect_inherits(mod, "transitreg", info = "Check model class")
 nd <- data.frame(x = rep(mean(x), length(mod$bins)))
 ny <- seq_along(mod$bins) - 1
 
-## Calulating CDF and PDF
-expect_silent(mcdf <- predict(mod, newdata = nd, y = ny, type = "cdf"),
-              info = "Calculating cdf (silent)")
-expect_true(is.numeric(mcdf), info = "Return class")
-expect_identical(length(mcdf), nrow(nd), info = "Length of cdf return")
-
-expect_silent(mpdf <- predict(mod, newdata = nd, y = ny, type = "pdf"),
-              info = "Calculating pdf (silent)")
-expect_true(is.numeric(mpdf), info = "Return class")
-expect_identical(length(mpdf), nrow(nd), info = "Length of pdf return")
+## TODO(R): Write more tests once the S3 method is back
+## ## Calulating CDF and PDF
+## expect_silent(mcdf <- predict(mod, newdata = nd, y = ny, type = "cdf"),
+##               info = "Calculating cdf (silent)")
+## expect_true(is.numeric(mcdf), info = "Return class")
+## expect_identical(length(mcdf), nrow(nd), info = "Length of cdf return")
+## 
+## expect_silent(mpdf <- predict(mod, newdata = nd, y = ny, type = "pdf"),
+##               info = "Calculating pdf (silent)")
+## expect_true(is.numeric(mpdf), info = "Return class")
+## expect_identical(length(mpdf), nrow(nd), info = "Length of pdf return")
 

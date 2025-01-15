@@ -27,13 +27,11 @@ expected <- c("new_formula", "model", "response", "model.frame",
               "maxcounts", "theta_vars", "factor", "probs", "bins", "ym", "yc_tab", "breaks")
 expect_true(all(names(m1) %in% expected),
             info = "Checking if all expected elements are there")
-# transitreg() auto-guesses ym/bins if the response looks like count data.
-# check if it did what it should do.
-m1_ym   <- seq.int(0, max(CD4$cd4))
-m1_bins <- seq.int(0, max(CD4$cd4) + 1) - 0.5
-expect_equal(m1_ym,   m1$ym,   info = "Testing if auto-guessed ym is correct")
-expect_equal(m1_bins, m1$bins, info = "Testing if auto-guessed bins is correct")
-rm(m1_ym, m1_bins)
+
+expect_true(is.null(m1$ym),       info = "Checking that 'ym' is NULL (discrete)")
+expect_true(is.null(m1$breaks),   info = "Checking that 'breaks' is NULL (discrete)")
+expect_identical(m1$bins, as.integer(ceiling(max(CD4$cd4) * 1.2)),
+                 info = "Checking number of bins (1.2 * max response)")
 
 
 # -------------------------------------------
@@ -71,7 +69,7 @@ expect_identical(dim(m1$model.frame), c(nrow(CD4), 1L),
 
 expect_identical(m1$response, "cd4", info = "Value of $response (name of response variable)")
 
-expect_identical(m1$maxcounts, max(CD4$cd4), info = "Value of $maxcounts")
+expect_identical(m1$maxcounts, as.integer(max(CD4$cd4)), info = "Value of $maxcounts")
 
 expect_true(is.character(m1$theta_vars) && length(m1$theta_vars) == 0,
             info = "Value and length of $theta_vars")
