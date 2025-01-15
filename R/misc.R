@@ -359,9 +359,6 @@ convert_tp <- function(x, from, to, width = NULL, drop = TRUE) {
                 length(width) == 1L || length(width) == length(x)
         )
         width <- if (length(width) == 1L) rep(as.numeric(width), length(x)) else as.numeric(width)
-
-        # TODO(R): Not yet implemented!
-        stop("TODO(R): The function allows for input 'width', but logic/math not yet implemented")
     }
 
     # Allowed conversions (name corresponds to 'from', the value as 'to',
@@ -381,7 +378,7 @@ convert_tp <- function(x, from, to, width = NULL, drop = TRUE) {
     res <- list()
     for (i in seq_along(do)) {
         fnname <- sprintf("%s_to_%s", names(do)[i], do[[i]])
-        res[[do[[i]]]] <- get(fnname)(x)
+        res[[do[[i]]]] <- get(fnname)(x, width = width)
     }
 
     # Return
@@ -398,7 +395,9 @@ convert_tp <- function(x, from, to, width = NULL, drop = TRUE) {
 }
 
 # Converts a cdf vector into transition probabilities.
-cdf_to_tp <- function(x) {
+#' @param x numeric vector with CDFs
+#' @param \dots unused.
+cdf_to_tp <- function(x, ...) {
     stopifnot(is.numeric(x), all(x >= 0 & x <= 1))
     stopifnot(all(diff(x) >= -.Machine$double.eps))
 
@@ -418,7 +417,9 @@ cdf_to_tp <- function(x) {
 }
 
 # Converts transition probabilities (tp) to cdf
-tp_to_cdf <- function(tp) {
+#' @param x numeric vector with TPs.
+#' @param \dots unused.
+tp_to_cdf <- function(tp, ...) {
     stopifnot(is.numeric(tp), all(tp >= 0 & tp <= 1), length(tp) >= 1L)
     stopifnot(all(diff(tp) <= .Machine$double.eps))
 
@@ -432,9 +433,21 @@ tp_to_cdf <- function(tp) {
 }
 
 # Converts transition probabilities (tp) to pdf
-tp_to_pdf <- function(tp) {
+#' @param x numeric vector with TPs.
+#' @param width `NULL` or a numeric vector of the same length as `x`.
+#'        Width of the bins, required to properly scale the CDF if
+#'        the width of the bins is not equal to `1` (as it is for count data).
+#' @param \dots unused.
+tp_to_pdf <- function(tp, width = NULL, ...) {
     stopifnot(is.numeric(tp), all(tp >= 0 & tp <= 1), length(tp) >= 1L)
     stopifnot(all(diff(tp) <= 0))
+    if (!is.null(width)) {
+        stopifnot(
+            "'width' (if provided) must be numeric" = is.numeric(width),
+            "'width' must be of the same length as 'tp'" = length(width) == length(tp),
+            "'width' must be > 0" = all(width > 0)
+        )
+    }
 
     res <- numeric()
     p <- 1.0
@@ -442,7 +455,7 @@ tp_to_pdf <- function(tp) {
         res <- c(res, p * (1.0 - tp[i]))
         p   <- p * tp[i]
     }
-    return(res)
+    return(if (is.null(width)) res else res / width)
 }
 
 

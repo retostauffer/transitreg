@@ -362,8 +362,8 @@ transitreg_predict <- function(object, newdata = NULL,
   ##  - If elementwise = FALSE: We must evaluate each distribution up to
   ##    max(y).
   if (type %in% c("quantile", "pmax", "tp")) {
-    ## -2: N breaks equal (N - 1) bin widths, and we start with bin 0 (thus -1 again)
-    newresponse <- rep(length(object$breaks - 2), nrow(newdata))
+    ## object$bins - 1 as we start with bin '0' again.
+    newresponse <- rep(object$bins - 1L, nrow(newdata))
   } else {
     newresponse <- if (elementwise) y else rep(max(y), nrow(newdata))
   }
@@ -392,34 +392,37 @@ transitreg_predict <- function(object, newdata = NULL,
     "gam"  = "response",
     "nnet" = "raw"
   )
-  print(dim(newdata))
-  print(summary(newdata))
-  print(newdata)
-  stop(" ---- issues with break length ----- ")
   tp <- as.numeric(predict(object$model, newdata = newdata, type = what))
 
   ## If 'type = "tp"' (transition probabilities) we already have our
   ## result. Conver to matrix, and return.
   if (type == "tp") {
-      print(length(tp))
-      print(length(tp) / 3)
-      return(matrix(tp, byrow = TRUE, ncol = object$bins))
+      tmp <- list(NULL, paste0("tp_", seq_len(object$bins) - 1))
+      return(matrix(tp, byrow = TRUE, ncol = object$bins, dimnames = tmp))
   }
 
   ## Extract unique indices
   ui   <- unique(newdata$index)
 
-  args <- list(uidx   = ui,                        # int; Unique distribution index (int)
-               idx    = newdata$index,             # int; Index vector (int)
-               tp     = tp,                        # num; Transition probabilities
-               breaks = object$breaks,             # num; Point intersections of bins
-               y      = y,                         # int; Response y, used for 'cdf/pdf'
-               prob   = prob,                      # num; Probabilities (used for 'quantile')
-               type   = type,                      # str; to predict/calculate
-               ncores = ncores,                   # int; Number of cores to be used (OpenMP)
-               elementwise = elementwise,         # Elementwise (one prob or y per ui)
-               discrete = rep(FALSE, length(ui))) # Discrete distribution?
-  warning("TODO(R): transitreg_predict: Currently assuming 'discrete = FALSE'")
+  ## If object$breaks is NULL, we have discrete bins (e.g., count data).
+  if (is.null(object$breaks)) {
+    discrete <- rep(TRUE, length(ui))
+    breaks   <- seq(-0.5, by = 1.0, length.out = object$bins + 1)
+  } else {
+    discrete <- rep(TRUE, length(ui))
+    breaks   <- object$breaks
+  }
+
+  args <- list(uidx   = ui,                # int; Unique distribution index (int)
+               idx    = newdata$index,     # int; Index vector (int)
+               tp     = tp,                # num; Transition probabilities
+               breaks = breaks,            # num; Point intersections of bins
+               y      = y,                 # int; Response y, used for 'cdf/pdf'
+               prob   = prob,              # num; Probabilities (used for 'quantile')
+               type   = type,              # str; to predict/calculate
+               ncores = ncores,            # int; Number of cores to be used (OpenMP)
+               elementwise = elementwise,  # Elementwise (one prob or y per ui)
+               discrete = discrete)        # Discrete distribution?
 
   # Calling C
   check_args_for_treg_predict(args)
@@ -880,25 +883,7 @@ transitreg <- function(formula, data, subset, na.action,
     mp     <- if (bins <= 10) { 2 } else if (bins <= 100) { 1.5 } else { 1.2 }
     bins   <- as.integer(ceiling(bins * mp))
     breaks <- seq_len(bins + 1) - 1.5 # 'Integer' bins
-    message("Response considered to be count data, using max count ", bins - 1)
-
-    ## TODO(R): REMOVE ME
-    ### TODO(R): Niki, I do need bins to evaluate the cdf. Adjusted this part
-    ###          quick'n'dirty to auto-generate bins for count data if that
-    ###          can be detected. This, however, can create thousands of bins
-    ###          as it uses 0:max(response).
-    ###          We need to re-think this.
-    #tmp <- unique(model.response(mf))
-    #if (all(tmp > -.Machine$double.eps) && all(tmp %% 1 < .Machine$double.eps)) {
-    #    ny   <- seq.int(0, max(tmp))
-    #    bins <- seq.int(0, max(tmp) + 1) - 0.5
-    #    breaks <- length(bins)
-    #    bin.y <- TRUE
-    #    yc <- cut(model.response(mf), breaks = bins, labels = FALSE, include.lowest = TRUE) - 1
-    #    ym <- (bins[-1] + bins[-length(bins)]) / 2
-    #} else {
-    #    stop("no 'breaks' provided, response does not look like count data.")
-    #}
+    if (verbose) message("Response considered to be count data, using max count ", bins - 1)
   }
 
   ## Scaling data.
@@ -1024,6 +1009,12 @@ transitreg <- function(formula, data, subset, na.action,
   return(rval)
 }
 
+
+#' @exportS3Method "[" transitreg
+#' @author Reto
+`[.transitreg` <- function(x, i, ..., drop = TRUE) {
+    print("Plan is to return Transition distributions later")
+}
 
 
 #' Plot Method for Transition Model Fits

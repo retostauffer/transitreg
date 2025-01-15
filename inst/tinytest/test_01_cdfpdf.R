@@ -67,8 +67,20 @@ expect_silent(pd <- convert_tp(tp, "tp", c("cdf", "pdf")),    info = "Covnerting
 expect_equal(structure(data.frame(cdf = pp, pdf = dd), row.names = names(tp)), pd, info = "Result of tp to cdf and pdf (named)")
 rm(p1, pd)
 
-# "WIDTH" currently not implemented
-expect_error(convert_tp(tp, "tp", "cdf", width = 1.5),       info = "Currently throws an error (TODO(R))")
+# Testing width argument
+expect_identical(convert_tp(tp, "tp", "cdf", width = NULL),
+                 convert_tp(tp, "tp", "cdf", width = 1.234),
+                 info = "Width must have no effect on CDF")
+
+expect_identical(convert_tp(tp, "tp", "pdf", width = NULL),
+                 convert_tp(tp, "tp", "pdf", width = 1),
+                 info = "Result with width = NULL and width 1 must be identical")
+expect_identical(convert_tp(tp, "tp", "pdf", width = NULL),
+                 convert_tp(tp, "tp", "pdf", width = rep(1.0, length(tp))),
+                 info = "Result with width = NULL and width 1 must be identical")
+expect_identical(convert_tp(tp, "tp", "pdf", width = NULL) / 0.5,
+                 convert_tp(tp, "tp", "pdf", width = 0.5),
+                 info = "Width set to 0.5, must scale the CDF.")
 
 
 # -------------------------------------------------------------------
