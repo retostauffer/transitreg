@@ -384,7 +384,7 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
                  y     = NA_integer_,              # Dummy, only used for cdf/pdf
                  prob  = probs,                    # Probabilities where to evaluate the distribution
                  type  = "quantile", ncores = ncores, elementwise = elementwise,
-                 discrete = rep(as.logical(discrete), length(ui)))
+                 discrete = as.logical(discrete))
 
     # Calling C
     check_args_for_treg_predict(args)

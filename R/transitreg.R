@@ -306,7 +306,20 @@ transitreg_predict <- function(object, newdata = NULL,
       newdata <- model.frame(object)
       if (type %in% c("cdf", "pdf") && is.null(y))
           y <- newdata[[object$response]] ## Integer in 0, 1, 2, ... Nbreaks
+  } else {
+    ## Applying scaler if needed; standardize data (except theta)
+    if (!is.null(object$scaler)) {
+        for (j in names(object$scaler)) {
+            if (j != "theta") {
+                newdata[[j]] <- (newdata[[j]] - object$scaler[[j]]$mean) / object$scaler[[j]]$sd
+            }
+        }
+    }
   }
+
+  ## Scaling (standardizing) theta if requested
+  if (!is.null(theta_scaler))
+    newdata$theta <- (newdata$theta - theta_scaler$mean) / theta_scaler$sd
 
   ## Guessing 'elementwise' if is NULL
   ##
@@ -381,10 +394,6 @@ transitreg_predict <- function(object, newdata = NULL,
       newdata[[j]] <- as.integer(newdata$theta == i)
     }
   }
-
-  ## Scaling (standardizing) theta if requested
-  if (!is.null(theta_scaler))
-    newdata$theta <- (newdata$theta - theta_scaler$mean) / theta_scaler$sd
 
   ## Specify argument for generic prediction method called below
   what <- switch(class(object$model)[1L],
@@ -1210,6 +1219,13 @@ print.transitreg <- function(x, ...) {
 #' @param type Character. Specifies the type of prediction to return (see Section 'Details').
 #' @param ncores `NULL` (default) or single numeric. See section 'OpenMP'
 #'        of the [transitreg()] man page for more details.
+#' @param elementwise Logical. Should each distribution in `object` be evaluated at
+#'        all elements of `prob`/`y`? (`elementwise = FALSE`, yielding a matrix)? Or, if
+#'        `x` and `probs` have the same length, should the evaluation be done element
+#'        by element (`elementwise = TRUE` yielding a vector)? The default of `NULL`
+#'        means that `elementwise = TRUE` is used if the lengths match and otherwise
+#'        `elementwise = FALSE` is used.
+#' @param verbose Logical, if `TRUE` few messages will be printed.
 #' @param \dots Additional arguments passed to the prediction function.
 #'
 #' @details
@@ -1287,41 +1303,11 @@ predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
   type <- tolower(type)
   type <- match.arg(type)
 
-  ## Get number of cores for OpenMP parallelization
-  ncores <- transitreg_get_number_of_cores(ncores, FALSE)
-
   if (!is.null(prob))
     type <- "quantile"
 
   if (is.null(prob) && type == "quantile")
     prob <- 0.5
-
-  if (is.null(newdata)) {
-    if (type %in% c("pdf", "cdf") && is.null(y)) {
-      ## Returning pdf/cdf stored on object
-      return(object$probs[[type]])
-    } else {
-      ## Extracting model.frame used for model training as 'newdata'
-      newdata <- model.frame(object)
-    }
-  }
-
-  ## Overwriting response to evaluate pdf/cdf/pmax at specific y's,
-  ## if type is either pmax or quantile: drop response altogether
-  if (!is.null(y) && type %in% c("pdf", "cdf")) {
-    newdata[[object$response]] <- y
-  } else if (type %in% c("pmax", "quantile")) {
-    newdata[[object$response]] <- NULL
-  }
-
-  ## Applying scaler if needed; standardize data (except theta)
-  if (!is.null(object$scaler)) {
-    for (j in names(object$scaler)) {
-      if (j != "theta") {
-        newdata[[j]] <- (newdata[[j]] - object$scaler[[j]]$mean) / object$scaler[[j]]$sd
-      }
-    }
-  }
 
   ## Calling transitreg_predict to perform the actual prediction
   args <- list(object       = object,
@@ -1336,30 +1322,8 @@ predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
                theta_vars   = object$theta_vars,
                factor       = object$factor,
                ncores       = ncores)
-  pred <- do.call(transitreg_predict, args)
-  print(pred)
-  print(length(pred))
-  str(args)
-  stop(" ----------- stop in predict.transitreg ------ ")
 
-  if (type == "quantile") print(summary(pred))
-
-  ## If binning is used (pseudo-counts), convert predicted
-  ## bin to numeric (center of the bin)
-  if (!is.null(object$breaks)) {
-    if (type %in% c("quantile", "pmax")) {
-      pred <- object$ym[pred + 1L]
-    }
-  }
-
-  ## Ensure PDF/CDF lie inside [0, 1]
-  if (type %in% c("pdf", "cdf")) {
-    eps <- abs(.Machine$double.eps)
-    pred[pred < eps]     <- eps
-    pred[pred > 1 - eps] <- 1 - eps
-  }
-
-  return(pred)
+  return(do.call(transitreg_predict, args))
 }
 
 #' @importFrom stats runif

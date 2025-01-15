@@ -11,6 +11,8 @@
   prob = NULL,
   type = c("pdf", "cdf", "pmax", "quantile"),
   ncores = NULL,
+  elementwise = NULL,
+  verbose = FALSE,
   ...
 )
 }
@@ -31,6 +33,15 @@ argument \code{type} is set to \code{type = "quantile"}.}
 
 \item{ncores}{\code{NULL} (default) or single numeric. See section 'OpenMP'
 of the \code{\link[=transitreg]{transitreg()}} man page for more details.}
+
+\item{elementwise}{Logical. Should each distribution in \code{object} be evaluated at
+all elements of \code{prob}/\code{y}? (\code{elementwise = FALSE}, yielding a matrix)? Or, if
+\code{x} and \code{probs} have the same length, should the evaluation be done element
+by element (\code{elementwise = TRUE} yielding a vector)? The default of \code{NULL}
+means that \code{elementwise = TRUE} is used if the lengths match and otherwise
+\code{elementwise = FALSE} is used.}
+
+\item{verbose}{Logical, if \code{TRUE} few messages will be printed.}
 
 \item{\dots}{Additional arguments passed to the prediction function.}
 }
