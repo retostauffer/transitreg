@@ -5,7 +5,7 @@
 #' probabilities (TP) for \code{K} 'bins' (counts or pseudo-counts).
 #'
 #' @param x numeric vector or a numeric matrix.
-#' @param bins numeric vector of points of intersection of the bins.
+#' @param breaks numeric vector of points of intersection of the breaks.
 #'        The length the vector must be of \code{length(x) + 1} (if \code{x} is
 #'        a vector) or \code{ncol(x) + 1} if \code{x} is a matrix. Must be
 #'        monotonically increasing.
@@ -27,34 +27,34 @@
 #' @author Reto
 #' @rdname Transition
 #' @export
-Transition <- function(x, bins) {
+Transition <- function(x, breaks) {
 
     # Sanity checks
     stopifnot(
         "'x' must be numeric (vector or matrix)" = is.numeric(x) && is.atomic(x),
         "'x' must be a vector or a matrix" = is.vector(x) || is.matrix(x),
         "length of 'x' must be > 0" = length(x) > 0L,
-        "'bins' must be a numeric vector" = is.atomic(bins) && is.numeric(bins),
-        "missing values in 'bins' not allowed" = all(!is.na(bins)),
-        "'bins' must be monotonically increasing" = all(diff(bins) > 0)
+        "'breaks' must be a numeric vector" = is.atomic(breaks) && is.numeric(breaks),
+        "missing values in 'breaks' not allowed" = all(!is.na(breaks)),
+        "'breaks' must be monotonically increasing" = all(diff(breaks) > 0)
     )
 
     # If 'x' is a vector, convert to matrix
     if (is.vector(x)) x <- matrix(x, nrow = 1)
 
-    # Checking 'bins' vector
-    if (length(bins) != (ncol(x) + 1))
-        stop("'bins' must be of length ", ncol(x) + 1)
+    # Checking 'breaks' vector
+    if (length(breaks) != (ncol(x) + 1))
+        stop("'breaks' must be of length ", ncol(x) + 1)
 
 
     # Ensure to convert to double in case input is integer
     x[,] <- as.numeric(x)
-    bins <- as.numeric(bins)
+    breaks <- as.numeric(breaks)
 
     res <- setNames(as.data.frame(x),
                     paste("tp", seq_len(ncol(x)) - 1, sep = "_"))
 
-    structure(res, class = c("Transition", "distribution"), bins = bins)
+    structure(res, class = c("Transition", "distribution"), breaks = breaks)
 }
 
 #' @param \dots objects to be concatenated. Must all come from the same
@@ -70,14 +70,14 @@ c.Transition <- function(...) {
     # Else check whether or not we can combine the objects
     for (i in seq.int(2, length(x))) {
         stopifnot("input not of class Transition" = inherits(x[[i]], "Transition"))
-        if (!all.equal(attr(x[[1]], "bins"), attr(x[[2]], "bins")))
-            stop("bins of the ", i, ifelse(i == 2, "nd", "th"),
+        if (!all.equal(attr(x[[1]], "breaks"), attr(x[[2]], "breaks")))
+            stop("breaks of the ", i, ifelse(i == 2, "nd", "th"),
                  "object not the same as for the first object. Can't be combined.")
     }
 
     # Combine and return
     res <- do.call(rbind, lapply(x, as.matrix))
-    Transition(res, attr(x[[1]], "bins"))
+    Transition(res, attr(x[[1]], "breaks"))
 }
 
 #' @importFrom distributions3 prodist
@@ -100,7 +100,7 @@ prodist.transitreg <- function(object, newdata = NULL, ...) {
     }
 
     # Creating res
-    nb <- length(object$ym) # Number of bins
+    nb <- length(object$ym) # Number of breaks
     nd <- nrow(res)         # Number of observations
 
     expand_covar <- function(x, nb) rep(x, each = nb)
@@ -110,8 +110,8 @@ prodist.transitreg <- function(object, newdata = NULL, ...) {
     # TODO(R): Currently 'type = response' which differs
     # for different engines (see transitreg()).
     res  <- data.frame(tp = predict(object$model, newdata = res, type = "response"),
-                       lo = rep(head(object$bins, -1), times = nd),
-                       up = rep(tail(object$bins, -1), times = nd))
+                       lo = rep(head(object$breaks, -1), times = nd),
+                       up = rep(tail(object$breaks, -1), times = nd))
     # Split into individual data.frames
     res <- split(res, rep(seq_len(nd), each = nb))
 
@@ -158,7 +158,7 @@ as.matrix.Transition <- function(x, expand = FALSE, ...) {
     stopifnot("'expand' must be logical TRUE or FALSE" = isTRUE(expand) || isFALSE(expand))
 
     xnames <- names(x) # Keep for later
-    bins   <- attr(x, "bins")
+    breaks   <- attr(x, "breaks")
 
     # convert to data.frame -> matrix
     x <- as.matrix(structure(x, class = "data.frame"))
@@ -166,14 +166,14 @@ as.matrix.Transition <- function(x, expand = FALSE, ...) {
     if (expand) {
         # Keep original dimension as we transpose(x) in a second
         nd <- nrow(x)          # Number of distributions
-        nb <- length(bins) - 1 # Number of bins
+        nb <- length(breaks) - 1 # Number of breaks
 
         index <- rep(seq_len(nd), each = nb) # distribution index
         theta <- rep(seq_len(nb) - 1, times = nd) # 'bin' index or theta
         x <- cbind(index = index, theta = theta, tp = as.vector(t(x)))
     }
 
-    structure(x, class = c("Transitionmatrix", class(x)), bins = bins)
+    structure(x, class = c("Transitionmatrix", class(x)), breaks = breaks)
 }
 
 #' @importFrom stats setNames
@@ -183,7 +183,7 @@ format.Transition <- function(x, digits = pmax(3L, getOption("digits") - 3L), ..
     if (length(x) < 1L) return(character(0))
     xnames <- names(x) # Keep for later
 
-    # Extracting probabilites and bins
+    # Extracting probabilites and breaks
     fmtfun <- function(i) {
         y <- as.matrix(x[i], expand = FALSE)
         sprintf("n = %d", ncol(y))
@@ -226,20 +226,20 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
 
     # Store element names for return
     xnames <- names(d)
-    bins <- attr(d, "bins")
+    breaks <- attr(d, "breaks")
 
     # Convert numeric values to corresponding 'bin indices' (int)
-    x <- num2bin(x, bins)
+    x <- num2bin(x, breaks)
 
     if (!elementwise) x <- sort(x) # Important
     ui  <- seq_along(d) # Unique index
-    idx <- rep(ui, each = length(bins) - 1) # Index of distribution
+    idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
     # Setting up arguments to call .C predict function
     args <- list(uidx  = ui,                       # Unique distribution index (int)
                  idx   = idx,                      # Index vector (int)
                  tp    = t(as.matrix(d)),          # Transition probabilities
-                 bins  = bins,                     # Point intersection of bins
+                 breaks  = breaks,                     # Point intersection of breaks
                  y     = x,                        # Where to evaluate the pdf
                  prob  = NA_real_,                 # Dummy, only used for 'quantile'
                  type  = "pdf", ncores = ncores, elementwise = elementwise,
@@ -293,20 +293,20 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
 
     # Store element names for return
     xnames <- names(d)
-    bins   <- attr(d, "bins")
+    breaks   <- attr(d, "breaks")
 
     # Convert numeric values to corresponding 'bin indices' (int)
-    x <- num2bin(x, bins)
+    x <- num2bin(x, breaks)
 
     if (!elementwise) x <- sort(x) # Important
     ui  <- seq_along(d) # Unique index
-    idx <- rep(ui, each = length(bins) - 1) # Index of distribution
+    idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
     ## Calling C to calculate the required values.
     args <- list(uidx  = ui,                       # Unique distribution index (int)
                  idx   = idx,                      # Index vector (int)
                  tp    = t(as.matrix(d)),          # Transition probabilities
-                 bins  = bins,                     # Point intersection of bins
+                 breaks  = breaks,                     # Point intersection of breaks
                  y     = x,                        # Where to evaluate the pdf
                  prob  = NA_real_,                 # Dummy, only used for 'quantile'
                  type  = "cdf", ncores = ncores, elementwise = elementwise,
@@ -364,7 +364,7 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
 
     # Store element names for return
     xnames <- names(x)
-    bins   <- as.numeric(attr(x, "bins"))
+    breaks   <- as.numeric(attr(x, "breaks"))
 
     # Discrete distributions?
     discrete <- is_discrete(x)
@@ -374,13 +374,13 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
 
     if (elementwise) probs <- sort(probs) # Important
     ui  <- seq_along(x) # Unique index
-    idx <- rep(ui, each = length(bins) - 1) # Index of distribution
+    idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
     ## Calling C to calculate the required values.
     args <- list(uidx  = ui,                       # Unique distribution index (int)
                  idx   = idx,                      # Index vector (int)
                  tp    = t(as.matrix(x)),          # Transition probabilities
-                 bins  = bins,                     # Point intersection of bins
+                 breaks  = breaks,                     # Point intersection of breaks
                  y     = NA_integer_,              # Dummy, only used for cdf/pdf
                  prob  = probs,                    # Probabilities where to evaluate the distribution
                  type  = "quantile", ncores = ncores, elementwise = elementwise,
@@ -428,9 +428,9 @@ mean.Transition <- function(x, ncores = NULL, ...) {
     ## Get number of cores for OpenMP parallelization
     ncores <- transitreg_get_number_of_cores(ncores, FALSE)
 
-    bins <- attr(x, "bins")
+    breaks <- attr(x, "breaks")
     ui   <- seq_along(x) # Unique index
-    idx  <- rep(ui, each = length(bins) - 1) # Index of distribution
+    idx  <- rep(ui, each = length(breaks) - 1) # Index of distribution
     discrete <- rep(FALSE, length(ui))
     warning("TODO(R): Currently assuming discrete = TRUE in mean.Transition")
 
@@ -438,7 +438,7 @@ mean.Transition <- function(x, ncores = NULL, ...) {
     args <- list(uidx  = ui,                       # Unique distribution index (int)
                  idx   = idx,                      # Index vector (int)
                  tp    = t(as.matrix(x)),          # Transition probabilities
-                 bins  = bins,                     # Point intersection of bins
+                 breaks  = breaks,                     # Point intersection of breaks
                  y     = NA_integer_,              # <- Dummy value
                  prob  = NA_real_,                 # <- Dummy value
                  type  = "mean", ncores = ncores,
@@ -460,10 +460,10 @@ mean.Transition <- function(x, ncores = NULL, ...) {
 random.Transition <- function(x, n = 1L, drop = TRUE, ...) {
 
     # Calculating 'bin mids'
-    bins <- attr(x, "bins")
-    i <- seq_len(length(bins) - 1)
-    binmid <- (bins[i + 1] + bins[i]) / 2.
-    binwidth <- diff(bins)
+    breaks <- attr(x, "breaks")
+    i <- seq_len(length(breaks) - 1)
+    binmid <- (breaks[i + 1] + breaks[i]) / 2.
+    binwidth <- diff(breaks)
 
     # Logical vector, is the distribution discrete?
     discrete <- is_discrete(x)
@@ -501,8 +501,8 @@ random.Transition <- function(x, n = 1L, drop = TRUE, ...) {
 #' @rdname Transition
 #' @exportS3Method is_discrete Transition
 is_discrete.Transition <- function(d, ...) {
-    x <- attr(d, "bins")
-    # Calculating mid of bins
+    x <- attr(d, "breaks")
+    # Calculating mid of breaks
     idx <- seq_len(length(x) - 1)
     x <- x[idx + 1] - x[idx]
     # If all 'bin mids' integer we assume it is a discrete distribution
@@ -525,7 +525,7 @@ is_continuous.Transition <- function(d, ...) {
 #' @rdname Transition
 #' @exportS3Method support Transition
 support.Transition <- function(d, drop = NULL, ...) {
-    x <- setNames(range(attr(d, "bins")), c("min", "max"))
+    x <- setNames(range(attr(d, "breaks")), c("min", "max"))
     if (length(x) > 1) {
         x <- matrix(x, nrow = length(d), ncol = 2, byrow = TRUE,
                     dimnames = list(names(d), names(x)))
@@ -547,7 +547,7 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 
     if (is.null(newdata)) {
         newdata <- object$model.frame
-        newdata[[yn]] <- object$bins[newdata[[yn]]]
+        newdata[[yn]] <- object$breaks[newdata[[yn]]]
     }
 
     if (is.null(newdata[[object$response]]))

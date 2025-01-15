@@ -48,9 +48,9 @@ integerVec find_positions(int x, int* y, int n) {
 
 /* Helper function for type = "mean".
  * Calculates elementwise pdf and multiplies it with center of the bin
- * ((binsptr[i + 1] + binsptr[i]) * 0.5) to get the weighted average.
+ * ((bkptr[i + 1] + bkptr[i]) * 0.5) to get the weighted average.
  * Returns a (doubleVec of length 1) */
-double treg_calc_mean(int* positions, int count, double* tpptr, double* binsptr) {
+double treg_calc_mean(int* positions, int count, double* tpptr, double* bkptr) {
 
     // Initialize return value, initialize sum with 0
     double res = 0.0;
@@ -64,8 +64,8 @@ double treg_calc_mean(int* positions, int count, double* tpptr, double* binsptr)
             //return R_NaReal; 
         }
         // Updating weighted sum, simply "binmid * pdf(bin)" summed up
-        // (binsptr[i + 1] + binsptr[i]) * 0.5 -> center of the bin
-        res += (binsptr[i + 1] + binsptr[i]) * 0.5 * prod * (1.0 - tpptr[positions[i]]);
+        // (bkptr[i + 1] + bkptr[i]) * 0.5 -> center of the bin
+        res += (bkptr[i + 1] + bkptr[i]) * 0.5 * prod * (1.0 - tpptr[positions[i]]);
         // Updating product of transition probabilities
         prod *= tpptr[positions[i]];
     }
@@ -75,7 +75,7 @@ double treg_calc_mean(int* positions, int count, double* tpptr, double* binsptr)
 
 /* Helper function for type = "pdf" */
 doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
-                        double* binsptr, int* y, int ny) {
+                        double* bkptr, int* y, int ny) {
 
     // Temporary double vector to calculate PDF along i = 0, ..., count - 1
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
@@ -95,7 +95,7 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
         prod *= tpptr[positions[i]];
     }
     // Divide PDF by width of the bin
-    for (i = 0; i < count; i++) { tmp[i] = tmp[i] / (binsptr[i + 1] - binsptr[i]); }
+    for (i = 0; i < count; i++) { tmp[i] = tmp[i] / (bkptr[i + 1] - bkptr[i]); }
 
     // Initialize return value/object.
     doubleVec res;
@@ -112,7 +112,7 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
 
 /* Helper function for type = "cdf" */
 doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
-                      double* binsptr,  int* y, int ny) {
+                      double* bkptr,  int* y, int ny) {
 
     // Temporary double vector to calculate PDF along i = 0, ..., count - 1
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
@@ -161,7 +161,7 @@ double interpolate_linear(double x1, double y1, double x2, double y2, double p) 
 
 /* Helper function for type = "quantile" */
 doubleVec treg_calc_quantile(int* positions, int count, double* tpptr,
-                             double* binsptr, double* prob, int np, bool disc) {
+                             double* bkptr, double* prob, int np, bool disc) {
 
     int i;
 
@@ -212,7 +212,7 @@ doubleVec treg_calc_quantile(int* positions, int count, double* tpptr,
     }
 
     // Evaluate quantile
-    eval_bins_quantile(res.values, tmp, positions, count, binsptr, prob, np, disc);
+    eval_bins_quantile(res.values, tmp, positions, count, bkptr, prob, np, disc);
 
     free(tmp); // Freeing allocated memory
 
@@ -222,7 +222,7 @@ doubleVec treg_calc_quantile(int* positions, int count, double* tpptr,
 
 
 void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
-                        double* binsptr, double* prob, int np, bool disc) {
+                        double* bkptr, double* prob, int np, bool disc) {
 
     int i, j;
     double eps = sqrt(DBL_EPSILON);
@@ -238,7 +238,7 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
 
             // If prob[i] < tmp[0]: Store lowest value and break loop
             if (prob[i] < (tmp[0] + eps)) {
-                res[i] = disc ? (binsptr[1] + binsptr[0]) * 0.5 : binsptr[0];
+                res[i] = disc ? (bkptr[1] + bkptr[0]) * 0.5 : bkptr[0];
                 break;
             }
 
@@ -246,10 +246,10 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
             if ((prob[i] >= (tmp[j - 1] - eps)) & (prob[i] < (tmp[j] + eps))) {
                 // If discrete: Store center of the bin
                 if (disc) {
-                    res[i] = (binsptr[j + 1] + binsptr[j]) * 0.5;
+                    res[i] = (bkptr[j + 1] + bkptr[j]) * 0.5;
                 // Perform linear interpolation between the two neighboring bin mids.
                 } else {
-                    res[i] = interpolate_linear(binsptr[j], tmp[j - 1], binsptr[j + 1], tmp[j], prob[i]);
+                    res[i] = interpolate_linear(bkptr[j], tmp[j - 1], bkptr[j + 1], tmp[j], prob[i]);
                 }
                 break; // Found what we were looking for, break inner loop
             }
@@ -259,7 +259,7 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
         // This means we reached the end of the loop above but could not find a
         // bin we fall into. Fill the results vector with "highest bin".
         if (j == count) {
-            res[i] = disc ? (binsptr[count] + binsptr[count + 1]) * 0.5 : binsptr[count];
+            res[i] = disc ? (bkptr[count] + bkptr[count + 1]) * 0.5 : bkptr[count];
         }
     }
     // void function, no return, we have updated/modified 'res'
@@ -357,7 +357,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y, SEXP prob,
     int    i, j, np;
 
     double* tpptr     = REAL(tp);          // Transition probabilities
-    double* binsptr   = REAL(bins);        // Bins, points of intersection
+    double* bkptr   = REAL(bins);        // Bins, points of intersection
     int*    yptr      = INTEGER(y);        // Where to evaluate the distribution; for cdf, pdf
     double* probptr   = REAL(prob);        // Probabilities to be evaluated; only for 'quantile'
 
@@ -420,27 +420,27 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y, SEXP prob,
             if (do_pdf) {
                 // Single PDF
                 if (ewise) {
-                    tmp = treg_calc_pdf(which.index, which.length, tpptr, binsptr, &yptr[i], 1);
+                    tmp = treg_calc_pdf(which.index, which.length, tpptr, bkptr, &yptr[i], 1);
                 // Multiple PDFs
                 } else {
-                    tmp = treg_calc_pdf(which.index, which.length, tpptr, binsptr, yptr, LENGTH(y));
+                    tmp = treg_calc_pdf(which.index, which.length, tpptr, bkptr, yptr, LENGTH(y));
                 }
             // --- Calculating cumulative distribution
             } else if (do_cdf) {
                 // Single CDF
                 if (ewise) {
-                    tmp = treg_calc_cdf(which.index, which.length, tpptr, binsptr, &yptr[i], 1);
+                    tmp = treg_calc_cdf(which.index, which.length, tpptr, bkptr, &yptr[i], 1);
                 // Multiple CDFs
                 } else {
-                    tmp = treg_calc_cdf(which.index, which.length, tpptr, binsptr, yptr, LENGTH(y));
+                    tmp = treg_calc_cdf(which.index, which.length, tpptr, bkptr, yptr, LENGTH(y));
                 }
             } else {
                 // Single quantile
                 if (ewise) {
-                    tmp = treg_calc_quantile(which.index, which.length, tpptr, binsptr, &probptr[i], 1, discptr[i] == 1);
+                    tmp = treg_calc_quantile(which.index, which.length, tpptr, bkptr, &probptr[i], 1, discptr[i] == 1);
                 // Multiple quantiles (elementwise)
                 } else {
-                    tmp = treg_calc_quantile(which.index, which.length, tpptr, binsptr, probptr, LENGTH(prob), discptr[i] == 1);
+                    tmp = treg_calc_quantile(which.index, which.length, tpptr, bkptr, probptr, LENGTH(prob), discptr[i] == 1);
                 }
             }
 
@@ -461,7 +461,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y, SEXP prob,
         // -----------------------------------------------------------
         // Calculate mean
         } else if (do_mean) {
-            resptr[i] = treg_calc_mean(which.index, which.length, tpptr, binsptr);
+            resptr[i] = treg_calc_mean(which.index, which.length, tpptr, bkptr);
         // Else it must be pmax
         } else {
             resptr[i] = treg_calc_pmax(which.index, which.length, tpptr);
@@ -502,7 +502,7 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP bins, SEXP n
     int*    uidxptr  = INTEGER(uidx);  // Unique indices in the dtaa
     int*    idxptr   = INTEGER(idx);   // Index vector
     int*    yptr     = INTEGER(y);     // Bin at which to evaluate the distribution
-    double* binsptr  = REAL(bins);     // Point intersection of bins
+    double* bkptr  = REAL(bins);     // Point intersection of bins
     int     nthreads = asInteger(ncores); // Number of threads for OMP
     int     n        = LENGTH(idx);
     int     un       = LENGTH(uidx);
@@ -545,9 +545,9 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP bins, SEXP n
         //     and treg_calc_cdf() do below [...., y = na, ny = 1)].
         //
         // Input arguments are (in this order)
-        //     positions, count, tpptr, binsptr, y, ny
-        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, binsptr, &yptr[i], 1);
-        tmpcdf = treg_calc_cdf(which.index, which.length, tpptr, binsptr, &yptr[i], 1);
+        //     positions, count, tpptr, bkptr, y, ny
+        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, bkptr, &yptr[i], 1);
+        tmpcdf = treg_calc_cdf(which.index, which.length, tpptr, bkptr, &yptr[i], 1);
 
         // Store last value, that is the last bin provided for this distribution.
         pdfptr[i] = tmppdf.values[tmppdf.length - 1];

@@ -16,7 +16,7 @@
 \alias{support.Transition}
 \title{Creates a Transition Distribution}
 \usage{
-Transition(x, bins)
+Transition(x, breaks)
 
 \method{c}{Transition}(...)
 
@@ -45,7 +45,7 @@ Transition(x, bins)
 \arguments{
 \item{x}{Numeric, vector of quantiles.}
 
-\item{bins}{numeric vector of points of intersection of the bins.
+\item{breaks}{numeric vector of points of intersection of the breaks.
 The length the vector must be of \code{length(x) + 1} (if \code{x} is
 a vector) or \code{ncol(x) + 1} if \code{x} is a matrix. Must be
 monotonically increasing.}

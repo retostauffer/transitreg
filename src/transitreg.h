@@ -69,20 +69,19 @@ typedef struct {
  */
 integerVec find_positions(int x, int* y, int n);
 
-//TODO(R) DELETE//void eval_bins_pdf_cdf(double* res, double* tmp, int count, double* binsptr, int* y, int ny);
-void eval_bins_quantile(double* res, double* tmp, int* positions, int count, double* binsptr, double* prob, int np, bool disc);
+void eval_bins_quantile(double* res, double* tmp, int* positions, int count, double* bkptr, double* prob, int np, bool disc);
 
 double interpolate_linear(double x1, double y1, double x2, double y2, double p);
-doubleVec treg_calc_pdf(int* positions, int count, double* tpptr, double* binsptr, int* y, int ny);
-doubleVec treg_calc_cdf(int* positions, int count, double* tpptr, double* binsptr, int* y, int ny);
-doubleVec treg_calc_quantile(int* positions, int count, double* tpptr, double* binsptr, double* prob, int np, bool disc);
+doubleVec treg_calc_pdf(int* positions, int count, double* tpptr, double* bkptr, int* y, int ny);
+doubleVec treg_calc_cdf(int* positions, int count, double* tpptr, double* bkptr, int* y, int ny);
+doubleVec treg_calc_quantile(int* positions, int count, double* tpptr, double* bkptr, double* prob, int np, bool disc);
 
 double treg_calc_pmax(int* positions, int count, double* pptr);
 double treg_calc_mean(int* positions, int count, double* tpptr, double* binsptr);
 
-SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP bins, SEXP y, SEXP prob,
+SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
                   SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete);
-SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP bins, SEXP ncores);
+SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks, SEXP ncores);
 SEXP treg_detect_cores();
 
 

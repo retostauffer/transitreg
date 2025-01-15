@@ -15,8 +15,8 @@ m <- rbind(A = convert_tp(ppois(0:15, lambda = 3.0), "cdf", "tp"),
            B = convert_tp(ppois(0:15, lambda = 8.0), "cdf", "tp"),
            C = convert_tp(ppois(0:15, lambda = 0.3), "cdf", "tp"))
 
-# Fake bins; width equal to 1
-bins <- seq(-0.5, by = 1, length.out = ncol(m) + 1)
+# Fake breaks; width equal to 1
+breaks <- seq(-0.5, by = 1, length.out = ncol(m) + 1)
 
 
 
@@ -29,9 +29,9 @@ bins <- seq(-0.5, by = 1, length.out = ncol(m) + 1)
 # One single distribution based on m[1, ]. Firstly, we test that
 # the constructor function works and that the result is identical
 # if we hand over a vector or a single-row matrix.
-expect_silent(d1 <- Transition(as.vector(m[1, ]), bins),
+expect_silent(d1 <- Transition(as.vector(m[1, ]), breaks),
               info = "Calling constructor function (vector input)")
-expect_silent(d1_m <- Transition(m[1, , drop = FALSE], bins),
+expect_silent(d1_m <- Transition(m[1, , drop = FALSE], breaks),
               info = "Constructor function with matrix input (nrow = 1)")
 expect_identical(d1, setNames(d1_m, NULL),
                info = "Check that Transition is identical with vector/matrix input")
@@ -44,8 +44,8 @@ expect_stdout(print(d1), pattern = "Transition\\(n = 16\\)", info = "Testing sta
 expect_identical(format(d1), "Transition(n = 16)",           info = "Testing format function")
 
 # Checking attribute
-expect_true("bins" %in% names(attributes(d1)),               info = "Checking if attribute 'bins' is available")
-expect_identical(attr(d1, "bins"), bins,                     info = "Testing attribute 'bins'")
+expect_true("breaks" %in% names(attributes(d1)),               info = "Checking if attribute 'breaks' is available")
+expect_identical(attr(d1, "breaks"), breaks,                     info = "Testing attribute 'breaks'")
 
 # Convert to matrix
 expect_silent(m1 <- as.matrix(d1),                          info = "Converting to matrix")
@@ -54,7 +54,7 @@ expect_true(is.matrix(m1) && is.numeric(m1),                info = "Testing matr
 expect_identical(dim(m1), c(1L, ncol(m)),                   info = "Testing matrix dimension")
 expect_true(all(grep("^tp_[0-9]+$", colnames(m1))),         info = "Matrix column names")
 expect_true(is.null(rownames(m1)),                          info = "Matrix row names (unnamed)")
-expect_identical(attr(m1, "bins"), bins,                    info = "Testing 'bins' attribute on matrix")
+expect_identical(attr(m1, "breaks"), breaks,                    info = "Testing 'breaks' attribute on matrix")
 rm(m1)
 
 # Convert to extended (long) matrix
@@ -64,7 +64,7 @@ expect_true(is.matrix(m1e) && is.numeric(m1e),              info = "Testing exte
 expect_identical(dim(m1e), c(ncol(m), 3L),                  info = "Testing extended matrix dimension")
 expect_identical(colnames(m1e), c("index", "theta", "tp"),  info = "Matrix extended column names")
 expect_true(is.null(rownames(m1e)),                         info = "Extended matrix row names (unnamed)")
-expect_identical(attr(m1e, "bins"), bins,                   info = "Testing 'bins' attribute on matrix")
+expect_identical(attr(m1e, "breaks"), breaks,                   info = "Testing 'breaks' attribute on matrix")
 
 # Testing content ...
 expect_true(all(m1e[, "index"] == 1L),                      info = "Checking matrix content (index)")
@@ -78,11 +78,11 @@ rm(d1)
 
 # In contrast to the test above we name the distribution "A";
 # should result in proper rownames on the matrices.
-expect_silent(d3 <- Transition(m, bins),                     info = "Calling constructor with three distributions")
+expect_silent(d3 <- Transition(m, breaks),                     info = "Calling constructor with three distributions")
 expect_identical(class(d3), c("Transition", "distribution"), info = "Testing return class")
 expect_identical(length(d3), nrow(m),                        info = "Testing length")
 expect_identical(names(d3), rownames(m),                     info = "Testing names")
-expect_identical(attr(d3, "bins"), bins,                     info = "Testing 'bins' attribute on Transition")
+expect_identical(attr(d3, "breaks"), breaks,                     info = "Testing 'breaks' attribute on Transition")
 expect_true(all(grepl(sprintf("^Transition\\(n = %d\\)$", ncol(m)), format(d3))), info = "Format")
 
 # Convert to matrix
@@ -91,7 +91,7 @@ expect_true(is.matrix(m3) && is.numeric(m3),                 info = "Testing mat
 expect_identical(dim(m3), dim(m),                            info = "Testing matrix dimension")
 expect_true(all(grep("^tp_[0-9]+$", colnames(m3))),          info = "Matrix column names")
 expect_identical(rownames(m3), rownames(m),                  info = "Matrix row names")
-expect_identical(attr(m3, "bins"), bins,                     info = "Testing 'bins' attribute on matrix")
+expect_identical(attr(m3, "breaks"), breaks,                     info = "Testing 'breaks' attribute on matrix")
 
 # Convert to extended (long) matrix
 expect_silent(m3e <- as.matrix(d3, expand = TRUE),           info = "Converting to extended matrix")
@@ -100,7 +100,7 @@ expect_true(is.matrix(m3e) && is.numeric(m3e),               info = "Testing ext
 expect_identical(dim(m3e), c(3L * ncol(m), 3L),              info = "Testing extended matrix dimension")
 expect_identical(colnames(m3e), c("index", "theta", "tp"),   info = "Matrix extended column names")
 expect_true(is.null(rownames(m3e)),                          info = "Extended matrix row names (unnamed)")
-expect_identical(attr(m3e, "bins"), bins,                    info = "Testing 'bins' attribute on matrix")
+expect_identical(attr(m3e, "breaks"), breaks,                    info = "Testing 'breaks' attribute on matrix")
 
 # Testing content ...
 expect_equal(m3e[, "index"], rep(seq_along(d3), each = ncol(m)),           info = "Checking matrix content (index)")
@@ -113,7 +113,7 @@ rm(d3)
 
 # ------------- testing S3 methods for Transition --------------------
 
-d3 <- Transition(m, bins)
+d3 <- Transition(m, breaks)
 
 # Testing c(); We have already tested 'd3', so if the result
 # of the c(...) call is identical we know the combined object is
@@ -131,7 +131,7 @@ expect_identical(rownames(d3df), names(d3),                   info = "Data.frame
 
 # S3 method support
 expect_silent(s3 <- support(d3),                              info = "Calling S3 method support")
-expect_identical(s3, matrix(range(bins), byrow = TRUE, ncol = 2L, nrow = length(d3), dimnames = list(names(d3), c("min", "max"))),
+expect_identical(s3, matrix(range(breaks), byrow = TRUE, ncol = 2L, nrow = length(d3), dimnames = list(names(d3), c("min", "max"))),
                  info = "Testing return of 'support()' method")
 
 
@@ -142,13 +142,13 @@ expect_silent(is_continuous(d3),                              info = "Calling S3
 expect_identical(is_continuous(d3), rep(FALSE, length(d3)),   info = "Testing return of is_continuous")
 
 # S3 method cdf
-# Evaluate the distributions at all bins (binmid)
-binmid <- (head(bins, -1) + tail(bins, -1)) / 2
+# Evaluate the distributions at all breaks (binmid)
+binmid <- (head(breaks, -1) + tail(breaks, -1)) / 2
 expect_silent(xcdf <- cdf(d3[1], binmid),                     info = "Calling S3 method cdf")
 expect_identical(xcdf, convert_tp(m[1, ], "tp", "cdf"),       info = "Compare result from C/R")
 
 # S3 method pdf
-# Evaluate the distributions at all bins (binmid)
+# Evaluate the distributions at all breaks (binmid)
 i <- 1
 expect_silent(dcdf <- cdf(d3[i], binmid),                     info = "Calling S3 method cdf")
 expect_identical(dcdf, convert_tp(m[i, ], "tp", "cdf"),       info = "Compare result from C/R")

@@ -222,26 +222,26 @@ transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose =
 
 
 ## Convert numeric values to bin index (integer). If x == NULL, NULL is returned.
-num2bin <- function(x, bins) {
+num2bin <- function(x, breaks) {
     if (is.null(x)) return(x)
     if (any(is.na(x)))
         stop("Response contains missing values (not allowed).")
-    if (any(x < min(bins) | x > max(bins)))
-        stop("Response values outside support (outside range defined by the bins).")
-    cut(x, breaks = bins, labels = FALSE, include.lowest = TRUE) - 1L
+    if (any(x < min(breaks) | x > max(breaks)))
+        stop("Response values outside support (outside range defined by the breaks).")
+    cut(x, breaks = breaks, labels = FALSE, include.lowest = TRUE) - 1L
 }
 
 
 
 # Helper function for predictions on a transitreg model object.
 transitreg_predict <- function(object, newdata = NULL,
-        type = c("pdf", "cdf", "quantile", "pmax"), y = NULL, prob = NULL,
+        type = c("pdf", "cdf", "quantile", "pmax", "tp"), y = NULL, prob = NULL,
         elementwise = NULL, maxcounts = 1e+03,
         verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
         factor = FALSE, ncores = NULL) {
 
   ## This method is built on the 'transitreg' model as we need access
-  ## to the original model.frame, bins, ... although the prediction (TPs)
+  ## to the original model.frame, breaks, ... although the prediction (TPs)
   ## will be done on object$model, the internal probability model.
   stopifnot(
     "'object' must be of class 'transitreg'" = inherits(object, "transitreg")
@@ -275,7 +275,7 @@ transitreg_predict <- function(object, newdata = NULL,
   ## - prob must be not NULL, all values must be in [0, 1].
   ## PDF/CDF:
   ## - If 'newdata = NULL' we take the model frame, so y can be missing.
-  ## - Else y must be not NULL, all values must be within support of 'bins'.
+  ## - Else y must be not NULL, all values must be within support of 'breaks'.
   if (type == "quantile") {
     stopifnot(
       "for 'type = \"quantile\"' argument 'prob' must be set" = !is.null(prob),
@@ -289,14 +289,14 @@ transitreg_predict <- function(object, newdata = NULL,
           !is.null(y),
       "'y' must be numeric of length > 0" = is.numeric(y) && length(y) > 0,
       "missing values in 'y' not allowed" = all(!is.na(y)),
-      "'y' must be in range of object$bins" =
-          all(y >= min(object$bins)) && all(y <= max(object$bins))
+      "'y' must be in range of object$breaks" =
+          all(y >= min(object$breaks)) && all(y <= max(object$breaks))
     )
   }
 
   ## If 'y' was set by the user, we must convert all values in 'y' from
   ## it's original numeric value to it's pseudo-observation (bin; int).
-  if (!is.null(y)) y <- num2bin(y, object$bins)
+  if (!is.null(y)) y <- num2bin(y, object$breaks)
 
   ## If newdata is empty, we are taking the model frame.
   ## In addition, we take the pseudo-response from the model.frame
@@ -319,21 +319,19 @@ transitreg_predict <- function(object, newdata = NULL,
   ##        ncol(newdata) times (length(y) | length(probs)) depending on type.
   if (is.null(elementwise)) {
       if (type == "quantile") {
-
           elementwise <- length(prob) == 1L | length(prob) == nrow(newdata)
           ## Extending prob and sorting if !elementwise
           if (elementwise & length(prob) == 1L)
               prob <- rep(prob, length.out = nrow(newdata))
-
       } else if (type %in% c("cdf", "pdf")) {
-
           elementwise <- length(y) == 1L | length(y) == nrow(newdata)
           ## Extending y and sorting if !elementwise
           if (elementwise & length(y) == 1L)
               y <- rep(y, length.out = nrow(newdata))
-
       } else if (type == "pmax") {
           elementwise <- TRUE # for 'pmax' elementwise is always TRUE
+      } else if (type == "tp") {
+          NULL
       } else {
           stop("Mode for type = \"", type, "\" must be implemented!")
       }
@@ -363,13 +361,12 @@ transitreg_predict <- function(object, newdata = NULL,
   ##    up to 'y[i]'.
   ##  - If elementwise = FALSE: We must evaluate each distribution up to
   ##    max(y).
-  if (type %in% c("quantile", "pmax")) {
-    ## -2: N bins equal (N - 1) bin widths, and we start with bin 0 (thus -1 again)
-    newresponse <- rep(length(object$bins - 2), nrow(newdata))
+  if (type %in% c("quantile", "pmax", "tp")) {
+    ## -2: N breaks equal (N - 1) bin widths, and we start with bin 0 (thus -1 again)
+    newresponse <- rep(length(object$breaks - 2), nrow(newdata))
   } else {
     newresponse <- if (elementwise) y else rep(max(y), nrow(newdata))
   }
-
 
   ## Preparing data
   newdata <- transitreg_data(newdata, response = object$response,
@@ -395,18 +392,30 @@ transitreg_predict <- function(object, newdata = NULL,
     "gam"  = "response",
     "nnet" = "raw"
   )
+  print(dim(newdata))
+  print(summary(newdata))
+  print(newdata)
+  stop(" ---- issues with break length ----- ")
   tp <- as.numeric(predict(object$model, newdata = newdata, type = what))
+
+  ## If 'type = "tp"' (transition probabilities) we already have our
+  ## result. Conver to matrix, and return.
+  if (type == "tp") {
+      print(length(tp))
+      print(length(tp) / 3)
+      return(matrix(tp, byrow = TRUE, ncol = object$bins))
+  }
 
   ## Extract unique indices
   ui   <- unique(newdata$index)
 
-  args <- list(uidx  = ui,                        # int; Unique distribution index (int)
-               idx   = newdata$index,             # int; Index vector (int)
-               tp    = tp,                        # num; Transition probabilities
-               bins  = object$bins,               # num; Point intersections of bins
-               y     = y,                         # int; Response y, used for 'cdf/pdf'
-               prob  = prob,                      # num; Probabilities (used for 'quantile')
-               type  = type,                      # str; to predict/calculate
+  args <- list(uidx   = ui,                        # int; Unique distribution index (int)
+               idx    = newdata$index,             # int; Index vector (int)
+               tp     = tp,                        # num; Transition probabilities
+               breaks = object$breaks,             # num; Point intersections of bins
+               y      = y,                         # int; Response y, used for 'cdf/pdf'
+               prob   = prob,                      # num; Probabilities (used for 'quantile')
+               type   = type,                      # str; to predict/calculate
                ncores = ncores,                   # int; Number of cores to be used (OpenMP)
                elementwise = elementwise,         # Elementwise (one prob or y per ui)
                discrete = rep(FALSE, length(ui))) # Discrete distribution?
@@ -445,7 +454,7 @@ transitreg_predict <- function(object, newdata = NULL,
 check_args_for_treg_predict <- function(x) {
     ## Checking types first
     tmp <- list("integer" = c("uidx", "idx", "y", "ncores"),
-                "double"  = c("tp", "bins", "prob"),
+                "double"  = c("tp", "breaks", "prob"),
                 "logical" = c("elementwise", "discrete"))
     for (n in names(tmp)) {
         fn <- get(sprintf("is.%s", n))
@@ -607,19 +616,34 @@ transitreg_dist <- function(y, data = NULL, ...) {
 
 
 
-## Function to create bins.
-make_bins <- function(y, breaks = 30, scale = FALSE , ...) {
-  if(scale) {
+#' Create Breaks for (Pseudo-)bins
+#'
+#' Calculates the breaks (point intersection between breaks)
+#' which span the range of `y`.
+#'
+#' @param y numeric vector with response data.
+#' @param breaks number of breaks to be created (single integer).
+#' @param scale logical, scaling involved?
+#'
+#' @return Returns a numeric vector with the breaks.
+make_breaks <- function(y, breaks = 30, scale = FALSE , ...) {
+  stopifnot(
+    "'y' must be numeric" = is.numeric(y),
+    "'breaks' must be numeric of length 1" = is.numeric(breaks) && length(breaks) == 1L,
+    "'breaks' must be >= 2" = breaks >= 2,
+    "'scale' must be TRUE or FALSE" = isTRUE(scale) || isFALSE(scale)
+  )
+  if (scale) {
     my <- min(y)
     y <- sqrt(y - my + 0.01)
     dy <- diff(range(y))
-    bins <- (seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks))^2 - 0.01 + my
+    breaks <- (seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks))^2 - 0.01 + my
   } else {
     dy <- diff(range(y))
-    bins <- seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks)
-    #bins <- c(min(y) - 0.5*dy, quantile(y, probs = seq(0, 1, length = breaks)), max(y) + 0.5*dy)
+    breaks <- seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks)
+    #breaks <- c(min(y) - 0.5*dy, quantile(y, probs = seq(0, 1, length = breaks)), max(y) + 0.5*dy)
   }
-  return(bins)
+  return(breaks)
 }
 
 
@@ -825,17 +849,14 @@ transitreg <- function(formula, data, subset, na.action,
 
   ## Discretize response?
   if (bin.y <- !is.null(breaks)) {
-    if (length(breaks) < 2L) {
-      bins <- make_bins(model.response(mf), breaks = breaks)
-    } else {
-      bins <- breaks
+    if (length(breaks) == 1L) {
+      breaks <- make_breaks(model.response(mf), breaks = breaks)
     }
-    #bins[1] <- -Inf
-    #bins[length(bins)] <- Inf
+    bins <- length(breaks) - 1L
 
     ## Discretize numeric response into counts.
-    yc <- num2bin(model.response(mf), bins)
-    ym <- (bins[-1] + bins[-length(bins)]) / 2
+    yc <- num2bin(model.response(mf), breaks)
+    ym <- (breaks[-1] + breaks[-length(breaks)]) / 2
 
     lower <- list(...)$lower
     upper <- list(...)$upper
@@ -849,26 +870,35 @@ transitreg <- function(formula, data, subset, na.action,
   } else {
     ## For the model we need an integer response; check if the response
     ## is integer. If not, break.
-    if (!all(mf[[response]] %% 1 < sqrt(.Machine$double.eps)))
-        stop("Response is not looking like count data (integers); binning may be required.")
-    mf[[response]] <- as.integer(mf[[response]])
+    if (!all(mf[[response]] %% 1 < sqrt(.Machine$double.eps)) &&
+        all(mf[[response]] > sqrt(.Machine$double.eps)))
+        stop("Response is not looking like count data (integers); binning via 'breaks' is required.")
+    mf[[response]] <- as.integer(round(mf[[response]], 1))
 
-    ## TODO(R): Niki, I do need bins to evaluate the cdf. Adjusted this part
-    ##          quick'n'dirty to auto-generate bins for count data if that
-    ##          can be detected. This, however, can create thousands of bins
-    ##          as it uses 0:max(response).
-    ##          We need to re-think this.
-    tmp <- unique(model.response(mf))
-    if (all(tmp > -.Machine$double.eps) && all(tmp %% 1 < .Machine$double.eps)) {
-        ny   <- seq.int(0, max(tmp))
-        bins <- seq.int(0, max(tmp) + 1) - 0.5
-        breaks <- length(bins)
-        bin.y <- TRUE
-        yc <- cut(model.response(mf), breaks = bins, labels = FALSE, include.lowest = TRUE) - 1
-        ym <- (bins[-1] + bins[-length(bins)]) / 2
-    } else {
-        stop("no 'breaks' provided, response does not look like count data.")
-    }
+    bins <- max(mf[[response]])
+    ## Setting highest 'bin' to max(response) * mp (multiplier)
+    mp     <- if (bins <= 10) { 2 } else if (bins <= 100) { 1.5 } else { 1.2 }
+    bins   <- as.integer(ceiling(bins * mp))
+    breaks <- seq_len(bins + 1) - 1.5 # 'Integer' bins
+    message("Response considered to be count data, using max count ", bins - 1)
+
+    ## TODO(R): REMOVE ME
+    ### TODO(R): Niki, I do need bins to evaluate the cdf. Adjusted this part
+    ###          quick'n'dirty to auto-generate bins for count data if that
+    ###          can be detected. This, however, can create thousands of bins
+    ###          as it uses 0:max(response).
+    ###          We need to re-think this.
+    #tmp <- unique(model.response(mf))
+    #if (all(tmp > -.Machine$double.eps) && all(tmp %% 1 < .Machine$double.eps)) {
+    #    ny   <- seq.int(0, max(tmp))
+    #    bins <- seq.int(0, max(tmp) + 1) - 0.5
+    #    breaks <- length(bins)
+    #    bin.y <- TRUE
+    #    yc <- cut(model.response(mf), breaks = bins, labels = FALSE, include.lowest = TRUE) - 1
+    #    ym <- (bins[-1] + bins[-length(bins)]) / 2
+    #} else {
+    #    stop("no 'breaks' provided, response does not look like count data.")
+    #}
   }
 
   ## Scaling data.
@@ -957,7 +987,7 @@ transitreg <- function(formula, data, subset, na.action,
   ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.
   args <- list(uidx = ui, idx = tmf$index,
-               tp = tp, y = mf[[response]], bins = bins, ncores = ncores)
+               tp = tp, y = mf[[response]], breaks = breaks, ncores = ncores)
 
   ## Verbose = TRUE, debugging output
   if (verbose) {
@@ -976,12 +1006,16 @@ transitreg <- function(formula, data, subset, na.action,
   rval$probs <- as.data.frame(tmp)
   rm(tmp)
 
+  ## We always store 'bins'. In case of bin.y this is he number
+  ## of bins (i.e., length(breaks) - 1), if !bin.y this is the higest
+  ## integer of the original response.
+  rval$bins <- bins
+
   ## If binning.
   if (bin.y) {
-    rval$bins   <- bins
+    rval$breaks <- breaks
     rval$ym     <- ym
     rval$yc_tab <- table(yc)
-    rval$breaks <- breaks
   }
 
   ## Assign class.
@@ -1271,7 +1305,7 @@ predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
 
   ## Calling transitreg_predict to perform the actual prediction
   pred <- transitreg_predict(object$model,
-                     bins         = object$bins,
+                     breaks       = object$breaks,
                      newdata      = newdata,
                      ncores       = ncores,
                      response     = object$response,
@@ -1287,7 +1321,7 @@ predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
 
   ## If binning is used (pseudo-counts), convert predicted
   ## bin to numeric (center of the bin)
-  if (!is.null(object$bins)) {
+  if (!is.null(object$breaks)) {
     if (type %in% c("quantile", "pmax")) {
       pred <- object$ym[pred + 1L]
     }
