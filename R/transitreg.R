@@ -445,7 +445,7 @@ transitreg_predict <- function(object, newdata = NULL,
 
 
 
-# Helper function to check the arguments we hand over to C. This
+# Helper functions to check the arguments we hand over to C. This
 # helps identifying potential problems easier. Input 'x' is a named
 # list with all the elements required when calling "treg_predict" in C.
 #
@@ -454,6 +454,7 @@ transitreg_predict <- function(object, newdata = NULL,
 # it is possible that C returns 'garbage' results as it tries to read
 # elemnets outside of memory, resulting in either segfaults or werid
 # results.
+
 #' @importFrom utils str
 check_args_for_treg_predict <- function(x) {
     ## Checking types first
@@ -486,6 +487,34 @@ check_args_for_treg_predict <- function(x) {
     invisible(TRUE)
 }
 
+#' @importFrom utils str
+check_args_for_treg_predict_pdfcdf <- function(x) {
+    ## Checking types first
+    tmp <- list("integer" = c("uidx", "idx", "y", "ncores"),
+                "double"  = c("tp", "breaks"))
+    for (n in names(tmp)) {
+        fn <- get(sprintf("is.%s", n))
+        for (e in tmp[[n]]) {
+            if (!fn(x[[e]])) stop("Element '", e, "' in args list is not \"", n, "\"")
+        }
+    }
+
+    ## Checking length of some of the elements
+    tryCatch(
+        {stopifnot(
+            "length of 'args$idx' and 'args$tp' must be identical" =
+                length(x$idx) == length(x$tp),
+            "length of 'args$y' and 'args$uidx' must be identical" =
+                length(x$y) == length(x$uidx)
+        )},
+        error = function(e) {
+            cat("\nDebugging output (str(args)):\n")
+            str(x)
+            stop(e)
+        }
+    )
+    invisible(TRUE)
+}
 
 
 #' Transition Model Probability Density Visualization
@@ -975,16 +1004,11 @@ transitreg <- function(formula, data, subset, na.action,
   args <- list(uidx = ui, idx = tmf$index,
                tp = tp, y = mf[[response]], breaks = breaks, ncores = ncores)
 
-  ## Verbose = TRUE, debugging output
-  if (verbose) {
-    cat("Arguments passed to C 'treg_predict_pdfcdf' in R 'transitreg()':\n")
-    str(args)
-  }
-
-  # Calling C
+  ## Calling C
+  check_args_for_treg_predict_pdfcdf(args)
   tmp <- do.call(function(...) .Call("treg_predict_pdfcdf", ...), args)
 
-  # Fixing values close to 0/1
+  ## Fixing values close to 0/1
   tmp$pdf[tmp$pdf < 1e-15]    <- 1e-15
   tmp$cdf[tmp$cdf < 1e-15]    <- 1e-15
   tmp$cdf[tmp$cdf > 0.999999] <- 0.999999
@@ -1014,7 +1038,10 @@ transitreg <- function(formula, data, subset, na.action,
 #' @exportS3Method "[" transitreg
 #' @author Reto
 `[.transitreg` <- function(x, i, ..., drop = TRUE) {
-    print("Plan is to return Transition distributions later")
+    tp <- transitreg_predict(x, newdata = model.frame(x)[i, , drop = FALSE],
+                            type = "tp")
+    breaks <- if (is.null(x$breaks)) seq_len(x$bins + 1) - 0.5 else x$breaks
+    return(Transition(tp, breaks))
 }
 
 

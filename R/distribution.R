@@ -243,7 +243,7 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
                  y     = x,                        # Where to evaluate the pdf
                  prob  = NA_real_,                 # Dummy, only used for 'quantile'
                  type  = "pdf", ncores = ncores, elementwise = elementwise,
-                 discrete = FALSE) # <- dummy value
+                 discrete = rep(FALSE, length(ui))) # <- dummy value
 
     # Calling C
     check_args_for_treg_predict(args)
@@ -310,7 +310,7 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
                  y     = x,                        # Where to evaluate the pdf
                  prob  = NA_real_,                 # Dummy, only used for 'quantile'
                  type  = "cdf", ncores = ncores, elementwise = elementwise,
-                 discrete = FALSE) # <- dummy value
+                 discrete = rep(FALSE, length(ui))) # <- dummy value
 
     # Calling C
     check_args_for_treg_predict(args)
@@ -384,7 +384,7 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
                  y     = NA_integer_,              # Dummy, only used for cdf/pdf
                  prob  = probs,                    # Probabilities where to evaluate the distribution
                  type  = "quantile", ncores = ncores, elementwise = elementwise,
-                 discrete = as.logical(discrete))
+                 discrete = rep(as.logical(discrete), length(ui)))
 
     # Calling C
     check_args_for_treg_predict(args)
@@ -532,6 +532,47 @@ support.Transition <- function(d, drop = NULL, ...) {
     }
     return(x)
 }
+
+
+#' @importFrom utils head tail
+#' @importFrom graphics matplot axis
+#' @exportS3Method plot Transition
+plot.Transition <- function(d, type = c("tp", "cdf", "pdf"), p = c(0.1, 99.9), len = 1000,
+                            all = FALSE, ...) {
+
+
+    type <- match.arg(type)
+    titles <- c("tp"  = "Transition Probabilities",
+               "cdf" = "Distribution",
+               "pdf" = "Density")
+
+    if (length(d) > 8 & !all) d <- d[1:8]
+
+    breaks <- attr(d, "breaks")
+
+    if (type == "tp") {
+        x <- (head(breaks, -1) + tail(breaks, -1)) / 2 # Mid of bin
+        m <- as.matrix(d)
+    } else if (type == "cdf") {
+        x <- seq(min(breaks), max(breaks), length.out = len)
+        m <- cdf(d, x, elementwise = FALSE, drop = FALSE)
+    } else {
+        x <- seq(min(breaks), max(breaks), length.out = len)
+        m <- pdf(d, x, elementwise = FALSE, drop = FALSE)
+    }
+
+    matplot(x = x, y = t(m), type = "l",
+            lty = 1, main = titles[type], ...)
+
+    axis(side = 1, at = attr(m, "breaks"), labels = FALSE, col = 1, tck = 0.015)
+    invisible(NULL)
+}
+
+
+
+
+
+
 
 
 # TODO(R): Used?
