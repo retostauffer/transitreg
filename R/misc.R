@@ -395,8 +395,8 @@ convert_tp <- function(x, from, to, width = NULL, drop = TRUE) {
 }
 
 # Converts a cdf vector into transition probabilities.
-#' @param x numeric vector with CDFs
-#' @param \dots unused.
+# @param x numeric vector with CDFs
+# @param \dots unused.
 cdf_to_tp <- function(x, ...) {
     stopifnot(is.numeric(x), all(x >= 0 & x <= 1))
     stopifnot(all(diff(x) >= -.Machine$double.eps))
@@ -417,8 +417,8 @@ cdf_to_tp <- function(x, ...) {
 }
 
 # Converts transition probabilities (tp) to cdf
-#' @param x numeric vector with TPs.
-#' @param \dots unused.
+# @param x numeric vector with TPs.
+# @param \dots unused.
 tp_to_cdf <- function(tp, ...) {
     stopifnot(is.numeric(tp), all(tp >= 0 & tp <= 1), length(tp) >= 1L)
     stopifnot(all(diff(tp) <= .Machine$double.eps))
@@ -433,11 +433,11 @@ tp_to_cdf <- function(tp, ...) {
 }
 
 # Converts transition probabilities (tp) to pdf
-#' @param x numeric vector with TPs.
-#' @param width `NULL` or a numeric vector of the same length as `x`.
-#'        Width of the bins, required to properly scale the CDF if
-#'        the width of the bins is not equal to `1` (as it is for count data).
-#' @param \dots unused.
+# @param x numeric vector with TPs.
+# @param width `NULL` or a numeric vector of the same length as `x`.
+#        Width of the bins, required to properly scale the CDF if
+#        the width of the bins is not equal to `1` (as it is for count data).
+# @param \dots unused.
 tp_to_pdf <- function(tp, width = NULL, ...) {
     stopifnot(is.numeric(tp), all(tp >= 0 & tp <= 1), length(tp) >= 1L)
     stopifnot(all(diff(tp) <= 0))

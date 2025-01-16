@@ -40,8 +40,9 @@ rm(d1_m)
 # Testing the Transition object of length 1
 expect_identical(class(d1), c("Transition", "distribution"), info = "Testing class")
 expect_identical(length(d1), 1L,                             info = "Testing length")
-expect_stdout(print(d1), pattern = "Transition\\(n = 16\\)", info = "Testing standard representation")
-expect_identical(format(d1), "Transition(n = 16)",           info = "Testing format function")
+pat <- "Transition_16\\([0-9\\.\\,\\ ]+)"
+expect_stdout(print(d1), pattern = pat,                      info = "Testing standard representation")
+expect_true(grepl(pat, format(d1)),                          info = "Testing format function")
 
 # Checking attribute
 expect_true("breaks" %in% names(attributes(d1)),               info = "Checking if attribute 'breaks' is available")
@@ -83,7 +84,7 @@ expect_identical(class(d3), c("Transition", "distribution"), info = "Testing ret
 expect_identical(length(d3), nrow(m),                        info = "Testing length")
 expect_identical(names(d3), rownames(m),                     info = "Testing names")
 expect_identical(attr(d3, "breaks"), breaks,                     info = "Testing 'breaks' attribute on Transition")
-expect_true(all(grepl(sprintf("^Transition\\(n = %d\\)$", ncol(m)), format(d3))), info = "Format")
+expect_true(all(grepl(sprintf("^Transition_%d\\([0-9\\.\\,\\ ]+\\)$", ncol(m)), format(d3))), info = "Format")
 
 # Convert to matrix
 expect_silent(m3 <- as.matrix(d3),                           info = "Converting to matrix")

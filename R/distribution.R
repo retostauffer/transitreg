@@ -186,10 +186,16 @@ format.Transition <- function(x, digits = pmax(3L, getOption("digits") - 3L), ..
     # Extracting probabilites and breaks
     fmtfun <- function(i) {
         y <- as.matrix(x[i], expand = FALSE)
-        sprintf("n = %d", ncol(y))
+        if (ncol(y) > 2L) {
+            sprintf("Transition_%d(%s, ..., %s)", ncol(y),
+                    format(y[1], digits = digits), format(y[ncol(y)], digits = digits))
+        } else {
+            # Typically unused, that is two bins only!
+            sprintf("Transition_%d(%s, %s)", ncol(y),
+                    format(y[1], digits = digits), format(y[2], digits = digits))
+        }
     }
     f <- sapply(seq_along(x), fmtfun)
-    f <- sprintf("Transition(%s)", f)
     setNames(f, xnames)
 }
 

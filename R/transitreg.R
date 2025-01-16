@@ -984,6 +984,8 @@ transitreg <- function(formula, data, subset, na.action,
   warn <- getOption("warn")
   options("warn" = -1)
   if (engine == "bam") {
+    if (length(attr(terms(rval$new_formula), "term.labels")) == 0L)
+      stop("Intercept only model (", format(formula), ") with engine = \"", engine, "\" not allowed.")
     rval$model <- bam(rval$new_formula, data = tmf, family = binomial, discrete = TRUE)
   } else if (engine == "gam") {
     rval$model <- gam(rval$new_formula, data = tmf, family = binomial, ...)
