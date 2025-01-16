@@ -57,6 +57,239 @@ Transition <- function(x, breaks) {
     structure(res, class = c("Transition", "distribution"), breaks = breaks)
 }
 
+
+
+#' @rdname Transition
+#' @export
+dtransit <- function(x, d, log = FALSE, ncores = NULL) {
+    stopifnot(
+        "'x' must be numeric of length > 0" = is.numeric(x) && length(x) > 0L,
+        "missing values in 'x' not allowed" = all(!is.na(x)),
+        "'d' must be of class 'Transition'" = inherits(d, "Transition")
+    )
+    log <- as.logical(log[1])
+    stopifnot("'log' must evaluate to TRUE/FALSE" = isTRUE(log) || isFALSE(log))
+
+    ## Evaluate cdf
+    res <- dpq_get_results(x, d, ncores, type = "pdf")
+
+    return(if (log) log(res) else res)
+}
+
+
+#' @rdname Transition
+#' @export
+ptransit <- function(x, d, lower.tail = TRUE, log.p = FALSE, ncores = NULL) {
+    stopifnot(
+        "'x' must be numeric of length > 0" = is.numeric(x) && length(x) > 0L,
+        "missing values in 'x' not allowed" = all(!is.na(x)),
+        "'d' must be of class 'Transition'" = inherits(d, "Transition")
+    )
+    lower.tail <- as.logical(lower.tail[1])
+    log.p <- as.logical(log.p[1])
+    stopifnot(
+        "'log.p' must evaluate to TRUE/FALSE" = isTRUE(log.p) || isFALSE(log.p),
+        "'log.p' must evaluate to TRUE/FALSE" = isTRUE(log.p) || isFALSE(log.p)
+    )
+
+    ## Evaluate cdf
+    res <- dpq_get_results(x, d, ncores, type = "cdf")
+
+    if (!lower.tail) res <- 1.0 - res
+    return(if (log.p) log(res) else res)
+}
+
+#' @rdname Transition
+#' @export
+qtransit <- function(p, d, lower.tail = TRUE, log.p = FALSE, ncores = NULL) {
+    stopifnot(
+        "'p' must be numeric of length > 0" = is.numeric(p) && length(p) > 0L,
+        "missing values in 'p' not allowed" = all(!is.na(p)),
+        "'p' must be in range [0, 1]" = all(p >= 0 & p <= 1),
+        "'d' must be of class 'Transition'" = inherits(d, "Transition")
+    )
+
+    # Evaluate quantiles
+    res <- dpq_get_results(p, d, ncores, type = "quantile")
+    return(res)
+}
+
+
+# Input 'z' is either 'x' (dtransit, ptransit), or 'p' (qtransit)
+dpq_get_results <- function(z, d, ncores, type) {
+    stopifnot(
+        is.numeric(z), inherits(d, "Transition"),
+        is.character(type) && length(type) == 1L
+    )
+
+    ## If type != 'quantile', z represents the numeric values where
+    ## to evaluate the distribution(s). Convert to 'bins'
+    if (type != "quantile") z <- num2bin(z, attr(d, "breaks"))
+
+    ## If length(y) == 1: Recycle
+    if (length(z) == 1L) z <- rep(z, length.out = length(d))
+
+    ## Get number of cores for OpenMP parallelization
+    ncores <- transitreg_get_number_of_cores(ncores, FALSE)
+
+    ## Store element names for return
+    breaks <- attr(d, "breaks")
+
+    ui  <- seq_along(d) # Unique index
+    idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
+
+    # If length(y) == length(d): elementwise = TRUE
+    elementwise <- length(z) == length(d)
+
+
+    # Setting up arguments to call .C predict function
+    args <- list(uidx    = ui,                       # Unique distribution index (int)
+                 idx     = idx,                      # Index vector (int)
+                 tp      = t(as.matrix(d)),          # Transition probabilities
+                 breaks  = breaks,                    # Point intersection of breaks
+                 type    = type, ncores = ncores, elementwise = elementwise,
+                 discrete = rep(FALSE, length(ui))) # <- dummy value
+    if (type == "quantile") {
+        args$y    <- NA_integer_
+        args$prob <- if (!elementwise) unique(sort(z)) else z # If !elementwise: take sorted unique
+    } else {
+        args$y    <- if (!elementwise) unique(sort(z)) else z # If !elementwise: take sorted unique
+        args$prob <- NA_real_
+    }
+
+    # Calling C
+    args <- check_args_for_treg_predict(args)
+    res <- do.call(function(...) .Call("treg_predict", ...), args)
+
+    # If !elementwise and length(d) != 1 we need to pick the correct elements
+    if (!elementwise & length(d) != 1L) res <- dpq_get_elements(res, z, length(d))
+    return(res)
+}
+
+
+# Helper function used in dtransit, ptransit, and qtransit.
+# For performance, dpq are always calculated with elementwise = FALSE.
+# Depending on length(x)|length(p) and length(d) we then need to
+# extract the correct elements for the final return.
+#
+# As an exmaple: Imagine calling:
+#   dtransit(c(1, 5, 2), d)
+# .. where d is of length 2. We calculate the density at position 1, 5, 2 for
+# all distributions in d, convert the result into a matrix, and then pick the
+# correct elements afterwards. As the results are sorted in the matrix the
+# order of 'x' is used. In this scenario the resulting matrix is:
+#
+#         xs_1    xs_2     xs_3
+# d_1     r_11    r_12     r_13
+# d_2     r_21    r_22     r_23
+#
+# ... with xs -> sort(x). We will create arr.ind as follows:
+#
+# arr.ind     row   col
+#             1     1
+#             2     3
+#             1     2
+#
+# Thus, returning a numeric vector with elements c(r_11, r_23, r_12).
+dpq_get_elements <- function(res, x, nd) {
+    res  <- matrix(res, nrow = nd, byrow = TRUE)
+    mtch <- match(x, sort(unique(x)))
+    n    <- max(length(x), nd)
+    arr.ind <- cbind(row = rep(seq_len(nd), length.out = n),
+                     col = rep(mtch,        length.out = n))
+    print(arr.ind)
+    res <- res[arr.ind]
+}
+
+
+#' @rdname Transition
+#' @export
+rtransit <- function(n, d, ncores = NULL) {
+    n <- as.integer(n)
+    if (length(n) > 1) n <- length(n)
+    stopifnot(
+        "'n' must be of length > 0" = length(n) > 0L,
+        "missing values in 'n' not allowed" = all(!is.na(n)),
+        "'n' must be integer > 0" = all(n > 0L)
+    )
+
+    ## Get number of cores for OpenMP parallelization
+    ncores <- transitreg_get_number_of_cores(ncores, FALSE)
+
+    # Calculating 'bin mids'
+    breaks <- attr(d, "breaks")
+    binmid <- (head(breaks, -1) + tail(breaks, -1)) / 2.
+    binwidth <- diff(breaks)
+
+    # Logical vector, is the distribution discrete?
+    discrete <- is_discrete(d)
+
+    # Calculating densities for all distributions
+    ui  <- seq_along(d)
+    idx <- rep(seq_along(binmid), length(d))
+    y   <- seq_along(binmid) - 1L
+    args <- list(uidx   = ui,                       # Unique distribution index (int)
+                 idx    = idx,                      # Index vector (int)
+                 tp     = t(as.matrix(d)),          # Transition probabilities
+                 breaks = breaks,                     # Point intersection of breaks
+                 y      = y,                        # Where to evaluate the pdf
+                 prob   = NA_real_,                 # <- Dummy value
+                 type   = "pdf", ncores = ncores,
+                 elementwise = FALSE, discrete = discrete) # <- Dummy values
+
+    check_args_for_treg_predict(args)
+    p <- matrix(do.call(function(...) .Call("treg_predict", ...), args),
+                ncol = length(binmid), byrow = TRUE)
+
+    # Helper function, draw weighted sample of length 'n'.
+    # Scoping 'x', 'n', 'binmid', 'binwidth'
+    fn <- function(i) {
+        y <- as.matrix(d[i], expand = TRUE)
+        p <- as.vector(p[i, ])
+        r <- sample(binmid, size = n, prob = p, replace = TRUE)
+        # Adding random uniform error
+        if (!discrete[i])
+            r <- r + runif(n, min = -binwidth[r] / 2, max = +binwidth[r] / 2)
+        return(r)
+    }
+    res <- lapply(seq_along(d), fn)
+    res <- do.call(rbind, res)
+    return(as.vector(t(res)))
+}
+
+
+mean_transit <- function(x, ncores = NULL, ...) {
+    ## TODO(R): Not correct if the distribution does not cover
+    ## the entire range of the data. Throw a warning for now.
+    warning("mean.Transition is only experimental. The result is incorrect ",
+            "if the distribution provided does not span the full support/range ",
+            "of the response distribution.")
+
+    ## Get number of cores for OpenMP parallelization
+    ncores <- transitreg_get_number_of_cores(ncores, FALSE)
+
+    breaks <- attr(x, "breaks")
+    ui   <- seq_along(x) # Unique index
+    idx  <- rep(ui, each = length(breaks) - 1) # Index of distribution
+    discrete <- rep(FALSE, length(ui))
+    warning("TODO(R): Currently assuming discrete = TRUE in mean.Transition")
+
+    ## Calling C to calculate the required values.
+    args <- list(uidx  = ui,                       # Unique distribution index (int)
+                 idx   = idx,                      # Index vector (int)
+                 tp    = t(as.matrix(x)),          # Transition probabilities
+                 breaks  = breaks,                     # Point intersection of breaks
+                 y     = NA_integer_,              # <- Dummy value
+                 prob  = NA_real_,                 # <- Dummy value
+                 type  = "mean", ncores = ncores,
+                 elementwise = TRUE, discrete = discrete) # <- Dummy values
+
+    # Calling C
+    args <- check_args_for_treg_predict(args)
+    return(do.call(function(...) .Call("treg_predict", ...), args))
+}
+
+
 #' @param \dots objects to be concatenated. Must all come from the same
 #'        transition distribution (i.e., be based on the same binning).
 #'
@@ -252,7 +485,7 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
                  discrete = rep(FALSE, length(ui))) # <- dummy value
 
     # Calling C
-    check_args_for_treg_predict(args)
+    args <- check_args_for_treg_predict(args)
     res  <- do.call(function(...) .Call("treg_predict", ...), args)
 
     # If elementwise: Return named vector
@@ -319,7 +552,7 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
                  discrete = rep(FALSE, length(ui))) # <- dummy value
 
     # Calling C
-    check_args_for_treg_predict(args)
+    args <- check_args_for_treg_predict(args)
     res  <- do.call(function(...) .Call("treg_predict", ...), args)
 
     # If elementwise: Return named vector
@@ -393,7 +626,7 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
                  discrete = as.logical(discrete))
 
     # Calling C
-    check_args_for_treg_predict(args)
+    args <- check_args_for_treg_predict(args)
     res  <- do.call(function(...) .Call("treg_predict", ...), args)
 
     # If elementwise: Return named vector
@@ -424,37 +657,7 @@ median.Transition <- function(x, na.rm = NULL, ncores = NULL, ...) {
 #' @rdname Transition
 #' @exportS3Method mean Transition
 mean.Transition <- function(x, ncores = NULL, ...) {
-
-    ## TODO(R): Not correct if the distribution does not cover
-    ## the entire range of the data. Throw a warning for now.
-    warning("mean.Transition is only experimental. The result is incorrect ",
-            "if the distribution provided does not span the full support/range ",
-            "of the response distribution.")
-
-    ## Get number of cores for OpenMP parallelization
-    ncores <- transitreg_get_number_of_cores(ncores, FALSE)
-
-    breaks <- attr(x, "breaks")
-    ui   <- seq_along(x) # Unique index
-    idx  <- rep(ui, each = length(breaks) - 1) # Index of distribution
-    discrete <- rep(FALSE, length(ui))
-    warning("TODO(R): Currently assuming discrete = TRUE in mean.Transition")
-
-    ## Calling C to calculate the required values.
-    args <- list(uidx  = ui,                       # Unique distribution index (int)
-                 idx   = idx,                      # Index vector (int)
-                 tp    = t(as.matrix(x)),          # Transition probabilities
-                 breaks  = breaks,                     # Point intersection of breaks
-                 y     = NA_integer_,              # <- Dummy value
-                 prob  = NA_real_,                 # <- Dummy value
-                 type  = "mean", ncores = ncores,
-                 elementwise = TRUE, discrete = discrete) # <- Dummy values
-
-    # Calling C
-    check_args_for_treg_predict(args)
-    res  <- do.call(function(...) .Call("treg_predict", ...), args)
-
-    setNames(res, names(x))
+    setNames(mean_transit(x, ncores = ncores), names(x))
 }
 
 #' @importFrom distributions3 random

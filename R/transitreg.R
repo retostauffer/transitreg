@@ -443,7 +443,7 @@ transitreg_predict <- function(object, newdata = NULL,
                discrete    = discrete)     # Discrete distribution?
 
   # Calling C
-  check_args_for_treg_predict(args)
+  args <- check_args_for_treg_predict(args)
   res  <- do.call(function(...) .Call("treg_predict", ...), args)
 
   # If 'ementwise = FALSE' we get length(y)/length(prob) results per
@@ -471,9 +471,16 @@ transitreg_predict <- function(object, newdata = NULL,
 # it is possible that C returns 'garbage' results as it tries to read
 # elemnets outside of memory, resulting in either segfaults or werid
 # results.
+#
+# Last but not least it ensures that the order of the arguments
+# are as expected by .C!
 
 #' @importFrom utils str
 check_args_for_treg_predict <- function(x) {
+    ## Expected elements (in the order expected by C)
+    enames <- c("uidx", "idx", "tp", "breaks", "y", "prob",
+                "type", "ncores", "elementwise", "discrete")
+
     ## Checking types first
     tmp <- list("integer" = c("uidx", "idx", "y", "ncores"),
                 "double"  = c("tp", "breaks", "prob"),
@@ -493,7 +500,9 @@ check_args_for_treg_predict <- function(x) {
                 length(x$idx) == length(x$tp),
             "length of 'args$type' must be 1" = length(x$type) == 1L,
             "length of 'args$discrete' and 'args$uidx' must be identical" =
-                length(x$uidx) == length(x$discrete)
+                length(x$uidx) == length(x$discrete),
+            "not all required elements found in 'args'" =
+                all(enames %in% names(x))
         )},
         error = function(e) {
             cat("\nDebugging output (str(args)):\n")
@@ -501,11 +510,16 @@ check_args_for_treg_predict <- function(x) {
             stop(e)
         }
     )
-    invisible(TRUE)
+
+    # Return (re-ordered) list
+    return(x[enames])
 }
 
 #' @importFrom utils str
 check_args_for_treg_predict_pdfcdf <- function(x) {
+    ## Required elements in the order as expected by C
+    enames <- c("uidx", "idx", "tp", "y", "breaks", "ncores")
+
     ## Checking types first
     tmp <- list("integer" = c("uidx", "idx", "y", "ncores"),
                 "double"  = c("tp", "breaks"))
@@ -530,7 +544,9 @@ check_args_for_treg_predict_pdfcdf <- function(x) {
             stop(e)
         }
     )
-    invisible(TRUE)
+
+    # Return (re-ordered) list
+    return(x[enames])
 }
 
 
@@ -1024,7 +1040,7 @@ transitreg <- function(formula, data, subset, na.action,
                tp = tp, y = mf[[response]], breaks = breaks, ncores = ncores)
 
   ## Calling C
-  check_args_for_treg_predict_pdfcdf(args)
+  args <- check_args_for_treg_predict_pdfcdf(args)
   tmp <- do.call(function(...) .Call("treg_predict_pdfcdf", ...), args)
 
   ## Fixing values close to 0/1
