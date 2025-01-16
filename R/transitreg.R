@@ -500,6 +500,10 @@ transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose =
   }
   result$theta <- fn_get_theta(nout, data[[response]], result$index)
 
+  ## TODO(R): Niki, I add theta0 in all situations. Needed/OK?
+  result$theta0 <- rep(0, length(result$theta))
+  result$theta0[result$theta == 0] <- 1
+
   ## Appending the remaining data from 'data'.
   for (n in names(data)) {
       ## If data[[n]] is a simple vector
@@ -1066,7 +1070,7 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 
     if (is.null(newdata)) {
         newdata <- object$model.frame
-        newdata[[yn]] <- object$breaks[newdata[[yn]]]
+        newdata[[yn]] <- object$breaks[newdata[[yn]] + 1L]
     }
 
     if (is.null(newdata[[object$response]]))

@@ -742,6 +742,7 @@ plot.Transition <- function(d, type = c("tp", "cdf", "pdf"), p = c(0.1, 99.9), l
     titles <- c("tp"  = "Transition Probabilities",
                "cdf" = "Distribution",
                "pdf" = "Density")
+    breaks <- attr(d, "breaks")
 
     if (length(d) > 8 & !all) d <- d[1:8]
 
@@ -761,7 +762,7 @@ plot.Transition <- function(d, type = c("tp", "cdf", "pdf"), p = c(0.1, 99.9), l
     matplot(x = x, y = t(m), type = "l",
             lty = 1, main = titles[type], ...)
 
-    axis(side = 1, at = attr(m, "breaks"), labels = FALSE, col = 1, tck = 0.015)
+    axis(side = 1, at = breaks, labels = FALSE, col = 1, tck = 0.015)
     invisible(NULL)
 }
 
