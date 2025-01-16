@@ -1,9 +1,12 @@
 
 ## Version 0.1-9004
 
-* Still in development, major changes to the C code (removing the
+* Major changes to the C code (removing the
   dependency to know the original (numeric) response), fixed a few
   smaller bugs.
+* Added proper dpqr support in addition to distributions3 methods:
+  dtransit, ptransit, qtransit, and rtransit.
+* Added proper handling for dpq functions if outside support.
 * Migrated to roxygen2 documentation.
 * Updated the prediction methods and functions.
 

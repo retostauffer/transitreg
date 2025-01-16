@@ -1,717 +1,6 @@
 ## Main paper: https://link.springer.com/article/10.1007/s10260-021-00558-6
 
 
-#' Detect number of cores for OpenMP
-#'
-#' The calculation of CDFs and PDFs is implemented in C and allows
-#' for parallelization using OpenMP. This function detects how may
-#' cores are available in total (if OpenMP is available).
-#'
-#' @param verbose logical, if `TRUE` a message is shown.
-#'
-#' @return Number of available cores (integer). If OpenMP is not
-#' available, `1L` is returned.
-#'
-#' @author Reto
-transitreg_detect_cores <- function(verbose = TRUE) {
-    stopifnot("'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose))
-    ncores <- .Call("treg_detect_cores")
-    if (verbose && ncores) {
-        message("OMP available, number of cores detected: ", ncores)
-    } else if (verbose) {
-        message("OMP not available (not compiled with omp)")
-    }
-    return(ncores)
-}
-
-#' Get number of cores for OpenMP
-#'
-#' Some parts of the package use C routines which allow for parallelization
-#' using OpenMP. This function is used to specify how many cores to be used.
-#'
-#' @param ncores `NULL` or a positive integer.
-#' @param verbose logical, if `TRUE` a message is shown.
-#'
-#' @return Number of cores to be used in OpenMP parallelization (integer).
-#'
-#' @details If `ncores` is `NULL` the number of available
-#' cores is auto-detected and set to 'total number of cores - 2'.
-#' If integer, it is checked if this number of cores is available,
-#' else set tot he 'total number of cores available'.
-#'
-#' @author Reto
-transitreg_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
-  ## Number of cores to be used for OpenMP. If
-  ## - NULL: Guess cores (max cores - 2L)
-  ## - Smaller or equal to 0: Set to 1L (single-core processing)
-  ## - Else: Take user input; limited to maximum number of detected cores.
-  ncores <- if (!is.null(ncores)) as.integer(ncores)[1L] else transitreg_detect_cores(verbose = FALSE) - 2L
-  ncores <- if (ncores < 1L) 1L else pmin(ncores, transitreg_detect_cores(verbose = FALSE))
-  if (verbose) message("Number of cores set to: ", ncores)
-  return(ncores)
-}
-
-
-
-#' Transition Model Data Preparer
-#'
-#' Transforms a data frame into the format required for estimating transition models.
-#' The function generates binary response data for fitting GLM-type models,
-#' specifically designed to represent transitions between counts or states in
-#' a probabilistic framework.
-#'
-#' @param data A data frame containing the raw input data.
-#' @param response Character string specifying the name of the response variable
-#'        to be used for transition modeling. This variable must represent
-#'        counts or categorical states.
-#' @param newresponse `NULL` or integer. New response vector to overwrite the one
-#'        in `data`.
-#' @param verbose Logical value indicating whether information about the transformation
-#'        process should be printed to the console. Default is `TRUE`.
-#'
-#' @details
-#' Transition models focus on modeling the conditional probabilities of transitions
-#' between states or counts. This function converts the input data into a long format
-#' suitable for such models. Each row in the resulting data frame corresponds to a
-#' binary transition indicator, representing whether a transition to a higher category
-#' occurred. For details on the modeling framework, see Berger and Tutz (2021).
-#'
-#' @return
-#'   A transformed data frame in the long format. Each row represents a binary transition
-#'   indicator (`Y`) for the response variable. Additional columns in the output include:
-#'
-#' * `index`: The original row index from the input data.
-#' * `Y`: The binary indicator for whether a transition to a higher
-#'       category occurred.
-#' * `theta`: The level corresponding to the current transition.
-#'
-#' This format is required for fitting transition models using GLM or GAM frameworks.
-#' For instance, a response variable with a value of 3 will generate rows with
-#' transitions up to its value (0, 1, 2, and 3).
-#'
-#' @seealso [transitreg()], [transitreg_dist()]
-#'
-#' @examples
-#' ## Raw data frame.
-#' d <- data.frame(
-#'   "id" = 1:5,
-#'   "counts" = c(1, 0, 2, 3, 1),
-#'   "x" = 1:5 * 10
-#' )
-#'
-#' ## Transformed data frame.
-#' dtm <- transitreg_data(d, response = "counts", verbose = TRUE)
-#' print(dtm)
-#'
-#' @keywords data transformation
-#' @concept transition
-#' @concept modeling
-#'
-#' @importFrom stats setNames
-#'
-#' @author Niki
-transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose = TRUE) {
-
-  stopifnot(
-    "'response' must be NULL or a character of length 1" =
-        is.null(response) || (is.character(response) && length(response) == 1L),
-    "'newresponse' must be NULL or a numeric vector with length > 0" =
-        is.null(newresponse) || (is.numeric(newresponse) && length(newresponse > 0)),
-    "'verbose' must be TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
-    "'newresponse' must be NULL or bins (0, 1, 2, ...)" =
-        is.null(newresponse) || (is.integer(newresponse) && all(newresponse >= 0))
-  )
-
-  ## Ensure data is a data frame.
-  if (!is.data.frame(data))
-    data <- as.data.frame(data)
-
-  ## Determine response column if not specified by user.
-  if (is.null(response))
-    response <- names(data)[1L]
-
-  ## If newresponse is give, it must be length == 1 or the same length
-  ## as the number of observations in 'data'. Required as we 'blow up'
-  ## the data for the binary model.
-  if (!is.null(newresponse)) {
-      if (length(newresponse) == 1L) {
-          newresponse <- rep(newresponse, nrow(data))
-      } else if (length(newresponse) != nrow(data)) {
-          stop("'newresponse' must be of length one (recycled for all observations) ",
-               "or a vector of the same length as number of observations (rows) ",
-               "in 'data'.")
-      }
-  }
-
-  ## If 'response' is provided in 'data' and an additional 'newresponse'
-  ## is provided, we will replace 'data[[response]]' with the newresponse.
-  if (response %in% names(data) & !is.null(newresponse)) {
-    warning("'newresponse' will overwrite response provided in 'data'.")
-    data[[response]] <- newresponse
-  } else if (!response %in% names(data)) {
-    ## 'newresponse' must be provided. If missing, stop, else append.
-    if (is.null(newresponse))
-      stop("'response' not contained in 'data', must be provided via 'newresponse'.")
-    data <- cbind(setNames(data.frame(newresponse), response), data)
-  }
-  rm(newresponse) # Delete object, no longer needed
-
-  ## If any missing value in response: stop
-  if (any(is.na(data[[response]])))
-      stop("NA values in response data!")
-
-  ## response$values must all be bin indices, so integers >= 0
-  check <- all(data[[response]] > -sqrt(.Machine$double.eps) |
-               abs(data[[response]] %% 1) > sqrt(.Machine$double.eps))
-  if (!check)
-    stop("The response must be bin indices, so integers in the range of {0, Inf}.")
-  data[[response]] <- as.integer(data[[response]])
-
-  ## Setting up the new data.frame with (pseudo-)bins
-
-  ## Define length of vectors in list
-  ## Sum of response indices + nrow(data), the latter to account for the
-  ## additional "0" bin.
-  nout <- sum(data[[response]]) + nrow(data)
-
-  ## ------ building transitreg data -------
-
-  ## Names of list elements.
-  names_out <- c("index", "Y", "theta", names(data))
-
-  ## Building index vector; each observation 1:nrow(data) gets its unique index
-  result <- list()
-  result$index <- rep(seq_len(nrow(data)), times = data[[response]] + 1L)
-
-  ## Creating Y; always 1 except for the last entry per index.
-  fn_get_Y <- function(nout, resp) {
-    res <- rep(1L, nout); res[cumsum(resp + 1)] <- 0L; return(res)
-  }
-  result$Y <- fn_get_Y(nout, data[[response]])
-
-  ## Creating theta; a sequence from zero to the
-  ## response_value for each index. The following
-  ## Two lines create this sequence of sequences.
-  fn_get_theta <- function(nout, resp, idx) {
-    resettozero <- c(0, which(diff(idx) > 0))
-    return(seq_len(nout) - rep(resettozero, resp + 1) - 1)
-  }
-  result$theta <- fn_get_theta(nout, data[[response]], result$index)
-
-  ## Appending the remaining data from 'data'.
-  for (n in names(data)) {
-      ## If data[[n]] is a simple vector
-      if (!is.matrix(data[[n]])) {
-        result[[n]] <- rep(data[[n]], data[[response]] + 1)
-      ## Else create matrix
-      } else {
-        result[[n]] <- matrix(rep(data[[n]], rep(data[[response]] + 1, ncol(data[[n]]))),
-                              ncol = ncol(data[[n]]),
-                              dimnames = list(NULL, colnames(data[[n]])))
-      }
-  }
-
-  result <- as.data.frame(result)
-
-  ## Attach the response column as an attribute.
-  attr(result, "response") <- response
-
-  return(result)
-}
-
-
-
-## Convert numeric values to bin index (integer). If x == NULL, NULL is returned.
-num2bin <- function(x, breaks) {
-    if (is.null(x)) return(x)
-    if (any(is.na(x)))
-        stop("Response contains missing values (not allowed).")
-    res <- cut(x, breaks = breaks, labels = FALSE, include.lowest = TRUE) - 1L
-    res[x < min(breaks)] <- -1L                  # Outside range (below bin 0)
-    res[x > max(breaks)] <- length(breaks) - 1L  # Outside range (above highest bin)
-    return(res)
-}
-
-
-
-# Helper function for predictions on a transitreg model object.
-transitreg_predict <- function(object, newdata = NULL,
-        type = c("pdf", "cdf", "quantile", "pmax", "tp"), y = NULL, prob = NULL,
-        elementwise = NULL, maxcounts = 1e+03,
-        verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
-        factor = FALSE, ncores = NULL) {
-
-  ## This method is built on the 'transitreg' model as we need access
-  ## to the original model.frame, breaks, ... although the prediction (TPs)
-  ## will be done on object$model, the internal probability model.
-  stopifnot(
-    "'object' must be of class 'transitreg'" = inherits(object, "transitreg")
-  )
-
-  ## Pre-processing inputs
-  type <- tolower(type)
-  type <- match.arg(type)
-
-  if (type == "pmax")
-      stop("TODO(R): Partially implemented, but not yet tested.")
-
-  if (is.null(ncores))
-    ncores <- transitreg_get_number_of_cores(ncores, verbose = verbose)
-
-  ## Staying sane
-  stopifnot(
-    "'newdata' must be NULL or data.frame" = 
-        is.null(newdata) || is.data.frame(newdata),
-    "'y' must be NULL or a vector" = is.null(y) || is.vector(y),
-    "'elementwise' must be NULL, TRUE, or FALSE" =
-        is.null(elementwise) || isTRUE(elementwise) || isFALSE(elementwise),
-    "'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
-    "'factor' must be logical TRUE or FALSE" = isTRUE(factor) || isFALSE(factor),
-    "'ncores' must be NULL or numeric >= 1" = is.null(ncores) || (ncores >= 1)
-  )
-  ## TODO(R) Not all arguments are checked above
-
-  ## Depending on 'type' we need to ensure y/prob is set correctly.
-  ## Quantile:
-  ## - prob must be not NULL, all values must be in [0, 1].
-  ## PDF/CDF:
-  ## - If 'newdata = NULL' we take the model frame, so y can be missing.
-  ## - Else y must be not NULL, all values must be within support of 'breaks'.
-  if (type == "quantile") {
-    stopifnot(
-      "for 'type = \"quantile\"' argument 'prob' must be set" = !is.null(prob),
-      "'prob' must be numeric of length > 0" = is.numeric(prob) && length(prob) > 0,
-      "missing values in 'prob' not allowed" = all(!is.na(prob)),
-      "'prob' must be in [0, 1]" = all(prob >= 0.0) && all(prob <= 1.0)
-    )
-  } else if (type %in% c("cdf", "pdf") & !is.null(newdata)) {
-    stopifnot(
-      "for 'type = \"cdf\" or \"pdf\"' argument 'y' must be set if 'newdata' is given" =
-          !is.null(y),
-      "'y' must be numeric of length > 0" = is.numeric(y) && length(y) > 0,
-      "missing values in 'y' not allowed" = all(!is.na(y))
-    )
-    # Discrete distribution? y must be in range [0, object$bins].
-    if (is.null(object$breaks)) {
-      y <- as.integer(y)
-      if (!all(y >= 0 & y <= object$bins - 1L))
-          stop("elements in 'y' must be in {0, ..., ", object$bins - 1L, "}")
-    # Else continuous
-    } else {
-      if (!all(y >= min(object$breaks) & y <= max(object$breaks)))
-          stop(sprintf("elements in 'y' must be in range [%s, %s]",
-                       format(min(object$breaks), format(max(object$breaks)))))
-      ## If 'y' was set by the user, we must convert all values in 'y' from
-      ## it's original numeric value to it's pseudo-observation (bin; int).
-      if (!is.null(y)) y <- num2bin(y, object$breaks)
-    }
-  }
-
-  ## If newdata is empty, we are taking the model frame.
-  ## In addition, we take the pseudo-response from the model.frame
-  ## in case type %in% c("cdf", "pdf") and the user did not provide any 'y'.
-  ## Thus, we will evaluate the cdf/pdf a the observation used for fitting the model.
-  if (is.null(newdata)) {
-      newdata <- model.frame(object)
-      if (type %in% c("cdf", "pdf") && is.null(y))
-          y <- newdata[[object$response]] ## Integer in 0, 1, 2, ... Nbreaks
-  } else {
-    ## Applying scaler if needed; standardize data (except theta)
-    if (!is.null(object$scaler)) {
-        for (j in names(object$scaler)) {
-            if (j != "theta") {
-                newdata[[j]] <- (newdata[[j]] - object$scaler[[j]]$mean) / object$scaler[[j]]$sd
-            }
-        }
-    }
-  }
-
-  ## Scaling (standardizing) theta if requested
-  if (!is.null(theta_scaler))
-    newdata$theta <- (newdata$theta - theta_scaler$mean) / theta_scaler$sd
-
-  ## Guessing 'elementwise' if is NULL
-  ##
-  ## TRUE:  If set TRUE, the prdiction is done elementwise. In other words:
-  ##        element i in y/prob corresponds to observation newdata[i, ] and
-  ##        for each observation in newdata we will get one result in return.
-  ##
-  ## FALSE: Each observation in newdata will be evaluated at every value in
-  ##        y/prob. The return will therefore be a matrix of dimension
-  ##        ncol(newdata) times (length(y) | length(probs)) depending on type.
-  if (is.null(elementwise)) {
-      if (type == "quantile") {
-          elementwise <- length(prob) == 1L | length(prob) == nrow(newdata)
-          ## Extending prob and sorting if !elementwise
-          if (elementwise & length(prob) == 1L)
-              prob <- rep(prob, length.out = nrow(newdata))
-      } else if (type %in% c("cdf", "pdf")) {
-          elementwise <- length(y) == 1L | length(y) == nrow(newdata)
-          ## Extending y and sorting if !elementwise
-          if (elementwise & length(y) == 1L)
-              y <- rep(y, length.out = nrow(newdata))
-      } else if (type == "pmax") {
-          elementwise <- TRUE # for 'pmax' elementwise is always TRUE
-      } else if (type == "tp") {
-          NULL
-      } else {
-          stop("Mode for type = \"", type, "\" must be implemented!")
-      }
-  }
-
-  ## Setting dummy values (required by C later on)
-  if (type == "quantile") {
-      ## Sorting 'prob'. This is important for the .C routine!
-      if (!elementwise) prob <- sort(unique(prob))
-      y    <- NA_integer_ ## Dummy value required for .C call
-  } else if (type %in% c("cdf", "pdf")) {
-      ## Sorting 'y'. This is important for the .C routine!
-      if (!elementwise) y <- sort(unique(y))
-      prob <- NA_real_    ## Dummy value required for .C call
-  } else {
-      y    <- NA_integer_ ## Dummy value required for .C call
-      prob <- NA_real_    ## Dummy value required for .C call
-  }
-
-
-  ## Setting up 'newresponse'.
-  ## Quantile, pmax:
-  ##  - Setting the pseudo-response to the highest bin. This ensures
-  ##    that the entire Transition distribution is evaluated.
-  ## CDF/PDF:
-  ##  - If elementwise = TRUE: We only need to evaluate each distribution
-  ##    up to 'y[i]'.
-  ##  - If elementwise = FALSE: We must evaluate each distribution up to
-  ##    max(y).
-  if (type %in% c("quantile", "pmax", "tp")) {
-    ## object$bins - 1 as we start with bin '0' again.
-    newresponse <- rep(object$bins - 1L, nrow(newdata))
-  } else {
-    newresponse <- if (elementwise) y else rep(max(y), nrow(newdata))
-  }
-
-  ## Preparing data
-  newdata <- transitreg_data(newdata, response = object$response,
-                             newresponse = newresponse, verbose = verbose)
-
-  if (factor)
-    newdata$theta <- as.factor(newdata$theta)
-
-  if (!is.null(theta_vars) && length(theta_vars) > 0L) {
-    for (j in theta_vars) {
-      i <- as.integer(gsub("theta", "", j))
-      newdata[[j]] <- as.integer(newdata$theta == i)
-    }
-  }
-
-  ## Specify argument for generic prediction method called below
-  what <- switch(class(object$model)[1L],
-    "bam"  = "response",
-    "gam"  = "response",
-    "nnet" = "raw"
-  )
-  tp <- as.numeric(predict(object$model, newdata = newdata, type = what))
-
-  ## If 'type = "tp"' (transition probabilities) we already have our
-  ## result. Conver to matrix, and return.
-  if (type == "tp") {
-      tmp <- list(NULL, paste0("tp_", seq_len(object$bins) - 1))
-      return(matrix(tp, byrow = TRUE, ncol = object$bins, dimnames = tmp))
-  }
-
-  ## Extract unique indices
-  ui   <- unique(newdata$index)
-
-  ## If object$breaks is NULL, we have discrete bins (e.g., count data).
-  if (is.null(object$breaks)) {
-    discrete <- rep(TRUE, length(ui))
-    breaks   <- seq(-0.5, by = 1.0, length.out = object$bins + 1)
-  } else {
-    discrete <- rep(TRUE, length(ui))
-    breaks   <- object$breaks
-  }
-
-  ## Setting up arguments for the .C call
-  args <- list(uidx   = ui,                # int; Unique distribution index (int)
-               idx    = newdata$index,     # int; Index vector (int)
-               tp     = tp,                # num; Transition probabilities
-               breaks = breaks,            # num; Point intersections of bins
-               y      = y,                 # int; Response y, used for 'cdf/pdf'
-               prob   = prob,              # num; Probabilities (used for 'quantile')
-               type   = type,              # str; to predict/calculate
-               ncores = ncores,            # int; Number of cores to be used (OpenMP)
-               elementwise = elementwise,  # Elementwise (one prob or y per ui)
-               discrete    = discrete)     # Discrete distribution?
-
-  # Calling C
-  args <- check_args_for_treg_predict(args)
-  res  <- do.call(function(...) .Call("treg_predict", ...), args)
-
-  # If 'ementwise = FALSE' we get length(y)/length(prob) results per
-  # observation and have to glue them back together into a matrix.
-  if (!elementwise && type == "quantile") {
-    res <- matrix(res, byrow = TRUE, ncol = length(prob),
-                  dimnames = list(NULL, get_elementwise_colnames(prob, NULL)))
-  } else if (!elementwise) {
-    prefix <- if (type == "pdf") "d" else "p"
-    res <- matrix(res, byrow = TRUE, ncol = length(y),
-                  dimnames = list(NULL, get_elementwise_colnames(y, prefix)))
-  }
-
-  return(res)
-}
-
-
-
-# Helper functions to check the arguments we hand over to C. This
-# helps identifying potential problems easier. Input 'x' is a named
-# list with all the elements required when calling "treg_predict" in C.
-#
-# The function ensures that (i) all the objects are of the correct type,
-# and that some elements do show the correct (expected) length. Else
-# it is possible that C returns 'garbage' results as it tries to read
-# elemnets outside of memory, resulting in either segfaults or werid
-# results.
-#
-# Last but not least it ensures that the order of the arguments
-# are as expected by .C!
-
-#' @importFrom utils str
-check_args_for_treg_predict <- function(x) {
-    ## Expected elements (in the order expected by C)
-    enames <- c("uidx", "idx", "tp", "breaks", "y", "prob",
-                "type", "ncores", "elementwise", "discrete")
-
-    ## Checking types first
-    tmp <- list("integer" = c("uidx", "idx", "y", "ncores"),
-                "double"  = c("tp", "breaks", "prob"),
-                "logical" = c("elementwise", "discrete"))
-    for (n in names(tmp)) {
-        fn <- get(sprintf("is.%s", n))
-        for (e in tmp[[n]]) {
-            if (!fn(x[[e]])) stop("Element '", e, "' in args list is not \"", n, "\"")
-        }
-    }
-
-    ## Checking length of some of the elements
-    tryCatch(
-        {stopifnot(
-            "'args$elementwise' must be of length 1" = length(x$elementwise) == 1L,
-            "length of 'args$idx' and 'args$tp' must be identical" = 
-                length(x$idx) == length(x$tp),
-            "length of 'args$type' must be 1" = length(x$type) == 1L,
-            "length of 'args$discrete' and 'args$uidx' must be identical" =
-                length(x$uidx) == length(x$discrete),
-            "not all required elements found in 'args'" =
-                all(enames %in% names(x))
-        )},
-        error = function(e) {
-            cat("\nDebugging output (str(args)):\n")
-            str(x)
-            stop(e)
-        }
-    )
-
-    # Return (re-ordered) list
-    return(x[enames])
-}
-
-#' @importFrom utils str
-check_args_for_treg_predict_pdfcdf <- function(x) {
-    ## Required elements in the order as expected by C
-    enames <- c("uidx", "idx", "tp", "y", "breaks", "ncores")
-
-    ## Checking types first
-    tmp <- list("integer" = c("uidx", "idx", "y", "ncores"),
-                "double"  = c("tp", "breaks"))
-    for (n in names(tmp)) {
-        fn <- get(sprintf("is.%s", n))
-        for (e in tmp[[n]]) {
-            if (!fn(x[[e]])) stop("Element '", e, "' in args list is not \"", n, "\"")
-        }
-    }
-
-    ## Checking length of some of the elements
-    tryCatch(
-        {stopifnot(
-            "length of 'args$idx' and 'args$tp' must be identical" =
-                length(x$idx) == length(x$tp),
-            "length of 'args$y' and 'args$uidx' must be identical" =
-                length(x$y) == length(x$uidx)
-        )},
-        error = function(e) {
-            cat("\nDebugging output (str(args)):\n")
-            str(x)
-            stop(e)
-        }
-    )
-
-    # Return (re-ordered) list
-    return(x[enames])
-}
-
-
-#' Transition Model Probability Density Visualization
-#'
-#' Visualizes the probability density function (PDF) and raw count or continuous data
-#' based on transition models estimated using [transitreg()]. This function provides
-#' an intuitive way to understand the distribution of the modeled response.
-#'
-#' @param y A response vector or a formula specifying the relationship between the
-#'        response and covariates. For count data, this is typically a vector of counts.
-#'        For continuous data, this can be paired with the `breaks` argument to
-#'        discretize the response.
-#' @param data Optional. If `y` is a formula, this specifies the data frame to
-#'        be used for model fitting.
-#' @param \dots Additional arguments to be passed to [transitreg()], including
-#'        settings for the estimation engine, formula, and other relevant parameters.
-#'
-#' @details
-#' This function estimates and visualizes the underlying probability density function
-#' (PDF) for count or continuous response data using transition models. For continuous
-#' data, the response is discretized based on the `breaks` argument passed through
-#' \dots
-#'
-#' The function supports visualizations for raw counts, zero-inflated data, and transformed
-#' distributions, providing insights into the modeled distribution of the response variable.
-#'
-#' @return
-#' An object of class `"transitreg"`, as described in [transitreg()]. This includes:
-#'
-#' * Fitted transition model details.
-#' * Model diagnostics and parameters.
-#' * Visualization-ready data for plotting PDFs or transformed distributions.
-#'
-#' @seealso [transitreg()], [transitreg_data()].
-#'
-#' @examples
-#' ## Example 1: Count data.
-#' set.seed(123)
-#' n <- 3000
-#' y <- rpois(n, 10)
-#'
-#' # Visualize PDF for count data.
-#' transitreg_dist(y)
-#'
-#' ## Example 2: Zero-inflated data.
-#' y <- c(y, rep(0, 500))
-#'
-#' ## Include a zero-inflation term.
-#' transitreg_dist(y ~ s(theta) + theta0)
-#'
-#' ## Example 3: Continuous data.
-#' set.seed(123)
-#' n <- 1000
-#' y <- rgamma(n, shape = 10, rate = 0.1)
-#'
-#' ## Visualize PDF for continuous data with discretization.
-#' transitreg_dist(y, breaks = 50)
-#'
-#' @keywords distribution visualization
-#'
-#' @importFrom stats model.response predict
-#' @importFrom grDevices rgb
-#' @importFrom graphics barplot lines points
-transitreg_dist <- function(y, data = NULL, ...) {
-  if (is.null(y))
-    stop("argument y is NULL!")
-
-  is_f <- FALSE
-  if (inherits(y, "formula")) {
-    yn <- response_name(y)
-    f <- y
-    is_f <- TRUE
-  } else {
-    yn <- deparse(substitute(y), backtick = TRUE, width.cutoff = 500)
-    f <- y ~ s(theta)
-    environment(f) <- environment(y)
-    data <- list()
-    data[["y"]] <- y
-  }
-
-  ## Estimate model.
-  b <- transitreg(f, data = data, ...)
-
-  if (inherits(y, "formula"))
-    y <- model.response(b$model.frame)
-
-  ## Predict probabilities.
-  nd <- data.frame("y" = 0:b$maxcounts)
-  if ((yn != "y") & is_f)
-    names(nd) <- yn
-  pb <- predict(b, newdata = nd)
-
-  nl <- NULL
-
-  if (is.null(b$yc_tab)) {
-    if (!is.null(data) & is_f)
-      y <- data[[yn]]
-    tab <- prop.table(table(y))
-  } else {
-    tab <- prop.table(b$yc_tab)
-    nl <- format(b$ym, digits = 2)
-  }
-
-  tab2 <- numeric(b$maxcounts + 1L)
-  names(tab2) <- as.character(0:b$maxcounts)
-  tab2[names(tab)] <- tab
-  tab <- tab2
-
-  ## Set labels.
-  ylim <- list(...)$ylim
-  if (is.null(ylim)) 
-    ylim <- range(c(0, tab, pb * 1.1), na.rm = TRUE)
-  ylab <- list(...)$ylab
-  if (is.null(ylab))
-    ylab <- "Probability"
-  xlab <- list(...)$xlab
-  if (is.null(xlab)) {
-    xlab <- if (is.null(b$yc_tab)) "#Counts" else yn
-  }
-
-  ## Plot.
-  if (!is.null(nl)) {
-    names(tab) <- nl[as.integer(names(tab)) + 1L]
-  }
-  x <- barplot(tab, xlab = xlab, ylab = ylab, ylim = ylim)
-  lines(pb ~ x, col = 4, lwd = 2, type = "h")
-  points(x, pb, col = 4, pch = 16)
-  points(x, pb, col = rgb(0.1, 0.1, 0.1, alpha = 0.6))
-
-  return(invisible(b))
-}
-
-
-
-#' Create Breaks for (Pseudo-)bins
-#'
-#' Calculates the breaks (point intersection between breaks)
-#' which span the range of `y`.
-#'
-#' @param y numeric vector with response data.
-#' @param breaks number of breaks to be created (single integer).
-#' @param scale logical, scaling involved?
-#'
-#' @return Returns a numeric vector with the breaks.
-make_breaks <- function(y, breaks = 30, scale = FALSE , ...) {
-  stopifnot(
-    "'y' must be numeric" = is.numeric(y),
-    "'breaks' must be numeric of length 1" = is.numeric(breaks) && length(breaks) == 1L,
-    "'breaks' must be >= 2" = breaks >= 2,
-    "'scale' must be TRUE or FALSE" = isTRUE(scale) || isFALSE(scale)
-  )
-  if (scale) {
-    my <- min(y)
-    y <- sqrt(y - my + 0.01)
-    dy <- diff(range(y))
-    breaks <- (seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks))^2 - 0.01 + my
-  } else {
-    dy <- diff(range(y))
-    breaks <- seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks)
-    #breaks <- c(min(y) - 0.5*dy, quantile(y, probs = seq(0, 1, length = breaks)), max(y) + 0.5*dy)
-  }
-  return(breaks)
-}
 
 
 
@@ -1071,6 +360,538 @@ transitreg <- function(formula, data, subset, na.action,
 }
 
 
+#' Transition Model Data Preparer
+#'
+#' Transforms a data frame into the format required for estimating transition models.
+#' The function generates binary response data for fitting GLM-type models,
+#' specifically designed to represent transitions between counts or states in
+#' a probabilistic framework.
+#'
+#' @param data A data frame containing the raw input data.
+#' @param response Character string specifying the name of the response variable
+#'        to be used for transition modeling. This variable must represent
+#'        counts or categorical states.
+#' @param newresponse `NULL` or integer. New response vector to overwrite the one
+#'        in `data`.
+#' @param verbose Logical value indicating whether information about the transformation
+#'        process should be printed to the console. Default is `TRUE`.
+#'
+#' @details
+#' Transition models focus on modeling the conditional probabilities of transitions
+#' between states or counts. This function converts the input data into a long format
+#' suitable for such models. Each row in the resulting data frame corresponds to a
+#' binary transition indicator, representing whether a transition to a higher category
+#' occurred. For details on the modeling framework, see Berger and Tutz (2021).
+#'
+#' @return
+#'   A transformed data frame in the long format. Each row represents a binary transition
+#'   indicator (`Y`) for the response variable. Additional columns in the output include:
+#'
+#' * `index`: The original row index from the input data.
+#' * `Y`: The binary indicator for whether a transition to a higher
+#'       category occurred.
+#' * `theta`: The level corresponding to the current transition.
+#'
+#' This format is required for fitting transition models using GLM or GAM frameworks.
+#' For instance, a response variable with a value of 3 will generate rows with
+#' transitions up to its value (0, 1, 2, and 3).
+#'
+#' @seealso [transitreg()], [transitreg_dist()]
+#'
+#' @examples
+#' ## Raw data frame.
+#' d <- data.frame(
+#'   "id" = 1:5,
+#'   "counts" = c(1, 0, 2, 3, 1),
+#'   "x" = 1:5 * 10
+#' )
+#'
+#' ## Transformed data frame.
+#' dtm <- transitreg_data(d, response = "counts", verbose = TRUE)
+#' print(dtm)
+#'
+#' @keywords data transformation
+#' @concept transition
+#' @concept modeling
+#'
+#' @importFrom stats setNames
+#'
+#' @author Niki
+transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose = TRUE) {
+
+  stopifnot(
+    "'response' must be NULL or a character of length 1" =
+        is.null(response) || (is.character(response) && length(response) == 1L),
+    "'newresponse' must be NULL or a numeric vector with length > 0" =
+        is.null(newresponse) || (is.numeric(newresponse) && length(newresponse > 0)),
+    "'verbose' must be TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
+    "'newresponse' must be NULL or bins (0, 1, 2, ...)" =
+        is.null(newresponse) || (is.integer(newresponse) && all(newresponse >= 0))
+  )
+
+  ## Ensure data is a data frame.
+  if (!is.data.frame(data))
+    data <- as.data.frame(data)
+
+  ## Determine response column if not specified by user.
+  if (is.null(response))
+    response <- names(data)[1L]
+
+  ## If newresponse is give, it must be length == 1 or the same length
+  ## as the number of observations in 'data'. Required as we 'blow up'
+  ## the data for the binary model.
+  if (!is.null(newresponse)) {
+      if (length(newresponse) == 1L) {
+          newresponse <- rep(newresponse, nrow(data))
+      } else if (length(newresponse) != nrow(data)) {
+          stop("'newresponse' must be of length one (recycled for all observations) ",
+               "or a vector of the same length as number of observations (rows) ",
+               "in 'data'.")
+      }
+  }
+
+  ## If 'response' is provided in 'data' and an additional 'newresponse'
+  ## is provided, we will replace 'data[[response]]' with the newresponse.
+  if (response %in% names(data) & !is.null(newresponse)) {
+    warning("'newresponse' will overwrite response provided in 'data'.")
+    data[[response]] <- newresponse
+  } else if (!response %in% names(data)) {
+    ## 'newresponse' must be provided. If missing, stop, else append.
+    if (is.null(newresponse))
+      stop("'response' not contained in 'data', must be provided via 'newresponse'.")
+    data <- cbind(setNames(data.frame(newresponse), response), data)
+  }
+  rm(newresponse) # Delete object, no longer needed
+
+  ## If any missing value in response: stop
+  if (any(is.na(data[[response]])))
+      stop("NA values in response data!")
+
+  ## response$values must all be bin indices, so integers >= 0
+  check <- all(data[[response]] > -sqrt(.Machine$double.eps) |
+               abs(data[[response]] %% 1) > sqrt(.Machine$double.eps))
+  if (!check)
+    stop("The response must be bin indices, so integers in the range of {0, Inf}.")
+  data[[response]] <- as.integer(data[[response]])
+
+  ## Setting up the new data.frame with (pseudo-)bins
+
+  ## Define length of vectors in list
+  ## Sum of response indices + nrow(data), the latter to account for the
+  ## additional "0" bin.
+  nout <- sum(data[[response]]) + nrow(data)
+
+  ## ------ building transitreg data -------
+
+  ## Names of list elements.
+  names_out <- c("index", "Y", "theta", names(data))
+
+  ## Building index vector; each observation 1:nrow(data) gets its unique index
+  result <- list()
+  result$index <- rep(seq_len(nrow(data)), times = data[[response]] + 1L)
+
+  ## Creating Y; always 1 except for the last entry per index.
+  fn_get_Y <- function(nout, resp) {
+    res <- rep(1L, nout); res[cumsum(resp + 1)] <- 0L; return(res)
+  }
+  result$Y <- fn_get_Y(nout, data[[response]])
+
+  ## Creating theta; a sequence from zero to the
+  ## response_value for each index. The following
+  ## Two lines create this sequence of sequences.
+  fn_get_theta <- function(nout, resp, idx) {
+    resettozero <- c(0, which(diff(idx) > 0))
+    return(seq_len(nout) - rep(resettozero, resp + 1) - 1)
+  }
+  result$theta <- fn_get_theta(nout, data[[response]], result$index)
+
+  ## Appending the remaining data from 'data'.
+  for (n in names(data)) {
+      ## If data[[n]] is a simple vector
+      if (!is.matrix(data[[n]])) {
+        result[[n]] <- rep(data[[n]], data[[response]] + 1)
+      ## Else create matrix
+      } else {
+        result[[n]] <- matrix(rep(data[[n]], rep(data[[response]] + 1, ncol(data[[n]]))),
+                              ncol = ncol(data[[n]]),
+                              dimnames = list(NULL, colnames(data[[n]])))
+      }
+  }
+
+  result <- as.data.frame(result)
+
+  ## Attach the response column as an attribute.
+  attr(result, "response") <- response
+
+  return(result)
+}
+
+
+
+
+
+# Helper function for predictions on a transitreg model object.
+transitreg_predict <- function(object, newdata = NULL,
+        type = c("pdf", "cdf", "quantile", "pmax", "tp"), y = NULL, prob = NULL,
+        elementwise = NULL, maxcounts = 1e+03,
+        verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
+        factor = FALSE, ncores = NULL) {
+
+  ## This method is built on the 'transitreg' model as we need access
+  ## to the original model.frame, breaks, ... although the prediction (TPs)
+  ## will be done on object$model, the internal probability model.
+  stopifnot(
+    "'object' must be of class 'transitreg'" = inherits(object, "transitreg")
+  )
+
+  ## Pre-processing inputs
+  type <- tolower(type)
+  type <- match.arg(type)
+
+  if (type == "pmax")
+      stop("TODO(R): Partially implemented, but not yet tested.")
+
+  if (is.null(ncores))
+    ncores <- transitreg_get_number_of_cores(ncores, verbose = verbose)
+
+  ## Staying sane
+  stopifnot(
+    "'newdata' must be NULL or data.frame" = 
+        is.null(newdata) || is.data.frame(newdata),
+    "'y' must be NULL or a vector" = is.null(y) || is.vector(y),
+    "'elementwise' must be NULL, TRUE, or FALSE" =
+        is.null(elementwise) || isTRUE(elementwise) || isFALSE(elementwise),
+    "'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
+    "'factor' must be logical TRUE or FALSE" = isTRUE(factor) || isFALSE(factor),
+    "'ncores' must be NULL or numeric >= 1" = is.null(ncores) || (ncores >= 1)
+  )
+  ## TODO(R) Not all arguments are checked above
+
+  ## Depending on 'type' we need to ensure y/prob is set correctly.
+  ## Quantile:
+  ## - prob must be not NULL, all values must be in [0, 1].
+  ## PDF/CDF:
+  ## - If 'newdata = NULL' we take the model frame, so y can be missing.
+  ## - Else y must be not NULL, all values must be within support of 'breaks'.
+  if (type == "quantile") {
+    stopifnot(
+      "for 'type = \"quantile\"' argument 'prob' must be set" = !is.null(prob),
+      "'prob' must be numeric of length > 0" = is.numeric(prob) && length(prob) > 0,
+      "missing values in 'prob' not allowed" = all(!is.na(prob)),
+      "'prob' must be in [0, 1]" = all(prob >= 0.0) && all(prob <= 1.0)
+    )
+  } else if (type %in% c("cdf", "pdf") & !is.null(newdata)) {
+    stopifnot(
+      "for 'type = \"cdf\" or \"pdf\"' argument 'y' must be set if 'newdata' is given" =
+          !is.null(y),
+      "'y' must be numeric of length > 0" = is.numeric(y) && length(y) > 0,
+      "missing values in 'y' not allowed" = all(!is.na(y))
+    )
+    # Discrete distribution? y must be in range [0, object$bins].
+    if (is.null(object$breaks)) {
+      y <- as.integer(y)
+      if (!all(y >= 0 & y <= object$bins - 1L))
+          stop("elements in 'y' must be in {0, ..., ", object$bins - 1L, "}")
+    # Else continuous
+    } else {
+      if (!all(y >= min(object$breaks) & y <= max(object$breaks)))
+          stop(sprintf("elements in 'y' must be in range [%s, %s]",
+                       format(min(object$breaks), format(max(object$breaks)))))
+      ## If 'y' was set by the user, we must convert all values in 'y' from
+      ## it's original numeric value to it's pseudo-observation (bin; int).
+      if (!is.null(y)) y <- num2bin(y, object$breaks)
+    }
+  }
+
+  ## If newdata is empty, we are taking the model frame.
+  ## In addition, we take the pseudo-response from the model.frame
+  ## in case type %in% c("cdf", "pdf") and the user did not provide any 'y'.
+  ## Thus, we will evaluate the cdf/pdf a the observation used for fitting the model.
+  if (is.null(newdata)) {
+      newdata <- model.frame(object)
+      if (type %in% c("cdf", "pdf") && is.null(y))
+          y <- newdata[[object$response]] ## Integer in 0, 1, 2, ... Nbreaks
+  } else {
+    ## Applying scaler if needed; standardize data (except theta)
+    if (!is.null(object$scaler)) {
+        for (j in names(object$scaler)) {
+            if (j != "theta") {
+                newdata[[j]] <- (newdata[[j]] - object$scaler[[j]]$mean) / object$scaler[[j]]$sd
+            }
+        }
+    }
+  }
+
+  ## Scaling (standardizing) theta if requested
+  if (!is.null(theta_scaler))
+    newdata$theta <- (newdata$theta - theta_scaler$mean) / theta_scaler$sd
+
+  ## Guessing 'elementwise' if is NULL
+  ##
+  ## TRUE:  If set TRUE, the prdiction is done elementwise. In other words:
+  ##        element i in y/prob corresponds to observation newdata[i, ] and
+  ##        for each observation in newdata we will get one result in return.
+  ##
+  ## FALSE: Each observation in newdata will be evaluated at every value in
+  ##        y/prob. The return will therefore be a matrix of dimension
+  ##        ncol(newdata) times (length(y) | length(probs)) depending on type.
+  if (is.null(elementwise)) {
+      if (type == "quantile") {
+          elementwise <- length(prob) == 1L | length(prob) == nrow(newdata)
+          ## Extending prob and sorting if !elementwise
+          if (elementwise & length(prob) == 1L)
+              prob <- rep(prob, length.out = nrow(newdata))
+      } else if (type %in% c("cdf", "pdf")) {
+          elementwise <- length(y) == 1L | length(y) == nrow(newdata)
+          ## Extending y and sorting if !elementwise
+          if (elementwise & length(y) == 1L)
+              y <- rep(y, length.out = nrow(newdata))
+      } else if (type == "pmax") {
+          elementwise <- TRUE # for 'pmax' elementwise is always TRUE
+      } else if (type == "tp") {
+          NULL
+      } else {
+          stop("Mode for type = \"", type, "\" must be implemented!")
+      }
+  }
+
+  ## Setting dummy values (required by C later on)
+  if (type == "quantile") {
+      ## Sorting 'prob'. This is important for the .C routine!
+      if (!elementwise) prob <- sort(unique(prob))
+      y    <- NA_integer_ ## Dummy value required for .C call
+  } else if (type %in% c("cdf", "pdf")) {
+      ## Sorting 'y'. This is important for the .C routine!
+      if (!elementwise) y <- sort(unique(y))
+      prob <- NA_real_    ## Dummy value required for .C call
+  } else {
+      y    <- NA_integer_ ## Dummy value required for .C call
+      prob <- NA_real_    ## Dummy value required for .C call
+  }
+
+
+  ## Setting up 'newresponse'.
+  ## Quantile, pmax:
+  ##  - Setting the pseudo-response to the highest bin. This ensures
+  ##    that the entire Transition distribution is evaluated.
+  ## CDF/PDF:
+  ##  - If elementwise = TRUE: We only need to evaluate each distribution
+  ##    up to 'y[i]'.
+  ##  - If elementwise = FALSE: We must evaluate each distribution up to
+  ##    max(y).
+  if (type %in% c("quantile", "pmax", "tp")) {
+    ## object$bins - 1 as we start with bin '0' again.
+    newresponse <- rep(object$bins - 1L, nrow(newdata))
+  } else {
+    newresponse <- if (elementwise) y else rep(max(y), nrow(newdata))
+  }
+
+  ## Preparing data
+  newdata <- transitreg_data(newdata, response = object$response,
+                             newresponse = newresponse, verbose = verbose)
+
+  if (factor)
+    newdata$theta <- as.factor(newdata$theta)
+
+  if (!is.null(theta_vars) && length(theta_vars) > 0L) {
+    for (j in theta_vars) {
+      i <- as.integer(gsub("theta", "", j))
+      newdata[[j]] <- as.integer(newdata$theta == i)
+    }
+  }
+
+  ## Specify argument for generic prediction method called below
+  what <- switch(class(object$model)[1L],
+    "bam"  = "response",
+    "gam"  = "response",
+    "nnet" = "raw"
+  )
+  tp <- as.numeric(predict(object$model, newdata = newdata, type = what))
+
+  ## If 'type = "tp"' (transition probabilities) we already have our
+  ## result. Conver to matrix, and return.
+  if (type == "tp") {
+      tmp <- list(NULL, paste0("tp_", seq_len(object$bins) - 1))
+      return(matrix(tp, byrow = TRUE, ncol = object$bins, dimnames = tmp))
+  }
+
+  ## Extract unique indices
+  ui   <- unique(newdata$index)
+
+  ## If object$breaks is NULL, we have discrete bins (e.g., count data).
+  if (is.null(object$breaks)) {
+    discrete <- rep(TRUE, length(ui))
+    breaks   <- seq(-0.5, by = 1.0, length.out = object$bins + 1)
+  } else {
+    discrete <- rep(TRUE, length(ui))
+    breaks   <- object$breaks
+  }
+
+  ## Setting up arguments for the .C call
+  args <- list(uidx   = ui,                # int; Unique distribution index (int)
+               idx    = newdata$index,     # int; Index vector (int)
+               tp     = tp,                # num; Transition probabilities
+               breaks = breaks,            # num; Point intersections of bins
+               y      = y,                 # int; Response y, used for 'cdf/pdf'
+               prob   = prob,              # num; Probabilities (used for 'quantile')
+               type   = type,              # str; to predict/calculate
+               ncores = ncores,            # int; Number of cores to be used (OpenMP)
+               elementwise = elementwise,  # Elementwise (one prob or y per ui)
+               discrete    = discrete)     # Discrete distribution?
+
+  # Calling C
+  args <- check_args_for_treg_predict(args)
+  res  <- do.call(function(...) .Call("treg_predict", ...), args)
+
+  # If 'ementwise = FALSE' we get length(y)/length(prob) results per
+  # observation and have to glue them back together into a matrix.
+  if (!elementwise && type == "quantile") {
+    res <- matrix(res, byrow = TRUE, ncol = length(prob),
+                  dimnames = list(NULL, get_elementwise_colnames(prob, NULL)))
+  } else if (!elementwise) {
+    prefix <- if (type == "pdf") "d" else "p"
+    res <- matrix(res, byrow = TRUE, ncol = length(y),
+                  dimnames = list(NULL, get_elementwise_colnames(y, prefix)))
+  }
+
+  return(res)
+}
+
+
+
+#' Transition Model Probability Density Visualization
+#'
+#' Visualizes the probability density function (PDF) and raw count or continuous data
+#' based on transition models estimated using [transitreg()]. This function provides
+#' an intuitive way to understand the distribution of the modeled response.
+#'
+#' @param y A response vector or a formula specifying the relationship between the
+#'        response and covariates. For count data, this is typically a vector of counts.
+#'        For continuous data, this can be paired with the `breaks` argument to
+#'        discretize the response.
+#' @param data Optional. If `y` is a formula, this specifies the data frame to
+#'        be used for model fitting.
+#' @param \dots Additional arguments to be passed to [transitreg()], including
+#'        settings for the estimation engine, formula, and other relevant parameters.
+#'
+#' @details
+#' This function estimates and visualizes the underlying probability density function
+#' (PDF) for count or continuous response data using transition models. For continuous
+#' data, the response is discretized based on the `breaks` argument passed through
+#' \dots
+#'
+#' The function supports visualizations for raw counts, zero-inflated data, and transformed
+#' distributions, providing insights into the modeled distribution of the response variable.
+#'
+#' @return
+#' An object of class `"transitreg"`, as described in [transitreg()]. This includes:
+#'
+#' * Fitted transition model details.
+#' * Model diagnostics and parameters.
+#' * Visualization-ready data for plotting PDFs or transformed distributions.
+#'
+#' @seealso [transitreg()], [transitreg_data()].
+#'
+#' @examples
+#' ## Example 1: Count data.
+#' set.seed(123)
+#' n <- 3000
+#' y <- rpois(n, 10)
+#'
+#' # Visualize PDF for count data.
+#' transitreg_dist(y)
+#'
+#' ## Example 2: Zero-inflated data.
+#' y <- c(y, rep(0, 500))
+#'
+#' ## Include a zero-inflation term.
+#' transitreg_dist(y ~ s(theta) + theta0)
+#'
+#' ## Example 3: Continuous data.
+#' set.seed(123)
+#' n <- 1000
+#' y <- rgamma(n, shape = 10, rate = 0.1)
+#'
+#' ## Visualize PDF for continuous data with discretization.
+#' transitreg_dist(y, breaks = 50)
+#'
+#' @keywords distribution visualization
+#'
+#' @importFrom stats model.response predict
+#' @importFrom grDevices rgb
+#' @importFrom graphics barplot lines points
+transitreg_dist <- function(y, data = NULL, ...) {
+  if (is.null(y))
+    stop("argument y is NULL!")
+
+  is_f <- FALSE
+  if (inherits(y, "formula")) {
+    yn <- response_name(y)
+    f <- y
+    is_f <- TRUE
+  } else {
+    yn <- deparse(substitute(y), backtick = TRUE, width.cutoff = 500)
+    f <- y ~ s(theta)
+    environment(f) <- environment(y)
+    data <- list()
+    data[["y"]] <- y
+  }
+
+  ## Estimate model.
+  b <- transitreg(f, data = data, ...)
+
+  if (inherits(y, "formula"))
+    y <- model.response(b$model.frame)
+
+  ## Predict probabilities.
+  nd <- data.frame("y" = 0:b$maxcounts)
+  if ((yn != "y") & is_f)
+    names(nd) <- yn
+  pb <- predict(b, newdata = nd)
+
+  nl <- NULL
+
+  if (is.null(b$yc_tab)) {
+    if (!is.null(data) & is_f)
+      y <- data[[yn]]
+    tab <- prop.table(table(y))
+  } else {
+    tab <- prop.table(b$yc_tab)
+    nl <- format(b$ym, digits = 2)
+  }
+
+  tab2 <- numeric(b$maxcounts + 1L)
+  names(tab2) <- as.character(0:b$maxcounts)
+  tab2[names(tab)] <- tab
+  tab <- tab2
+
+  ## Set labels.
+  ylim <- list(...)$ylim
+  if (is.null(ylim)) 
+    ylim <- range(c(0, tab, pb * 1.1), na.rm = TRUE)
+  ylab <- list(...)$ylab
+  if (is.null(ylab))
+    ylab <- "Probability"
+  xlab <- list(...)$xlab
+  if (is.null(xlab)) {
+    xlab <- if (is.null(b$yc_tab)) "#Counts" else yn
+  }
+
+  ## Plot.
+  if (!is.null(nl)) {
+    names(tab) <- nl[as.integer(names(tab)) + 1L]
+  }
+  x <- barplot(tab, xlab = xlab, ylab = ylab, ylim = ylim)
+  lines(pb ~ x, col = 4, lwd = 2, type = "h")
+  points(x, pb, col = 4, pch = 16)
+  points(x, pb, col = rgb(0.1, 0.1, 0.1, alpha = 0.6))
+
+  return(invisible(b))
+}
+
+
+
+
 #' @exportS3Method "[" transitreg
 #' @author Reto
 `[.transitreg` <- function(x, i, ..., drop = TRUE) {
@@ -1226,6 +1047,41 @@ print.transitreg <- function(x, ...) {
 }
 
 
+#' @importFrom distributions3 prodist
+#' @importFrom stats setNames
+#' @importFrom utils head tail
+#'
+#' @author Reto
+#' @exportS3Method prodist transitreg
+#' @rdname transitreg
+prodist.transitreg <- function(object, newdata = NULL, ...) {
+    n <- nrow(object$model.frame)
+    object[seq_len(n)]
+}
+
+
+#' @importFrom topmodels newresponse
+#'
+#' @author Reto
+#' @rdname transitreg
+#' @exportS3Method newresponse transitreg
+newresponse.transitreg <- function(object, newdata = NULL, ...) {
+    ## Response name
+    yn <- object$response
+
+    if (is.null(newdata)) {
+        newdata <- object$model.frame
+        newdata[[yn]] <- object$breaks[newdata[[yn]]]
+    }
+
+    if (is.null(newdata[[object$response]]))
+        stop("response missing in newdata!")
+
+    y <- setNames(data.frame(newdata[[object$response]]), yn)
+    return(y)
+}
+
+
 
 #' Predict Method for Transition Model Fits
 #'
@@ -1372,174 +1228,4 @@ logLik.transitreg <- function(object, newdata = NULL, ...) {
   return(ll)
 }
 
-#' @author Niki
-#' @rdname transitreg
-#' @exportS3Method residuals transitreg
-residuals.transitreg <- function(object, newdata = NULL, y = NULL, ...) {
-  if (is.null(newdata)) {
-    if (is.null(object$model.frame))
-      stop("cannot compute residuals, no model.frame including the response!")
-    newdata <- object$model.frame
-  }
-
-  if (is.null(y)) {
-    y <- newdata[[object$response]]
-  }
-
-  if (is.null(y)) {
-    stop("cannot compute residuals, response is missing!")
-  }
-
-  i <- y > 0
-  p <- numeric(length(y))
-
-  pL <- predict(object, newdata = newdata[i, , drop = FALSE], y = y[i] - 1L, type = "cdf", ...)
-  pU <- predict(object, newdata = newdata[i, , drop = FALSE], y = y[i], type = "cdf", ...)
-
-  p[i] <- runif(sum(i), pL, pU)
-
-  if (any(!i)) {
-    pU <- predict(object, newdata = newdata[!i, , drop = FALSE], y = y[!i], type = "cdf", ...)
-    p[!i] <- runif (sum(!i), 0, pU)
-  }
-
-  eps <- abs(.Machine$double.eps)
-  p[p < eps]     <- eps
-  p[p > 1 - eps] <- 1 - eps
-
-  return(qnorm(p))
-}
-
-
-#### Rootogram method.
-##
-###' @importFrom topmodels rootogram
-###'
-###' @author Niki
-###' @rdname transitreg
-###' @exportS3Method rootogram transitreg
-##rootogram.transitreg <- function(object, newdata = NULL, plot = TRUE,
-##  width = 0.9, style = c("hanging", "standing", "suspended"),
-##  scale = c("sqrt", "raw"), expected = TRUE, confint = TRUE,
-##  ref = TRUE, K = NULL, xlab = NULL, ylab = NULL, main = NULL, ...) {
-##  if (is.null(newdata))
-##    newdata <- object$model.frame
-##
-##  if (is.null(newdata[[object$response]]))
-##    stop("response missing in newdata!")
-##
-##  y <- newdata[[object$response]]
-##  n <- length(y)
-##
-##  if(!is.null(K))
-##    object$maxcounts <- K
-##  counts <- 0:object$maxcounts
-##  p <- NULL; obs <- NULL
-##  for (j in counts) {
-##    if (isTRUE(list(...)$verbose))
-##      cat(j, "/", sep = "")
-##    p <- cbind(p, predict(object, newdata = newdata, type = "pdf", y = j))
-##    obs <- c(obs, sum(y == j))
-##  }
-##
-##  if (isTRUE(list(...)$verbose))
-##    cat("\n")
-##
-##  e <- colMeans(p) * n
-##
-##  rg <- data.frame("observed" = obs, "expected" = e,
-##    "mid" = counts, "width" = width)
-##
-##  scale <- match.arg(scale)
-##
-##  if (scale == "sqrt") {
-##    rg$observed <- sqrt(rg$observed)
-##    rg$expected <- sqrt(rg$expected)
-##  }
-##
-##  p <- t(p)
-##  rownames(p) <- paste0("p_", counts + 0.5)
-##  colnames(p) <- as.character(1:n)
-##  rg$distribution <- p
-##
-##  attr(rg, "style") <- match.arg(style)
-##  attr(rg, "scale") <- scale
-##  attr(rg, "expected") <- expected
-##  attr(rg, "confint") <- confint
-##  attr(rg, "ref") <- ref
-##  attr(rg, "xlab") <- if (is.null(xlab)) "#Counts" else xlab
-##  attr(rg, "ylab") <- if (is.null(ylab)) "sqrt(Frequency)" else ylab
-##  attr(rg, "main") <- if (is.null(main)) "Rootogram" else main
-##
-##  class(rg) <- c("rootogram", "data.frame")
-##
-##  if (plot)
-##    plot(rg, ...)
-##
-##  return(invisible(rg))
-##}
-
-#' @author Niki
-#' @rdname tmdist
-#' @exportS3Method rootogram tmdist
-rootogram.tmdist <- function(object, newdata = NULL, plot = TRUE,
-  width = 0.9, style = c("hanging", "standing", "suspended"),
-  scale = c("sqrt", "raw"), expected = TRUE, confint = TRUE,
-  ref = TRUE, K = NULL, xlab = NULL, ylab = NULL, main = NULL, ...) {
-  if (is.null(newdata))
-    newdata <- object$model.frame
-
-  if (is.null(newdata[[object$response]]))
-    stop("response missing in newdata!")
-
-  y <- newdata[[object$response]]
-  n <- length(y)
-
-  if(!is.null(K))
-    object$maxcounts <- K
-  counts <- 0:object$maxcounts
-  p <- NULL; obs <- NULL
-  for (j in counts) {
-    if (isTRUE(list(...)$verbose))
-      cat(j, "/", sep = "")
-    p <- cbind(p, predict(object, newdata = newdata, type = "pdf", y = j))
-    obs <- c(obs, sum(y == j))
-  }
-
-  if (isTRUE(list(...)$verbose))
-    cat("\n")
-
-  e <- colMeans(p) * n  
-
-  rg <- data.frame("observed" = obs, "expected" = e,
-    "mid" = counts, "width" = width)
-
-  scale <- match.arg(scale)
-
-  if (scale == "sqrt") {
-    rg$observed <- sqrt(rg$observed)
-    rg$expected <- sqrt(rg$expected)
-  }
-
-  p <- t(p)
-  rownames(p) <- paste0("p_", counts + 0.5)
-  colnames(p) <- as.character(1:n)
-  rg$distribution <- p
-
-  attr(rg, "style") <- match.arg(style)
-  attr(rg, "scale") <- scale
-  attr(rg, "expected") <- expected
-  attr(rg, "confint") <- confint
-  attr(rg, "ref") <- ref
-  attr(rg, "xlab") <- if (is.null(xlab)) "#Counts" else xlab
-  attr(rg, "ylab") <- if (is.null(ylab)) "sqrt(Frequency)" else ylab
-  attr(rg, "main") <- if (is.null(main)) "Rootogram" else main
-
-  class(rg) <- c("rootogram", "data.frame")
-
-  if (plot)
-    plot(rg, ...)
-
-  return(invisible(rg))
-}
 

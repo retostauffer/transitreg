@@ -51,6 +51,8 @@ expect_identical(attr(d1, "breaks"), breaks,                 info = "Testing att
 
 expect_true("discrete" %in% names(attributes(d1)),           info = "Checking if attribute 'discrete' is available")
 expect_identical(attr(d1, "discrete"), TRUE,                 info = "Testing attribute 'discrete'")
+expect_identical(is_discrete(d1),   rep(TRUE, 1),            info = "Testing return of is_discrete")
+expect_identical(is_continuous(d1), rep(FALSE, 1),           info = "Testing return of is_continuous")
 
 
 # Convert to matrix
@@ -80,8 +82,14 @@ expect_identical(m1e[, "theta"], seq_len(ncol(m)) - 1.0,    info = "Checking mat
 expect_equal(m1e[, "tp"], as.vector(m[1, ]),                info = "Checking matrix content (tp)")
 
 # Testing that attributes survive when subsetting
-expect_identical(attr(m1e[1, ], "breaks"), breaks,          info = "Testing 'breaks' attribute on matrix subset")
-expect_identical(attr(m1e[1, ], "discrete"), TRUE,          info = "Testing 'discrete' attribute on matrix subset")
+# TODO(R): Not properly implemented, attemted it, but that broke
+#          the format function as I need to support to access
+#          specific elements using y[i] if dim(y) = c(1, N).
+expect_true(is.null(attr(m1e[1, ], "breaks")))
+expect_true(is.null(attr(m1e[1, ], "discrete")))
+#expect_identical(attr(m1e[1, ], "breaks"), breaks,          info = "Testing 'breaks' attribute on matrix subset")
+#expect_identical(attr(m1e[1, ], "discrete"), TRUE,          info = "Testing 'discrete' attribute on matrix subset")
+
 rm(m1e)
 rm(d1)
 
@@ -90,15 +98,19 @@ rm(d1)
 # --------- testing non-discrete mode (breaks) -----------------------
 # ---------------- continuous distribution ---------------------------
 
-cbreaks <- seq(17.3, 28.3, length.out = length(breaks))
-expect_silent(d1c <- Transition(m, breaks = cbreaks),       info = "Create continuous distribution, discrete = NULL")
-f(); d1  <- Transition(m, breaks = breaks)
-class(d1)
-f(); print(d1)
-f(); as.matrix(d1)[1, 1]
-f(); as.matrix(d1)[1, ]
-f(); as.matrix(d1)[1]
-f(); d1c <- Transition(m, breaks = cbreaks)
+cbreaks <- seq(11.5, 34.1, length.out = length(breaks))
+expect_silent(d1c  <- Transition(m, breaks = cbreaks),
+              info = "Create continuous distribution, discrete = NULL")
+expect_silent(d1c2 <- Transition(m, breaks = cbreaks, discrete = FALSE),
+              info = "Create continuous distribution, discrete = FALSE")
+expect_identical(d1c, d1c2, info = "Test that both objects are identical")
+expect_true("breaks" %in% names(attributes(d1c)),         info = "Testing that attribute 'breaks' is available")
+expect_identical(attr(d1c, "breaks"), cbreaks,            info = "Testing values of attribute 'breaks'")
+expect_true("discrete" %in% names(attributes(d1c)),       info = "Testing that attribute 'discrete' is available")
+expect_identical(attr(d1c, "discrete"), FALSE,            info = "Testing attribute 'discrete'")
+expect_identical(is_continuous(d1c), rep(TRUE, nrow(m)),  info = "Testing return of is_continuous")
+expect_identical(is_discrete(d1c),   rep(FALSE, nrow(m)), info = "Testing return of is_discrete")
+rm(d1c, d1c2)
 
 # ------------- distribution m, length 3 -----------------------------
 

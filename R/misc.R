@@ -496,3 +496,188 @@ get_elementwise_colnames <- function(x, prefix = NULL, digits = pmax(3L, getOpti
     return(trimws(x))
 }
 
+
+## Convert numeric values to bin index (integer). If x == NULL, NULL is returned.
+num2bin <- function(x, breaks) {
+    if (is.null(x)) return(x)
+    if (any(is.na(x)))
+        stop("Response contains missing values (not allowed).")
+    res <- cut(x, breaks = breaks, labels = FALSE, include.lowest = TRUE) - 1L
+    res[x < min(breaks)] <- -1L                  # Outside range (below bin 0)
+    res[x > max(breaks)] <- length(breaks) - 1L  # Outside range (above highest bin)
+    return(res)
+}
+
+
+#' Create Breaks for (Pseudo-)bins
+#'
+#' Calculates the breaks (point intersection between breaks)
+#' which span the range of `y`.
+#'
+#' @param y numeric vector with response data.
+#' @param breaks number of breaks to be created (single integer).
+#' @param scale logical, scaling involved?
+#'
+#' @return Returns a numeric vector with the breaks.
+make_breaks <- function(y, breaks = 30, scale = FALSE , ...) {
+  stopifnot(
+    "'y' must be numeric" = is.numeric(y),
+    "'breaks' must be numeric of length 1" = is.numeric(breaks) && length(breaks) == 1L,
+    "'breaks' must be >= 2" = breaks >= 2,
+    "'scale' must be TRUE or FALSE" = isTRUE(scale) || isFALSE(scale)
+  )
+  if (scale) {
+    my <- min(y)
+    y <- sqrt(y - my + 0.01)
+    dy <- diff(range(y))
+    breaks <- (seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks))^2 - 0.01 + my
+  } else {
+    dy <- diff(range(y))
+    breaks <- seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks)
+    #breaks <- c(min(y) - 0.5*dy, quantile(y, probs = seq(0, 1, length = breaks)), max(y) + 0.5*dy)
+  }
+  return(breaks)
+}
+
+
+
+# Helper functions to check the arguments we hand over to C. This
+# helps identifying potential problems easier. Input 'x' is a named
+# list with all the elements required when calling "treg_predict" in C.
+#
+# The function ensures that (i) all the objects are of the correct type,
+# and that some elements do show the correct (expected) length. Else
+# it is possible that C returns 'garbage' results as it tries to read
+# elemnets outside of memory, resulting in either segfaults or werid
+# results.
+#
+# Last but not least it ensures that the order of the arguments
+# are as expected by .C!
+
+#' @importFrom utils str
+check_args_for_treg_predict <- function(x) {
+    ## Expected elements (in the order expected by C)
+    enames <- c("uidx", "idx", "tp", "breaks", "y", "prob",
+                "type", "ncores", "elementwise", "discrete")
+
+    ## Checking types first
+    tmp <- list("integer" = c("uidx", "idx", "y", "ncores"),
+                "double"  = c("tp", "breaks", "prob"),
+                "logical" = c("elementwise", "discrete"))
+    for (n in names(tmp)) {
+        fn <- get(sprintf("is.%s", n))
+        for (e in tmp[[n]]) {
+            if (!fn(x[[e]])) stop("Element '", e, "' in args list is not \"", n, "\"")
+        }
+    }
+
+    ## Checking length of some of the elements
+    tryCatch(
+        {stopifnot(
+            "'args$elementwise' must be of length 1" = length(x$elementwise) == 1L,
+            "length of 'args$idx' and 'args$tp' must be identical" = 
+                length(x$idx) == length(x$tp),
+            "length of 'args$type' must be 1" = length(x$type) == 1L,
+            "length of 'args$discrete' and 'args$uidx' must be identical" =
+                length(x$uidx) == length(x$discrete),
+            "not all required elements found in 'args'" =
+                all(enames %in% names(x))
+        )},
+        error = function(e) {
+            cat("\nDebugging output (str(args)):\n")
+            str(x)
+            stop(e)
+        }
+    )
+
+    # Return (re-ordered) list
+    return(x[enames])
+}
+
+#' @importFrom utils str
+check_args_for_treg_predict_pdfcdf <- function(x) {
+    ## Required elements in the order as expected by C
+    enames <- c("uidx", "idx", "tp", "y", "breaks", "ncores")
+
+    ## Checking types first
+    tmp <- list("integer" = c("uidx", "idx", "y", "ncores"),
+                "double"  = c("tp", "breaks"))
+    for (n in names(tmp)) {
+        fn <- get(sprintf("is.%s", n))
+        for (e in tmp[[n]]) {
+            if (!fn(x[[e]])) stop("Element '", e, "' in args list is not \"", n, "\"")
+        }
+    }
+
+    ## Checking length of some of the elements
+    tryCatch(
+        {stopifnot(
+            "length of 'args$idx' and 'args$tp' must be identical" =
+                length(x$idx) == length(x$tp),
+            "length of 'args$y' and 'args$uidx' must be identical" =
+                length(x$y) == length(x$uidx)
+        )},
+        error = function(e) {
+            cat("\nDebugging output (str(args)):\n")
+            str(x)
+            stop(e)
+        }
+    )
+
+    # Return (re-ordered) list
+    return(x[enames])
+}
+
+
+
+#' Detect number of cores for OpenMP
+#'
+#' The calculation of CDFs and PDFs is implemented in C and allows
+#' for parallelization using OpenMP. This function detects how may
+#' cores are available in total (if OpenMP is available).
+#'
+#' @param verbose logical, if `TRUE` a message is shown.
+#'
+#' @return Number of available cores (integer). If OpenMP is not
+#' available, `1L` is returned.
+#'
+#' @author Reto
+transitreg_detect_cores <- function(verbose = TRUE) {
+    stopifnot("'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose))
+    ncores <- .Call("treg_detect_cores")
+    if (verbose && ncores) {
+        message("OMP available, number of cores detected: ", ncores)
+    } else if (verbose) {
+        message("OMP not available (not compiled with omp)")
+    }
+    return(ncores)
+}
+
+#' Get number of cores for OpenMP
+#'
+#' Some parts of the package use C routines which allow for parallelization
+#' using OpenMP. This function is used to specify how many cores to be used.
+#'
+#' @param ncores `NULL` or a positive integer.
+#' @param verbose logical, if `TRUE` a message is shown.
+#'
+#' @return Number of cores to be used in OpenMP parallelization (integer).
+#'
+#' @details If `ncores` is `NULL` the number of available
+#' cores is auto-detected and set to 'total number of cores - 2'.
+#' If integer, it is checked if this number of cores is available,
+#' else set tot he 'total number of cores available'.
+#'
+#' @author Reto
+transitreg_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
+  ## Number of cores to be used for OpenMP. If
+  ## - NULL: Guess cores (max cores - 2L)
+  ## - Smaller or equal to 0: Set to 1L (single-core processing)
+  ## - Else: Take user input; limited to maximum number of detected cores.
+  ncores <- if (!is.null(ncores)) as.integer(ncores)[1L] else transitreg_detect_cores(verbose = FALSE) - 2L
+  ncores <- if (ncores < 1L) 1L else pmin(ncores, transitreg_detect_cores(verbose = FALSE))
+  if (verbose) message("Number of cores set to: ", ncores)
+  return(ncores)
+}
+
+

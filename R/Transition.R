@@ -325,31 +325,6 @@ c.Transition <- function(...) {
     Transition(res, attr(x[[1]], "breaks"))
 }
 
-#' @importFrom distributions3 prodist
-#' @importFrom stats setNames
-#' @importFrom utils head tail
-#'
-#' @author Reto
-#' @exportS3Method prodist transitreg
-#' @rdname transitreg
-prodist.transitreg <- function(object, newdata = NULL, ...) {
-    n <- nrow(object$model.frame)
-    object[seq_len(n)]
-}
-
-# TODO(R): Not needed! Remove once d3 is implemented properly.
-####procast.transitreg <- function(object, newdata = NULL, na.action = na.pass,
-####                       type = "distribution", at = 0.5, drop = FALSE, ...) {
-####    object <- if (is.null(newdata)) {
-####        prodist(object)
-####    } else {
-####        # TODO(R): na.action passed to 'procast.transitreg' but not yet implemented (no effect)
-####        prodist(object, newdata = newdata, na.action = na.action)
-####    }
-####
-####    return(if (drop) object[[1]] else object)
-####}
-
 
 #' Convert Transition Distributions to Matrix
 #'
@@ -728,12 +703,7 @@ random.Transition <- function(x, n = 1L, drop = TRUE, ...) {
 #' @rdname Transition
 #' @exportS3Method is_discrete Transition
 is_discrete.Transition <- function(d, ...) {
-    x <- attr(d, "breaks")
-    # Calculating mid of breaks
-    idx <- seq_len(length(x) - 1)
-    x <- x[idx + 1] - x[idx]
-    # If all 'bin mids' integer we assume it is a discrete distribution
-    rep(all(abs(x %% 1) < sqrt(.Machine$double.eps)), length(d))
+    rep(attr(d, "discrete"), length(d))
 }
 
 #' @importFrom distributions3 is_continuous
@@ -800,28 +770,4 @@ plot.Transition <- function(d, type = c("tp", "cdf", "pdf"), p = c(0.1, 99.9), l
 
 
 
-
-
-# TODO(R): Used?
-
-#' @importFrom topmodels newresponse
-#'
-#' @author Reto
-#' @rdname transitreg
-#' @exportS3Method newresponse transitreg
-newresponse.transitreg <- function(object, newdata = NULL, ...) {
-    ## Response name
-    yn <- object$response
-
-    if (is.null(newdata)) {
-        newdata <- object$model.frame
-        newdata[[yn]] <- object$breaks[newdata[[yn]]]
-    }
-
-    if (is.null(newdata[[object$response]]))
-        stop("response missing in newdata!")
-
-    y <- setNames(data.frame(newdata[[object$response]]), yn)
-    return(y)
-}
 
