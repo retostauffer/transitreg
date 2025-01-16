@@ -4,7 +4,7 @@
 #' A 'Transition' distrubiton consists of a series of \code{K} transition
 #' probabilities (TP) for \code{K} 'bins' (counts or pseudo-counts).
 #'
-#' @param x numeric vector or a numeric matrix.
+#' @param x Numeric vector or a numeric matrix.
 #' @param breaks numeric vector of points of intersection of the breaks.
 #'        The length the vector must be of \code{length(x) + 1} (if \code{x} is
 #'        a vector) or \code{ncol(x) + 1} if \code{x} is a matrix. Must be

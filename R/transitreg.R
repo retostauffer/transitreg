@@ -228,7 +228,7 @@ transitreg <- function(formula, data, subset, na.action,
 
     bins <- max(mf[[response]])
     ## Setting highest 'bin' to max(response) * mp (multiplier)
-    mp     <- if (bins <= 10) { 2 } else if (bins <= 100) { 1.5 } else { 1.2 }
+    mp     <- if (bins <= 10) { 3 } else if (bins <= 100) { 1.5 } else { 1.25 }
     bins   <- as.integer(ceiling(bins * mp))
     breaks <- seq_len(bins + 1) - 1.5 # 'Integer' bins
     if (verbose) message("Response considered to be count data, using max count ", bins - 1)
@@ -1070,7 +1070,13 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 
     if (is.null(newdata)) {
         newdata <- object$model.frame
-        newdata[[yn]] <- object$breaks[newdata[[yn]] + 1L]
+        # Discrete model
+        if (is.null(object$breaks)) {
+            newdata[[yn]] <- newdata[[yn]]
+        # Continuous model
+        } else {
+            newdata[[yn]] <- object$breaks[newdata[[yn]] + 1L]
+        }
     }
 
     if (is.null(newdata[[object$response]]))
