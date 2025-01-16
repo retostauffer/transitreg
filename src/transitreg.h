@@ -72,8 +72,8 @@ integerVec find_positions(int x, int* y, int n);
 void eval_bins_quantile(double* res, double* tmp, int* positions, int count, double* bkptr, double* prob, int np, bool disc);
 
 double interpolate_linear(double x1, double y1, double x2, double y2, double p);
-doubleVec treg_calc_pdf(int* positions, int count, double* tpptr, double* bkptr, int* y, int ny);
-doubleVec treg_calc_cdf(int* positions, int count, double* tpptr, double* bkptr, int* y, int ny);
+doubleVec treg_calc_pdf(int* positions, int count, double* tpptr, double* bkptr, int nbins, int* y, int ny);
+doubleVec treg_calc_cdf(int* positions, int count, double* tpptr, double* bkptr, int nbins, int* y, int ny);
 doubleVec treg_calc_quantile(int* positions, int count, double* tpptr, double* bkptr, double* prob, int np, bool disc);
 
 double treg_calc_pmax(int* positions, int count, double* pptr);

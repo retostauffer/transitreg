@@ -20,7 +20,7 @@
 \alias{support.Transition}
 \title{Creates a Transition Distribution}
 \usage{
-Transition(x, breaks)
+Transition(x, breaks, discrete = NULL)
 
 dtransit(x, d, log = FALSE, ncores = NULL)
 
@@ -61,6 +61,10 @@ rtransit(n, d, ncores = NULL)
 The length the vector must be of \code{length(x) + 1} (if \code{x} is
 a vector) or \code{ncol(x) + 1} if \code{x} is a matrix. Must be
 monotonically increasing.}
+
+\item{discrete}{\code{NULL} or logical. If \code{NULL} and the breaks look like
+count data breaks (\code{c(-0.5, 0.5, 1.5, ...)}) discrete will be set
+\code{TRUE}, else \code{FALSE}.}
 
 \item{d}{An object of class \code{Transition}.}
 

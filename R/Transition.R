@@ -9,6 +9,9 @@
 #'        The length the vector must be of \code{length(x) + 1} (if \code{x} is
 #'        a vector) or \code{ncol(x) + 1} if \code{x} is a matrix. Must be
 #'        monotonically increasing.
+#' @param discrete `NULL` or logical. If `NULL` and the breaks look like
+#'        count data breaks (`c(-0.5, 0.5, 1.5, ...)`) discrete will be set
+#'        `TRUE`, else `FALSE`.
 #'
 #' @return Returns an object of class \code{c("Transition", "distribution")}.
 #' TODO(R): Missing.
@@ -27,7 +30,7 @@
 #' @author Reto
 #' @rdname Transition
 #' @export
-Transition <- function(x, breaks) {
+Transition <- function(x, breaks, discrete = NULL) {
 
     # Sanity checks
     stopifnot(
@@ -36,7 +39,8 @@ Transition <- function(x, breaks) {
         "length of 'x' must be > 0" = length(x) > 0L,
         "'breaks' must be a numeric vector" = is.atomic(breaks) && is.numeric(breaks),
         "missing values in 'breaks' not allowed" = all(!is.na(breaks)),
-        "'breaks' must be monotonically increasing" = all(diff(breaks) > 0)
+        "'breaks' must be monotonically increasing" = all(diff(breaks) > 0),
+        "'discrete' must be NULL or logical TRUE/FALSE" = is.null(discrete) || (isTRUE(discrete) || isFALSE(discrete))
     )
 
     # If 'x' is a vector, convert to matrix
@@ -46,15 +50,25 @@ Transition <- function(x, breaks) {
     if (length(breaks) != (ncol(x) + 1))
         stop("'breaks' must be of length ", ncol(x) + 1)
 
-
     # Ensure to convert to double in case input is integer
     x[,] <- as.numeric(x)
     breaks <- as.numeric(breaks)
 
+    # Guessing 'discrete' option if needed.
+    if (is.null(discrete)) {
+        mids <- (head(breaks, -1) + tail(breaks, -1)) / 2
+        if (all(abs(mids %% 1 < sqrt(.Machine$double.eps)) &
+                isTRUE(all.equal(mids, seq_along(mids) - 1)))) {
+            discrete <- TRUE
+        } else {
+            discrete <- FALSE
+        }
+    }
+
     res <- setNames(as.data.frame(x),
                     paste("tp", seq_len(ncol(x)) - 1, sep = "_"))
 
-    structure(res, class = c("Transition", "distribution"), breaks = breaks)
+    structure(res, class = c("Transition", "distribution"), breaks = breaks, discrete = discrete)
 }
 
 
@@ -105,7 +119,6 @@ qtransit <- function(p, d, lower.tail = TRUE, log.p = FALSE, ncores = NULL) {
     stopifnot(
         "'p' must be numeric of length > 0" = is.numeric(p) && length(p) > 0L,
         "missing values in 'p' not allowed" = all(!is.na(p)),
-        "'p' must be in range [0, 1]" = all(p >= 0 & p <= 1),
         "'d' must be of class 'Transition'" = inherits(d, "Transition")
     )
 
@@ -197,7 +210,6 @@ dpq_get_elements <- function(res, x, nd) {
     n    <- max(length(x), nd)
     arr.ind <- cbind(row = rep(seq_len(nd), length.out = n),
                      col = rep(mtch,        length.out = n))
-    print(arr.ind)
     res <- res[arr.ind]
 }
 
@@ -237,7 +249,7 @@ rtransit <- function(n, d, ncores = NULL) {
                  type   = "pdf", ncores = ncores,
                  elementwise = FALSE, discrete = discrete) # <- Dummy values
 
-    check_args_for_treg_predict(args)
+    args <- check_args_for_treg_predict(args)
     p <- matrix(do.call(function(...) .Call("treg_predict", ...), args),
                 ncol = length(binmid), byrow = TRUE)
 
@@ -321,35 +333,8 @@ c.Transition <- function(...) {
 #' @exportS3Method prodist transitreg
 #' @rdname transitreg
 prodist.transitreg <- function(object, newdata = NULL, ...) {
-    # Extracting covariable names to create newdata
-    covars <- attr(terms(fake_formula(formula(object))), "term.labels")
-    covars <- covars[!covars == "theta"]
-
-    # In-sample data
-    if (is.null(newdata)) {
-        res <- object$model.frame
-    } else {
-        res <- newdata; rm(newdata)
-    }
-
-    # Creating res
-    nb <- length(object$ym) # Number of breaks
-    nd <- nrow(res)         # Number of observations
-
-    expand_covar <- function(x, nb) rep(x, each = nb)
-    res  <- lapply(res[, covars, drop = FALSE], expand_covar, nb = nb)
-    res  <- data.frame(c(list(theta = rep(seq_len(nb) - 1, times = nd)), res))
-
-    # TODO(R): Currently 'type = response' which differs
-    # for different engines (see transitreg()).
-    res  <- data.frame(tp = predict(object$model, newdata = res, type = "response"),
-                       lo = rep(head(object$breaks, -1), times = nd),
-                       up = rep(tail(object$breaks, -1), times = nd))
-    # Split into individual data.frames
-    res <- split(res, rep(seq_len(nd), each = nb))
-
-    # Convert into distributions object, pack into a data.frame
-    return(setNames(as.data.frame(Transition(res)), as.character(substitute(object))))
+    n <- nrow(object$model.frame)
+    object[seq_len(n)]
 }
 
 # TODO(R): Not needed! Remove once d3 is implemented properly.
@@ -392,6 +377,7 @@ as.matrix.Transition <- function(x, expand = FALSE, ...) {
 
     xnames <- names(x) # Keep for later
     breaks   <- attr(x, "breaks")
+    discrete <- attr(x, "discrete")
 
     # convert to data.frame -> matrix
     x <- as.matrix(structure(x, class = "data.frame"))
@@ -406,8 +392,40 @@ as.matrix.Transition <- function(x, expand = FALSE, ...) {
         x <- cbind(index = index, theta = theta, tp = as.vector(t(x)))
     }
 
-    structure(x, class = c("Transitionmatrix", class(x)), breaks = breaks)
+    structure(x, class = c("Transitionmatrix", class(x)), breaks = breaks, discrete = discrete)
 }
+
+## TODO(R): Problem when subsetting a matrix issue
+### #' @exportS3Method "[" Transitionmatrix
+### `[.Transitionmatrix` <- function(x, i, j, drop = TRUE, ...) {
+###     breaks   <- attr(x, "breaks")
+###     discrete <- attr(x, "discrete")
+###     xclass   <- class(x)
+### 
+###     # Convert to default matrix
+###     class(x) <- class(x)[!class(x) == "Transitionmatrix"]
+###     x <- x[i, j, drop = drop]
+### 
+###     if (!missing(j)) return(x)
+###     # Re-create Transitionmatrix object
+###     structure(x, class = xclass, breaks = breaks, discrete = discrete)
+### }
+
+#### @exportS3Method format Transitionmatrix
+###format.Transitionmatrix <- function(x, ...) {
+###    class(x) <- class(x)[!class(x) == "Transitionmatrix"]
+###
+###    # Extracting (and deleting) attributes
+###    an <- c("breaks", "discrete")
+###    att <- setNames(lapply(an, function(n) attr(x, n)), an)
+###    for (n in an) attr(x, n) <- NULL
+###
+###    # Print
+###    print(x)
+###    cat("breaks: ", paste(att$breaks, sep = ", "), "\n")
+###    cat("discrete: ", att$discrete, "\n")
+###
+###}
 
 #' @importFrom stats setNames
 #'
@@ -803,7 +821,7 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
     if (is.null(newdata[[object$response]]))
         stop("response missing in newdata!")
 
-    y <- newdata[[object$response]]
+    y <- setNames(data.frame(newdata[[object$response]]), yn)
     return(y)
 }
 

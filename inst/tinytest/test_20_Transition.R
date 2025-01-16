@@ -44,9 +44,14 @@ pat <- "Transition_16\\([0-9\\.\\,\\ ]+)"
 expect_stdout(print(d1), pattern = pat,                      info = "Testing standard representation")
 expect_true(grepl(pat, format(d1)),                          info = "Testing format function")
 
-# Checking attribute
-expect_true("breaks" %in% names(attributes(d1)),               info = "Checking if attribute 'breaks' is available")
-expect_identical(attr(d1, "breaks"), breaks,                     info = "Testing attribute 'breaks'")
+# Checking attributes
+expect_true("breaks" %in% names(attributes(d1)),             info = "Checking if attribute 'breaks' is available")
+expect_identical(attr(d1, "breaks"), breaks,                 info = "Testing attribute 'breaks'")
+
+
+expect_true("discrete" %in% names(attributes(d1)),           info = "Checking if attribute 'discrete' is available")
+expect_identical(attr(d1, "discrete"), TRUE,                 info = "Testing attribute 'discrete'")
+
 
 # Convert to matrix
 expect_silent(m1 <- as.matrix(d1),                          info = "Converting to matrix")
@@ -55,7 +60,8 @@ expect_true(is.matrix(m1) && is.numeric(m1),                info = "Testing matr
 expect_identical(dim(m1), c(1L, ncol(m)),                   info = "Testing matrix dimension")
 expect_true(all(grep("^tp_[0-9]+$", colnames(m1))),         info = "Matrix column names")
 expect_true(is.null(rownames(m1)),                          info = "Matrix row names (unnamed)")
-expect_identical(attr(m1, "breaks"), breaks,                    info = "Testing 'breaks' attribute on matrix")
+expect_identical(attr(m1, "breaks"), breaks,                info = "Testing 'breaks' attribute on matrix")
+expect_identical(attr(m1, "discrete"), TRUE,                info = "Testing 'discrete' attribute on matrix")
 rm(m1)
 
 # Convert to extended (long) matrix
@@ -65,25 +71,44 @@ expect_true(is.matrix(m1e) && is.numeric(m1e),              info = "Testing exte
 expect_identical(dim(m1e), c(ncol(m), 3L),                  info = "Testing extended matrix dimension")
 expect_identical(colnames(m1e), c("index", "theta", "tp"),  info = "Matrix extended column names")
 expect_true(is.null(rownames(m1e)),                         info = "Extended matrix row names (unnamed)")
-expect_identical(attr(m1e, "breaks"), breaks,                   info = "Testing 'breaks' attribute on matrix")
+expect_identical(attr(m1e, "breaks"), breaks,               info = "Testing 'breaks' attribute on matrix")
+expect_identical(attr(m1e, "discrete"), TRUE,               info = "Testing 'discrete' attribute on matrix")
 
 # Testing content ...
 expect_true(all(m1e[, "index"] == 1L),                      info = "Checking matrix content (index)")
 expect_identical(m1e[, "theta"], seq_len(ncol(m)) - 1.0,    info = "Checking matrix content (index)")
 expect_equal(m1e[, "tp"], as.vector(m[1, ]),                info = "Checking matrix content (tp)")
+
+# Testing that attributes survive when subsetting
+expect_identical(attr(m1e[1, ], "breaks"), breaks,          info = "Testing 'breaks' attribute on matrix subset")
+expect_identical(attr(m1e[1, ], "discrete"), TRUE,          info = "Testing 'discrete' attribute on matrix subset")
 rm(m1e)
 rm(d1)
 
 
 # ------------- distribution m, length 3 -----------------------------
+# --------- testing non-discrete mode (breaks) -----------------------
+# ---------------- continuous distribution ---------------------------
+
+cbreaks <- seq(17.3, 28.3, length.out = length(breaks))
+expect_silent(d1c <- Transition(m, breaks = cbreaks),       info = "Create continuous distribution, discrete = NULL")
+f(); d1  <- Transition(m, breaks = breaks)
+class(d1)
+f(); print(d1)
+f(); as.matrix(d1)[1, 1]
+f(); as.matrix(d1)[1, ]
+f(); as.matrix(d1)[1]
+f(); d1c <- Transition(m, breaks = cbreaks)
+
+# ------------- distribution m, length 3 -----------------------------
 
 # In contrast to the test above we name the distribution "A";
 # should result in proper rownames on the matrices.
-expect_silent(d3 <- Transition(m, breaks),                     info = "Calling constructor with three distributions")
+expect_silent(d3 <- Transition(m, breaks),                   info = "Calling constructor with three distributions")
 expect_identical(class(d3), c("Transition", "distribution"), info = "Testing return class")
 expect_identical(length(d3), nrow(m),                        info = "Testing length")
 expect_identical(names(d3), rownames(m),                     info = "Testing names")
-expect_identical(attr(d3, "breaks"), breaks,                     info = "Testing 'breaks' attribute on Transition")
+expect_identical(attr(d3, "breaks"), breaks,                 info = "Testing 'breaks' attribute on Transition")
 expect_true(all(grepl(sprintf("^Transition_%d\\([0-9\\.\\,\\ ]+\\)$", ncol(m)), format(d3))), info = "Format")
 
 # Convert to matrix

@@ -6,7 +6,7 @@
 \alias{transitreg}
 \alias{logLik.transitreg}
 \alias{residuals.transitreg}
-\alias{rootogram.transitreg}
+\alias{rootogram.tmdist}
 \title{Transition Models Estimation}
 \usage{
 \method{prodist}{transitreg}(object, newdata = NULL, ...)
@@ -31,7 +31,7 @@ transitreg(
 
 \method{residuals}{transitreg}(object, newdata = NULL, y = NULL, ...)
 
-\method{rootogram}{transitreg}(
+\method{rootogram}{tmdist}(
   object,
   newdata = NULL,
   plot = TRUE,
