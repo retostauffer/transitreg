@@ -24,6 +24,7 @@ Depends: R (>= 4.1.0), mgcv, topmodels, distributions3
 Imports: Formula
 Suggests: colorspace, nnet, quarto, glmnet
 VignetteBuilder: quarto
+LazyData: yes
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2

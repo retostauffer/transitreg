@@ -1,5 +1,78 @@
 
 
+# @rdname tmdist
+# @export
+# @author Niki
+tm_dist <- function(y, data = NULL, ...)
+{
+  if (is.null(y))
+    stop("argument y is NULL!")
+
+  is_f <- FALSE
+  if (inherits(y, "formula")) {
+    yn <- response_name(y)
+    f <- y
+    is_f <- TRUE
+  } else {
+    yn <- deparse(substitute(y), backtick = TRUE, width.cutoff = 500)
+    f <- y ~ s(theta)
+    environment(f) <- environment(y)
+    data <- list()
+    data[["y"]] <- y
+  }
+
+  ## Estimate model.
+  b <- tm(f, data = data, ...)
+
+  if (inherits(y, "formula"))
+    y <- model.response(b$model.frame)
+
+  ## Predict probabilities.
+  nd <- data.frame("y" = 0:b$maxcounts)
+  if ((yn != "y") & is_f)
+    names(nd) <- yn
+  pb <- predict(b, newdata = nd)
+
+  nl <- NULL
+
+  if (is.null(b$yc_tab)) {
+    if (!is.null(data) & is_f)
+      y <- data[[yn]]
+    tab <- prop.table(table(y))
+  } else {
+    tab <- prop.table(b$yc_tab)
+    nl <- format(b$ym, digits = 2)
+  }
+
+  tab2 <- numeric(b$maxcounts + 1L)
+  names(tab2) <- as.character(0:b$maxcounts)
+  tab2[names(tab)] <- tab
+  tab <- tab2
+
+  ## Set labels.
+  ylim <- list(...)$ylim
+  if (is.null(ylim)) 
+    ylim <- range(c(0, tab, pb * 1.1), na.rm = TRUE)
+  ylab <- list(...)$ylab
+  if (is.null(ylab))
+    ylab <- "Probability"
+  xlab <- list(...)$xlab
+  if (is.null(xlab)) {
+    xlab <- if (is.null(b$yc_tab)) "#Counts" else yn
+  }
+
+  ## Plot.
+  if (!is.null(nl)) {
+    names(tab) <- nl[as.integer(names(tab)) + 1L]
+  }
+  x <- barplot(tab, xlab = xlab, ylab = ylab, ylim = ylim)
+  lines(pb ~ x, col = 4, lwd = 2, type = "h")
+  points(x, pb, col = 4, pch = 16)
+  points(x, pb, col = rgb(0.1, 0.1, 0.1, alpha = 0.6))
+
+  return(invisible(b))
+}
+
 #' @author Niki
 #' @rdname tmdist
 #' @exportS3Method rootogram tmdist

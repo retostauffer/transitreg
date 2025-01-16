@@ -1,8 +1,3 @@
-## Main paper: https://link.springer.com/article/10.1007/s10260-021-00558-6
-
-
-
-
 
 #' Transition Models Estimation
 #'
