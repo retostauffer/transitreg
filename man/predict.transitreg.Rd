@@ -9,7 +9,7 @@
   newdata = NULL,
   y = NULL,
   prob = NULL,
-  type = c("pdf", "cdf", "pmax", "quantile"),
+  type = c("pdf", "cdf", "quantile", "pmax", "tp"),
   ncores = NULL,
   elementwise = NULL,
   verbose = FALSE,

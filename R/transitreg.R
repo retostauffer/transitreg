@@ -288,15 +288,23 @@ transitreg_predict <- function(object, newdata = NULL,
       "for 'type = \"cdf\" or \"pdf\"' argument 'y' must be set if 'newdata' is given" =
           !is.null(y),
       "'y' must be numeric of length > 0" = is.numeric(y) && length(y) > 0,
-      "missing values in 'y' not allowed" = all(!is.na(y)),
-      "'y' must be in range of object$breaks" =
-          all(y >= min(object$breaks)) && all(y <= max(object$breaks))
+      "missing values in 'y' not allowed" = all(!is.na(y))
     )
+    # Discrete distribution? y must be in range [0, object$bins].
+    if (is.null(object$breaks)) {
+      y <- as.integer(y)
+      if (!all(y >= 0 & y <= object$bins - 1L))
+          stop("elements in 'y' must be in {0, ..., ", object$bins - 1L, "}")
+    # Else continuous
+    } else {
+      if (!all(y >= min(object$breaks) & y <= max(object$breaks)))
+          stop(sprintf("elements in 'y' must be in range [%s, %s]",
+                       format(min(object$breaks), format(max(object$breaks)))))
+      ## If 'y' was set by the user, we must convert all values in 'y' from
+      ## it's original numeric value to it's pseudo-observation (bin; int).
+      if (!is.null(y)) y <- num2bin(y, object$breaks)
+    }
   }
-
-  ## If 'y' was set by the user, we must convert all values in 'y' from
-  ## it's original numeric value to it's pseudo-observation (bin; int).
-  if (!is.null(y)) y <- num2bin(y, object$breaks)
 
   ## If newdata is empty, we are taking the model frame.
   ## In addition, we take the pseudo-response from the model.frame
@@ -1298,7 +1306,8 @@ print.transitreg <- function(x, ...) {
 #' @exportS3Method predict transitreg
 #' @author Niki
 predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
-        type = c("pdf", "cdf", "pmax", "quantile"), ncores = NULL, elementwise = NULL, verbose = FALSE, ...) {
+        type = c("pdf", "cdf", "quantile", "pmax", "tp"), ncores = NULL,
+        elementwise = NULL, verbose = FALSE, ...) {
 
   type <- tolower(type)
   type <- match.arg(type)
