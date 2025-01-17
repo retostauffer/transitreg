@@ -1,4 +1,9 @@
 
+## Version 0.1-9005
+
+* Migrated back to main branch, repository renamed to final
+  package name `transitreg`.
+
 ## Version 0.1-9004
 
 * Major changes to the C code (removing the
@@ -9,6 +14,7 @@
 * Added proper handling for dpq functions if outside support.
 * Migrated to roxygen2 documentation.
 * Updated the prediction methods and functions.
+* Added (full) topmodels support.
 
 ## Version 0.1-9003
 
