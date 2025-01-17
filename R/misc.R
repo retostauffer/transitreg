@@ -283,19 +283,35 @@ plot_wp <- function(x, ...) {
 
 #' Converting between Densities, Probabilities, and Transition Probabilities
 #'
-#' A transiton model consists of a series of transition probabilities (TP)
-#' which define the probability that an observation falls into the next hither
-#' bin. Based on these transition probabilities, the cummulative distribution
+#' A transition model consists of a series of transition probabilities (TP)
+#' which define the probability that an observation falls into the next higher
+#' bin. Based on these transition probabilities, the cumulative distribution
 #' function (CDF) as well as the density (PDF) can be calculated.
 #' This utility function allows to convert from CDF to TPs, and from TPs
 #' back to CDF/PDF.
 #'
 #' @param x Numeric vector with density, probabilities, or transition probabilities.
+#'        All non-missing `>=0`.
 #' @param from Character, current type of data in `x`.
-#' @param to  Character, type into which `x` should be converted.
+#'        Either `"tp"`, `"cdf"`, or `"pdf"`.
+#' @param to  Character, type into which `x` should be converted (see `from`).
+#'        Note that not all combinations of conversions are allowed. If not possible,
+#'        an error will be thrown.
 #' @param width `NULL` or numeric (either length `1` or same length as `x`.
 #'        Width of the individual bins represented in `x`.
 #' @param drop If `TRUE` (default) the result is simplified if possible.
+#'
+#' @details
+#' If `from = "tp"` (transition probabilities) all values in `x` must be
+#' in `[0, 1]` and monotonically decreasing. Transition probabilities
+#' can be converted into both, `to = "cdf"` as well as `to = "pdf"` (or both
+#' at the same time, setting `to = c("cdf", "pdf"`)`.
+#'
+#' If `from = "cdf"` (distribution) all elements in `x` must be in `[0,1]`.
+#' Can be converted `to = "tp"`.
+#'
+#' Similarly, `from = "pdf"` can only be converted `to = "tp"`. This requires
+#' all elements in `x` to be in `[0, Inf]`.
 #'
 #' @return If `to` is a single character and `drop = TRUE`, the return is a numeric vector
 #' of the same length as the input argument `x`. Else the return is
@@ -338,11 +354,15 @@ convert_tp <- function(x, from, to, width = NULL, drop = TRUE) {
     stopifnot(
         "'x' must be numeric of length > 0" = is.numeric(x) && length(x) > 0,
         "'x' does not allow for NAs" = all(!is.na(x)),
-        "values in 'x' must be between 0.0 and 1.0" = all(x >= 0 & x <= 1)
+        "values in 'x' must be between 0.0 and 1.0" = all(x >= 0)
     )
     from <- tolower(from); to <- tolower(to)
     from <- match.arg(from, c("cdf", "pdf", "tp"))
     to   <- match.arg(to,   c("cdf", "pdf", "tp"), several.ok = TRUE)
+
+    # Checking range
+    if (from == c("tp", "cdf") & !all(x <= 1.0))
+        stop("if from = \"", from, "\" all 'x' must be in [0, 1]")
 
     # Evaluate input argument 'width'. If width = NULL no weighting
     # is preformed. This is correct if we are talking about count data,

@@ -7,11 +7,15 @@
 convert_tp(x, from, to, width = NULL, drop = TRUE)
 }
 \arguments{
-\item{x}{Numeric vector with density, probabilities, or transition probabilities.}
+\item{x}{Numeric vector with density, probabilities, or transition probabilities.
+All non-missing \verb{>=0}.}
 
-\item{from}{Character, current type of data in \code{x}.}
+\item{from}{Character, current type of data in \code{x}.
+Either \code{"tp"}, \code{"cdf"}, or \code{"pdf"}.}
 
-\item{to}{Character, type into which \code{x} should be converted.}
+\item{to}{Character, type into which \code{x} should be converted (see \code{from}).
+Note that not all combinations of conversions are allowed. If not possible,
+an error will be thrown.}
 
 \item{width}{\code{NULL} or numeric (either length \code{1} or same length as \code{x}.
 Width of the individual bins represented in \code{x}.}
@@ -24,12 +28,24 @@ of the same length as the input argument \code{x}. Else the return is
 a \code{data.frame} with the same number of rows as \code{length(x)}.
 }
 \description{
-A transiton model consists of a series of transition probabilities (TP)
-which define the probability that an observation falls into the next hither
-bin. Based on these transition probabilities, the cummulative distribution
+A transition model consists of a series of transition probabilities (TP)
+which define the probability that an observation falls into the next higher
+bin. Based on these transition probabilities, the cumulative distribution
 function (CDF) as well as the density (PDF) can be calculated.
 This utility function allows to convert from CDF to TPs, and from TPs
 back to CDF/PDF.
+}
+\details{
+If \code{from = "tp"} (transition probabilities) all values in \code{x} must be
+in \verb{[0, 1]} and monotonically decreasing. Transition probabilities
+can be converted into both, \code{to = "cdf"} as well as \code{to = "pdf"} (or both
+at the same time, setting \verb{to = c("cdf", "pdf"})`.
+
+If \code{from = "cdf"} (distribution) all elements in \code{x} must be in \verb{[0,1]}.
+Can be converted \code{to = "tp"}.
+
+Similarly, \code{from = "pdf"} can only be converted \code{to = "tp"}. This requires
+all elements in \code{x} to be in \verb{[0, Inf]}.
 }
 \examples{
 ## For testing
