@@ -13,7 +13,7 @@
 
 #include <R.h>
 #include <Rinternals.h>
-#include "tm.h"
+#include "transitreg.h"
 
 /* Helper function to check if OMP is ON (i.e.,
  * parallelization enabled
@@ -21,7 +21,7 @@
  * @return Returns an integer, 0 if OMP is not available,
  * else the number of available cores (procs).
  * */
-SEXP tm_detect_cores() {
+SEXP treg_detect_cores() {
     int ncores = 0;
     #ifdef OPENMP_ON
         ncores = omp_get_num_procs();

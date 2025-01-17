@@ -5,19 +5,19 @@ format:
     html-math-method: mathjax
     toc: true
     number-sections: true
-bibliography: tm.bib
+bibliography: transitreg.bib
 nocite: |
   @Berger:2021
 vignette: >
   %\VignetteIndexEntry{Transition Models}
   %\VignetteEngine{quarto::html}
-  %\VignetteDepends{TransitionModels}
+  %\VignetteDepends{transitreg}
   %\VignetteKeywords{transition models, first steps}
   %\VignettePackage{tm}
 ---
 
 ```{r preliminaries, echo=FALSE, message=FALSE, results="hide"}
-library("TransitionModels")
+library("transitreg")
 ```
 Transition models provide a flexible and powerful framework for modeling response variables that transition between discrete or continuous states. Unlike traditional models that rely on fixed distributional assumptions (e.g., Poisson or Gaussian), transition models focus on the conditional probabilities of transitioning between successive response levels. This makes them particularly useful for data where the underlying distribution is complex, overdispersed, zero-inflated, or exhibits heteroskedasticity.
 
@@ -69,4 +69,4 @@ This discretization enables the application of transition probabilities to conti
 - **Dynamic distributions**: By modeling conditional transitions, the response distribution is not fixed but depends on covariates, allowing for greater flexibility.
 - **Integration with GAMs**: Transition models are often implemented within GAM frameworks, leveraging smooth terms and complex interactions to improve predictive performance and interpretability.
 
-In this vignette, we will demonstrate the implementation and application of transition models using the `TransitionModels` package. The following sections provide practical examples and insights into their flexibility and versatility.
+In this vignette, we will demonstrate the implementation and application of transition models using the `transitreg` package. The following sections provide practical examples and insights into their flexibility and versatility.

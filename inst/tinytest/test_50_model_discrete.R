@@ -1,11 +1,12 @@
 # -------------------------------------------------------------------
-# Testing 'tm' for discrete response (count data).
+# Testing 'transitreg' for discrete response (count data).
 # TODO(R): Remove useC and comparison against the R version
 #          once we removed that.
 # -------------------------------------------------------------------
 
-suppressPackageStartupMessages(library("TransitionModels"))
-if (interactive()) library("tinytest")
+
+suppressPackageStartupMessages(library("tinytest"))
+suppressPackageStartupMessages(library("transitreg"))
 
 
 # ===================================================================
@@ -18,20 +19,25 @@ data("CD4", package = "gamlss.data")
 # -------------------------------------------------------------------
 # Estimating simple model, testing return object.
 # -------------------------------------------------------------------
-m1   <- tm(cd4 ~ theta, data = CD4, useC = TRUE)
+m1   <- transitreg(cd4 ~ theta, data = CD4)
 
-expect_inherits(m1, "tm", info = "Returnclass")
+expect_inherits(m1, "transitreg", info = "Returnclass")
 expect_true(is.list(m1))
 expected <- c("new_formula", "model", "response", "model.frame",
-              "maxcounts", "theta_vars", "factor", "probs")
+              "maxcounts", "theta_vars", "factor", "probs", "bins", "ym", "yc_tab", "breaks")
 expect_true(all(names(m1) %in% expected),
             info = "Checking if all expected elements are there")
+
+expect_true(is.null(m1$ym),       info = "Checking that 'ym' is NULL (discrete)")
+expect_true(is.null(m1$breaks),   info = "Checking that 'breaks' is NULL (discrete)")
+expect_identical(m1$bins, as.integer(ceiling(max(CD4$cd4) * 1.2)),
+                 info = "Checking number of bins (1.2 * max response)")
 
 
 # -------------------------------------------
 # checking element $new_formula
 # For comparison and convenience I am also testing
-# the S3 method formula.tm here and compare $new_formula
+# the S3 method formula.transitreg here and compare $new_formula
 # to the model formula.
 # -------------------------------------------
 expect_silent(f <- formula(m1), info = "Testing S3 method formula")
@@ -63,7 +69,7 @@ expect_identical(dim(m1$model.frame), c(nrow(CD4), 1L),
 
 expect_identical(m1$response, "cd4", info = "Value of $response (name of response variable)")
 
-expect_identical(m1$maxcounts, max(CD4$cd4), info = "Value of $maxcounts")
+expect_identical(m1$maxcounts, as.integer(max(CD4$cd4)), info = "Value of $maxcounts")
 
 expect_true(is.character(m1$theta_vars) && length(m1$theta_vars) == 0,
             info = "Value and length of $theta_vars")
@@ -71,9 +77,10 @@ expect_true(is.character(m1$theta_vars) && length(m1$theta_vars) == 0,
 expect_true(isFALSE(m1$factor), info = "Boolean value $factor")
 
 expect_inherits(m1$probs, "data.frame", info = "Class of $probs")
-expect_identical(dim(m1$probs), c(nrow(CD4), 2L), info = "Dimension of $probs")
-expect_identical(names(m1$probs), c("pdf", "cdf"), info = "Names of $probs")
-expect_true(all(m1$probs >= 0 & m1$probs <= 1), info = "All $probs in [0, 1]")
+expect_identical(dim(m1$probs), c(nrow(CD4), 2L),       info = "Dimension of $probs")
+expect_identical(names(m1$probs), c("pdf", "cdf"),      info = "Names of $probs")
+expect_true(all(m1$probs$cdf >= 0 & m1$probs$cdf <= 1), info = "All $probs$cdf in [0, 1]")
+expect_true(all(m1$probs$pdf >= 0),                     info = "All $probs$pdf in [0, Inf]")
 
 
 # -------------------------------------------
@@ -104,23 +111,13 @@ expect_equivalent(sum(m1$probs), 306.1717, tolerance = 1e-3, info = "sum($probs)
 
 
 
-# RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR
-# Rudimentary check against the R version
-m1_R <- tm(cd4 ~ theta, data = CD4)
-expect_equal(logLik(m1), logLik(m1_R), info = "Comparing R/C version")
-expect_equal(coef(m1), coef(m1_R),     info = "Comparing R/C version")
-rm(m1_R)
-# RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR
-
-
 # -------------------------------------------------------------------
 # Estimate the same model, specifying all default options to
 # test that they remain unchanged.
 # -------------------------------------------------------------------
-m2   <- tm(cd4 ~ theta, data = CD4,
+m2   <- transitreg(cd4 ~ theta, data = CD4,
            engine = "bam", scale.x = FALSE, breaks = NULL,
-           model = TRUE, ncores = NULL, verbose = FALSE,
-           useC = TRUE)
+           model = TRUE, ncores = NULL, verbose = FALSE)
 
 # Comparing m1 against m2 (rough check)
 expect_equal(logLik(m1), logLik(m2), info = "Checking results w/ default args")

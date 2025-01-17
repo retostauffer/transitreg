@@ -1,0 +1,15 @@
+
+bibentry(bibtype = "Article",
+    author  = c(person(given = "Moritz", family = "Berger"),
+                person(given = "Gerhard", family = "Tutz")),
+    title   = "Transition Models for Count Data: a Flexible Alternative to Fixed Distribution Models"
+    journal = "Statistical Methods {\&} Applications",
+    year    = "2021",
+    volume  = "30",
+    number  = "4",
+    pages   = "1259--1283",
+    doi     = "10.1007/s10260-021-00558-6",
+
+    header  = "To cite the original work on transition models for count data use:"
+)
+

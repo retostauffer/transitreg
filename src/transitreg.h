@@ -1,6 +1,8 @@
 
 /* Strongly inspired by the great mgcv package! */
 
+#include <stdbool.h>
+
 /* Most compilers with openMP support supply a pre-defined compiler macro
  * _OPENMP. Following facilitates selective turning off (by testing value or
  * defining multiple versions OPENMP_ON1, OPENMP_ON2...)
@@ -48,7 +50,15 @@
 typedef struct {
     int* index;
     int length;
-} tmWhich;
+} integerVec;
+
+/* Custom type: stuctured object with ...
+ * a double vector and length.
+ * NOTE: .values must be freed by the user! */
+typedef struct {
+    double* values;
+    int length;
+} doubleVec;
 
 /* The custom struct is used by find_position.
  * Searches for 'x' (int) in integer vector 'y' with a max length of 'n'.
@@ -57,15 +67,21 @@ typedef struct {
  *   -   .index:   integer vector. position of 'x' in 'y'.
  *   -   .length:  length of .index, or number of 'x' in 'y'.
  */
-tmWhich find_positions(int x, int* y, int n);
+integerVec find_positions(int x, int* y, int n);
 
-void fun(double *y, double *H);
-double tm_calc_pdf(int* positions, int count, double* pptr);
-double tm_calc_cdf(int* positions, int count, double* pptr);
-double tm_calc_pmax(int* positions, int count, double* pptr);
+void eval_bins_quantile(double* res, double* tmp, int* positions, int count, double* bkptr, double* prob, int np, bool disc);
 
-SEXP tm_predict(SEXP uidx, SEXP idx, SEXP p, SEXP type, SEXP prob, SEXP ncores);
-SEXP tm_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP p, SEXP ncores);
-SEXP tm_detect_cores();
+double interpolate_linear(double x1, double y1, double x2, double y2, double p);
+doubleVec treg_calc_pdf(int* positions, int count, double* tpptr, double* bkptr, int nbins, int* y, int ny);
+doubleVec treg_calc_cdf(int* positions, int count, double* tpptr, double* bkptr, int nbins, int* y, int ny);
+doubleVec treg_calc_quantile(int* positions, int count, double* tpptr, double* bkptr, double* prob, int np, bool disc);
+
+double treg_calc_pmax(int* positions, int count, double* pptr);
+double treg_calc_mean(int* positions, int count, double* tpptr, double* binsptr);
+
+SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
+                  SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete);
+SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks, SEXP ncores);
+SEXP treg_detect_cores();
 
 

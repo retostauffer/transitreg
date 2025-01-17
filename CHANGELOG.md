@@ -1,4 +1,24 @@
 
+## Version 0.1-9004
+
+* Major changes to the C code (removing the
+  dependency to know the original (numeric) response), fixed a few
+  smaller bugs.
+* Added proper dpqr support in addition to distributions3 methods:
+  dtransit, ptransit, qtransit, and rtransit.
+* Added proper handling for dpq functions if outside support.
+* Migrated to roxygen2 documentation.
+* Updated the prediction methods and functions.
+
+## Version 0.1-9003
+
+* Renamed the package from it's working title `TransitionModels`
+  to `transitreg` (Transitional Model Regression).
+* Various smaller and larger changes to both increase functionality
+  and performance (speed and memory footprint).
+* Added distributions3 support for the new model class via the
+  `Transition()` distribution object.
+
 ## Version 0.1-9002
 
 * Removed original base-R implementation which have been replaced

@@ -1,7 +1,7 @@
-Package: TransitionModels
+Package: transitreg
 Title: Flexible Transition Models for Probabilistic Learning
-Version: 0.1-9002
-Date: 2024-01-07
+Version: 0.1-9005
+Date: 2024-01-16
 Authors@R: c(person(
                given = "Nikolaus", 
                family = "Umlauf", 
@@ -20,8 +20,11 @@ Description: Provides infrastructure for estimating flexible transition models,
   supporting both count and continuous responses. For continuous responses, a 
   slicing trick is applied to estimate fully probabilistic models. 
 License: GPL-2 | GPL-3
-Depends: R (>= 4.1.0), mgcv, topmodels
+Depends: R (>= 4.1.0), mgcv, topmodels, distributions3
 Imports: Formula
-Suggests: colorspace, distributions3, nnet, quarto
+Suggests: colorspace, nnet, quarto, glmnet
 VignetteBuilder: quarto
-
+LazyData: yes
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2

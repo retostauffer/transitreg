@@ -2,132 +2,125 @@
 # Testing implementation of CDF, PDF, pmax
 # -------------------------------------------------------------------
 
-suppressPackageStartupMessages(library("TransitionModels"))
-if (interactive()) library("tinytest")
+suppressPackageStartupMessages(library("tinytest"))
+suppressPackageStartupMessages(library("transitreg"))
 
 # -------------------------------------------------------------------
-# Drawing probability for x = 0:10 from a binomial distribution.
-# This represents the probabilities for different outcomes
-# for one specific observation y in Y.
+# Drawing probability for x = 0:15 from a Poisson distribution.
+# Convert CDF to transition probabilities for testing.
 # -------------------------------------------------------------------
-Y  <- 0:10
-pp <- dbinom(0:11, 7, 0.4)
+pp <- ppois(0:15, lambda = 5)
+dd <- dpois(0:15, lambda = 5)
+
+
+# Testing misuse
+expect_error(convert_tp(), info = "No input arguments")
+expect_error(convert_tp(0.5, "cdf"), info = "Not enough input arguments")
+expect_error(convert_tp(pp, from = 1, to = "cdf"), pattern = "'arg' should be one of", info = "Argument 'from' wrong")
+expect_error(convert_tp(pp, from = "cdf", to = "foo"), pattern = "'arg' should be one of", info = "Argument 'to' wrong")
+expect_error(convert_tp(LETTERS[1:3], "cdf", "tp"), info = "Argument 'x' not numeric")
+expect_error(convert_tp(numeric(), "cdf", "tp"), info = "Argument 'x' of length 0")
+
+# If input is tp: All values must be in [0, 1] and monotonically decreasing
+expect_error(convert_tp(c(NA, 0.3, 0.5), "tp", "cdf"), info = "Missing value(s)")
+
+expect_error(convert_tp(seq(1.2, 0.5, length.out = 3), "tp", "cdf"), info = "Values outside expected range")
+expect_error(convert_tp(seq(0.5, -0.5, length.out = 3), "tp", "cdf"), info = "Values outside expected range")
+expect_error(convert_tp(seq(0.2, 0.5, length.out = 3), "tp", "cdf"), info = "Values not monotonically decreasing")
+
+expect_error(convert_tp(seq(1.2, 0.5, length.out = 3), "cdf", "tp"), info = "Values outside expected range")
+expect_error(convert_tp(seq(0.5, -0.5, length.out = 3), "cdf", "tp"), info = "Values outside expected range")
+expect_error(convert_tp(seq(0.5, 0.2, length.out = 3), "cdf", "tp"), info = "Values not monotonically increasing")
+
+
+# Convert cdf -> tp
+expect_silent(tp <- convert_tp(pp, from = "cdf", to = "tp"),
+              info = "Converstion from cdf to tp (width = NULL)")
+expect_identical(convert_tp(pp, "cdf", "tp", NULL, TRUE),
+              tp, info = "Testing default arguments and argument order")
+
+# Converting tp back to CDF, PDF (width = NULL)
+expect_silent(p1 <- convert_tp(tp, from = "tp", to = "cdf"),  info = "Covnerting from tp to cdf")
+expect_equal(p1, pp,                                          info = "Result of tp -> cdf")
+expect_silent(d1 <- convert_tp(tp, from = "tp", to = "pdf"),  info = "Covnerting from tp to pdf")
+expect_equal(d1, dd,                                          info = "Result of tp -> pdf")
+rm(d1, p1)
+
+# Checking evaluation of from/to
+expect_equal(tp, convert_tp(pp, "CDF", "TP"))
+expect_equal(tp, convert_tp(pp, "C", "T"))
+
+# Convert to cdf/pdf all at once
+expect_silent(pd1 <- convert_tp(tp, from = "tp", to = c("cdf", "pdf")),
+              info = "Covnerting from tp to cdf and pdf")
+expect_equal(pd1, data.frame(cdf = pp, pdf = dd),             info = "Testing result")
+expect_silent(pd2 <- convert_tp(tp, from = "tp", to = c("cdf", "pdf"), drop = TRUE),
+              info = "Testing that drop = TRUE has no effect here")
+expect_equal(pd2, data.frame(cdf = pp, pdf = dd),             info = "Testing result")
+rm(pd1, pd2)
+
+# Keeping names
+names(tp) <- LETTERS[seq_along(tp)]
+expect_silent(p1 <- convert_tp(tp, "tp", "cdf"),              info = "Covnerting from tp to cdf (named)")
+expect_equal(setNames(pp, names(tp)), p1,                     info = "Result of tp -> cdf (named)")
+expect_silent(pd <- convert_tp(tp, "tp", c("cdf", "pdf")),    info = "Covnerting from tp to cdf and pdf (named)")
+expect_equal(structure(data.frame(cdf = pp, pdf = dd), row.names = names(tp)), pd, info = "Result of tp to cdf and pdf (named)")
+rm(p1, pd)
+
+# Testing width argument
+expect_identical(convert_tp(tp, "tp", "cdf", width = NULL),
+                 convert_tp(tp, "tp", "cdf", width = 1.234),
+                 info = "Width must have no effect on CDF")
+
+expect_identical(convert_tp(tp, "tp", "pdf", width = NULL),
+                 convert_tp(tp, "tp", "pdf", width = 1),
+                 info = "Result with width = NULL and width 1 must be identical")
+expect_identical(convert_tp(tp, "tp", "pdf", width = NULL),
+                 convert_tp(tp, "tp", "pdf", width = rep(1.0, length(tp))),
+                 info = "Result with width = NULL and width 1 must be identical")
+expect_identical(convert_tp(tp, "tp", "pdf", width = NULL) / 0.5,
+                 convert_tp(tp, "tp", "pdf", width = 0.5),
+                 info = "Width set to 0.5, must scale the CDF.")
+
 
 # -------------------------------------------------------------------
 # R implementation of calculating the CDF and PDF
 # -------------------------------------------------------------------
-
-#                        y                   y-1
-# CDF: (1 - P(y = 0)) + sum (1 - P(y = i)) * prod P(y = j)
-#                       i=1                  j=1
-#
-# Note that in the R implementation r is the index (r = 1 equals y = 0)
-man_cdf <- function(r, p) {
-    res <- (1 - p[1])
-    if (r > 1) { for (i in 2:r) res <- res + (1 - p[i]) * prod(p[1:(i-1)]) } 
-    return(res)
+fn <- function(i, tp, binwidth = 1) {
+    tp <- tp[seq_len(i)] # Take first 'i' values
+    # Fake bins: width 1
+    bins <- seq(binwidth / 2, by = binwidth, length.out = i + 1)
+    ynum <- (tail(bins, -1) + head(bins, -1)) / 2
+    # Calculate numeric value falling into the last bin
+    ynum <- mean(tail(bins, 2))
+    # Convert numeric response to 'bin' representation (num2bin)
+    y    <- transitreg:::num2bin(ynum, bins)
+    res <- .Call("treg_predict_pdfcdf",
+                 uidx = 42L, idx = rep(42L, length(tp)), tp = tp,
+                 y = y, bins = bins, ncores = 1L, PACKAGE = "transitreg")
+    return(data.frame(res))
 }
+tp <- convert_tp(pp, from = "cdf", to = "tp")
+res <- do.call(rbind, lapply(seq_along(tp), fn, tp = tp))
+expect_equal(res$pdf, dd)
+expect_equal(res$cdf, pp)
 
-#          y-1
-# PDF: 1 * prod P(y = i) * (1 - P(y = y))
-#          i=1
-#
-# Note that in the R implementation r is the index (r = 1 equals y = 0)
-man_pdf <- function(r, p) {
-    res <- 1
-    if (r > 1) { for (i in seq_len(r - 1)) res <- res * p[i] }
-    return(res * (1 - p[r]))
-}
+# Calling transitreg_predict
+bins <- seq(-0.5, by = 1, length.out = length(tp) + 1)
+p3 <- .Call("treg_predict", uidx = 3L, idx = rep(3L, length(tp)), tp = tp,
+            bins = bins, y = 0:15, prob = NA_real_, type = "cdf",
+            cors = 1L, elementwise = FALSE, discrete = TRUE)
+expect_equal(pp, p3)
+d3 <- .Call("treg_predict", uidx = 3L, idx = rep(3L, length(tp)), tp = tp,
+            bins = bins, y = 0:15, prob = NA_real_, type = "pdf",
+            cores = 1L, elementwise = FALSE, discrete = TRUE)
+expect_equal(dd, d3)
 
-
-# Calculate CDF and PDF for each y in Y
-res_manual <- data.frame(pdf = sapply(Y + 1, man_pdf, p = pp),
-                         cdf = sapply(Y + 1, man_cdf, p = pp),
-                         y = Y)
-
-# -------------------------------------------------------------------
-# Doing the same but using the C implementation
-# -------------------------------------------------------------------
-# Again, r is the index not y itself, so r = 1 equals y = 0
-tm_fun <- function(r, p) {
-    # Index 42 is just a random index
-    x <- as.data.frame(.Call("tm_predict_pdfcdf", 42L, rep(42L, r), p = p[1:r], 1L,
-                   PACKAGE = "TransitionModels"))
-    return(transform(x, y = r - 1))
-}
-
-# Testing if tm_predict_pdfcdf is callable and returns what it should return
-expect_silent(tmp <- tm_fun(3, pp),
-              info = "Calling tm_predict_pcfcdf, checking return")
-expect_inherits(tmp, "data.frame")
-expect_identical(dim(tmp), c(1L, 3L))
-expect_identical(names(tmp), c("pdf", "cdf", "y"))
-rm(tmp)
-
-# Calculate PDF and CDF for all y in Y
-expect_silent(res_tm <- do.call(rbind, lapply(Y + 1, tm_fun, p = pp)),
-              info = "Calculating CDF/PDF for y in Y")
-expect_inherits(res_tm, "data.frame")
-expect_identical(dim(res_tm), c(11L, 3L))
-expect_identical(names(res_tm), c("pdf", "cdf", "y"))
-rm(tm_fun)
-
-# -------------------------------------------------------------------
-# When everything works as expected, res_manual and res_tm
-# should be all equal.
-# -------------------------------------------------------------------
-expect_equal(res_tm, res_manual,
-             info = "Comparing results of manual and C implementation")
-
-# -------------------------------------------------------------------
-# Above we've used tm_predict_pdfcdf which calcultes both CDF and PDF,
-# now testing against tm_predict which returns either CDF or PDF,
-# or pmax (tested later).
-# -------------------------------------------------------------------
-# prob = 42 is a dummy value (must be double; not used)
-tm_fun2 <- function(r, p, type, prob = 42.0) {
-    # Index 666 is just a random index
-    .Call("tm_predict", 666L, rep(666L, r), p = p[1:r], type, prob, 1L,
-          PACKAGE = "TransitionModels")
-}
-
-# First testing if the function tm_fun2 works as expected, and that
-# the C function is callable as expected.
-expect_silent(tmp <- tm_fun2(3L, pp, "cdf"), info = "Testing tm_fun2 for type CDF")
-expect_true(is.numeric(tmp) && length(tmp) == 1L, info = "Returns one single numeric")
-rm(tmp)
-expect_silent(tmp <- tm_fun2(3L, pp, "pdf"), info = "Testing tm_fun2 for type CDF")
-expect_true(is.numeric(tmp) && length(tmp) == 1L, info = "Returns one single numeric")
-rm(tmp)
-
-# Calculating PDF/CDF using tm_predict for all y in Y and compare
-# against the results from above; should be all equal.
-expect_silent(res_tm2 <- data.frame(pdf = sapply(Y + 1, tm_fun2, p = pp, type = "pdf"),
-                                    cdf = sapply(Y + 1, tm_fun2, p = pp, type = "cdf"),
-                                    y   = Y))
-expect_equal(res_tm, res_tm2,
-             info = "Comparing results from tm_predict_pdfcdf and tm_predict")
 
 
 # -------------------------------------------------------------------
 # Checking 'pmax'
 # -------------------------------------------------------------------
 
-# pmax; internally uses man_pdf and returns the position of maximum
-# probability. Used to check correctness of tm_predict(..., type = "pmax")
-# implemented in C.
-man_pmax <- function(r, p) {
-    x <- sapply(seq_len(r), man_pdf, p = p)
-    return(which.max(x) - 1)
-}
-pmax_man <- sapply(Y + 1, man_pmax, p = pp)
+# TODO(R): Update and check 'pmax', write tests.
 
-# Re-using 'tm_fun2' defined above with type = 'pmax'
-expect_silent(pmax_tm <- sapply(Y + 1, tm_fun2, p = pp, type = "pmax"),
-              info = "Getting pmax via C")
-expect_true(is.numeric(pmax_tm) && length(pmax_tm) == length(Y),
-            info = "Checking return")
-expect_identical(pmax_man, pmax_tm,
-            info = "Comparing results for 'pmax'; manual implementation vs. C")
-
-## TODO(R): Is pmax doing what it is intended to do and in any kind useful?

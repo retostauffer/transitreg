@@ -1,6 +1,5 @@
 
 if (requireNamespace("tinytest", quietly = TRUE)) {
-    require("tinytest")
-    test_package("TransitionModels")
+    test_package("transitreg")
 }
 
