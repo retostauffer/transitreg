@@ -30,8 +30,8 @@ expect_true(all(names(m1) %in% expected),
 
 expect_true(is.null(m1$ym),       info = "Checking that 'ym' is NULL (discrete)")
 expect_true(is.null(m1$breaks),   info = "Checking that 'breaks' is NULL (discrete)")
-expect_identical(m1$bins, as.integer(ceiling(max(CD4$cd4) * 1.2)),
-                 info = "Checking number of bins (1.2 * max response)")
+expect_identical(m1$bins, as.integer(ceiling(max(CD4$cd4) * 1.25)),
+                 info = "Checking number of bins (1.25 * max response as n > 100)")
 
 
 # -------------------------------------------

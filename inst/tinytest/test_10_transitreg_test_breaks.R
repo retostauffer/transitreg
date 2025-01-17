@@ -23,8 +23,8 @@ expect_inherits(m1, "transitreg",
                info = "Checking return class")
 expect_true("bins" %in% names(m1),
                info = "Element 'bins' must be stored in the model")
-expect_identical(m1$bins, as.integer(max(ndp$y) * 2),
-               info = "Checking number of bins")
+expect_identical(m1$bins, as.integer(max(ndp$y) * 3),
+               info = "Checking number of bins (max response value * 3 as n <= 10)")
 expect_identical(m1$breaks, NULL,
                info = "No user-defined breaks, thus 'breaks' must be NULL")
 rm(m1)
