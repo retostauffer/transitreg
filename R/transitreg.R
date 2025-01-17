@@ -965,6 +965,7 @@ transitreg_dist <- function(y, data = NULL, ...) {
 #' @keywords methods models visualization
 #'
 #' @exportS3Method plot transitreg
+#' @importFrom topmodels qqrplot wormplot rootogram
 #' @importFrom stats residuals
 #' @importFrom graphics par
 plot.transitreg <- function(x, which = "effects", spar = TRUE, k = 5, ...)
@@ -1001,17 +1002,9 @@ plot.transitreg <- function(x, which = "effects", spar = TRUE, k = 5, ...)
     on.exit(par(oma))
   }
 
-  if ("hist-resid" %in% which) {
-    plot_hist(resids, ...)
-  }
-
-  if ("qq-resid" %in% which) {
-    plot_qq(resids, ...)
-  }
-
-  if ("wp-resid" %in% which) {
-    plot_wp(resids, ...)
-  }
+  if ("hist-resid" %in% which) rootogram(x, ...)
+  if ("qq-resid" %in% which) qqrplot(x, ...)
+  if ("wp-resid" %in% which) wormplot(b, ...)
 }
 
 #' @exportS3Method summary transitreg
@@ -1215,6 +1208,10 @@ predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
   return(do.call(transitreg_predict, args))
 }
 
+#' @param object Transition model, object of class `transitreg`.
+#' @param newdata An optional data frame in which to look for variables with
+#'        which to predict. If omitted, the fitted values are used.
+#'
 #' @importFrom stats runif
 #'
 #' @author Niki

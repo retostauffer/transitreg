@@ -346,7 +346,7 @@ plot_wp <- function(x, ...) {
 #' barplot(tp, col = "steelblue", main = "Transition Probabilities")
 #' col <- c("gray80", "tomato")
 #' barplot(rbind(p, p2), beside = TRUE, main = "CDF Comparison", col = col)
-#' barplot(rbind(d, d2), beside = TRUE, main = "PDF Comparison", col = col)
+#' barplot(rbind(d, d2$pdf), beside = TRUE, main = "PDF Comparison", col = col)
 #'
 #' @author Reto
 #' @export
@@ -361,7 +361,7 @@ convert_tp <- function(x, from, to, width = NULL, drop = TRUE) {
     to   <- match.arg(to,   c("cdf", "pdf", "tp"), several.ok = TRUE)
 
     # Checking range
-    if (from == c("tp", "cdf") & !all(x <= 1.0))
+    if (from %in% c("tp", "cdf") & !all(x <= 1.0))
         stop("if from = \"", from, "\" all 'x' must be in [0, 1]")
 
     # Evaluate input argument 'width'. If width = NULL no weighting
@@ -537,6 +537,7 @@ num2bin <- function(x, breaks) {
 #' @param y numeric vector with response data.
 #' @param breaks number of breaks to be created (single integer).
 #' @param scale logical, scaling involved?
+#' @param \dots currently ignored.
 #'
 #' @return Returns a numeric vector with the breaks.
 make_breaks <- function(y, breaks = 30, scale = FALSE , ...) {

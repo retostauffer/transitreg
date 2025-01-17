@@ -57,6 +57,11 @@ the return object.}
 should be printed. Default is \code{FALSE}.}
 
 \item{\dots}{Additional arguments to be passed to the estimation engine.}
+
+\item{object}{Transition model, object of class \code{transitreg}.}
+
+\item{newdata}{An optional data frame in which to look for variables with
+which to predict. If omitted, the fitted values are used.}
 }
 \value{
 An object of class \code{"transitreg"}, which includes the following components:

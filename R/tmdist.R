@@ -22,7 +22,7 @@ tm_dist <- function(y, data = NULL, ...)
   }
 
   ## Estimate model.
-  b <- tm(f, data = data, ...)
+  b <- transitreg(f, data = data, ...)
 
   if (inherits(y, "formula"))
     y <- model.response(b$model.frame)
@@ -75,6 +75,7 @@ tm_dist <- function(y, data = NULL, ...)
 
 #' @author Niki
 #' @rdname tmdist
+#' @importFrom topmodels rootogram
 #' @exportS3Method rootogram tmdist
 rootogram.tmdist <- function(object, newdata = NULL, plot = TRUE,
   width = 0.9, style = c("hanging", "standing", "suspended"),

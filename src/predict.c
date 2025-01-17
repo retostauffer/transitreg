@@ -104,7 +104,7 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
 
     // Store CDF from tmp[y] to res.values
     for (int i = 0; i < ny; i++) {
-        if (y[i] < 0 | y[i] >= nbins) {
+        if ((y[i] < 0) | (y[i] >= nbins)) {
             res.values[i] = 0.0; // Below or above support
         } else {
             res.values[i] = tmp[y[i]];

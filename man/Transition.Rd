@@ -18,6 +18,7 @@
 \alias{is_discrete.Transition}
 \alias{is_continuous.Transition}
 \alias{support.Transition}
+\alias{plot.Transition}
 \title{Creates a Transition Distribution}
 \usage{
 Transition(x, breaks, discrete = NULL)
@@ -53,6 +54,8 @@ rtransit(n, d, ncores = NULL)
 \method{is_continuous}{Transition}(d, ...)
 
 \method{support}{Transition}(d, drop = NULL, ...)
+
+\method{plot}{Transition}(x, type = c("tp", "cdf", "pdf"), all = FALSE, n = 8L, ...)
 }
 \arguments{
 \item{x}{Numeric, vector of quantiles.}
@@ -68,9 +71,16 @@ count data breaks (\code{c(-0.5, 0.5, 1.5, ...)}) discrete will be set
 
 \item{d}{An object of class \code{Transition}.}
 
+\item{log, log.p}{Logical, if \code{TRUE}, probabilities \code{p} are given as \code{log(p)}.}
+
 \item{ncores}{Number of cores to be used (see \code{\link[=transitreg]{transitreg()}} for details).}
 
-\item{n}{Integer \verb{>0}, number of random values to be drawn per distribution.}
+\item{lower.tail}{Logical, if \code{TRUE} (default), probabilities are
+\code{P[X <= x]} otherwise, \code{P[X > x]}.}
+
+\item{p}{Numeric, vector of probabilities.}
+
+\item{n}{Integer. Maximum number of distributions to be plotted, defaults to 8.}
 
 \item{\dots}{unused.}
 
@@ -91,6 +101,12 @@ means that \code{elementwise = TRUE} is used if the lengths match and otherwise
 moved to the nearby endpoint.) TODO(R): SURE?}
 
 \item{na.rm}{Unused.}
+
+\item{type}{Character, type of plot to be created. Either
+\code{"tp"} (transition probabilities), \code{"cdf"} or \code{"pdf"}.}
+
+\item{all}{Logical. If \code{TRUE} all distributions in \code{x} will be drawn.
+Else only the first N ones (default is 8).}
 }
 \value{
 Returns an object of class \code{c("Transition", "distribution")}.

@@ -76,7 +76,7 @@ all.equal(d, d2$pdf)
 barplot(tp, col = "steelblue", main = "Transition Probabilities")
 col <- c("gray80", "tomato")
 barplot(rbind(p, p2), beside = TRUE, main = "CDF Comparison", col = col)
-barplot(rbind(d, d2), beside = TRUE, main = "PDF Comparison", col = col)
+barplot(rbind(d, d2$pdf), beside = TRUE, main = "PDF Comparison", col = col)
 
 }
 \author{

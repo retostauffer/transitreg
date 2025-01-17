@@ -12,6 +12,8 @@ make_breaks(y, breaks = 30, scale = FALSE, ...)
 \item{breaks}{number of breaks to be created (single integer).}
 
 \item{scale}{logical, scaling involved?}
+
+\item{\dots}{currently ignored.}
 }
 \value{
 Returns a numeric vector with the breaks.

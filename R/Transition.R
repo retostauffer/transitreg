@@ -73,6 +73,8 @@ Transition <- function(x, breaks, discrete = NULL) {
 
 
 
+#' @param log,log.p Logical, if `TRUE`, probabilities `p` are given as `log(p)`.
+#'
 #' @rdname Transition
 #' @export
 dtransit <- function(x, d, log = FALSE, ncores = NULL) {
@@ -91,6 +93,9 @@ dtransit <- function(x, d, log = FALSE, ncores = NULL) {
 }
 
 
+#' @param lower.tail Logical, if `TRUE` (default), probabilities are
+#'        `P[X <= x]` otherwise, `P[X > x]`.
+#'
 #' @rdname Transition
 #' @export
 ptransit <- function(x, d, lower.tail = TRUE, log.p = FALSE, ncores = NULL) {
@@ -113,6 +118,8 @@ ptransit <- function(x, d, lower.tail = TRUE, log.p = FALSE, ncores = NULL) {
     return(if (log.p) log(res) else res)
 }
 
+#' @param p Numeric, vector of probabilities.
+#'
 #' @rdname Transition
 #' @export
 qtransit <- function(p, d, lower.tail = TRUE, log.p = FALSE, ncores = NULL) {
@@ -731,32 +738,42 @@ support.Transition <- function(d, drop = NULL, ...) {
 }
 
 
+#' @param type Character, type of plot to be created. Either
+#'        `"tp"` (transition probabilities), `"cdf"` or `"pdf"`.
+#' @param all Logical. If `TRUE` all distributions in `x` will be drawn.
+#'        Else only the first N ones (default is 8).
+#' @param n Integer. Maximum number of distributions to be plotted, defaults to 8.
+#'
 #' @importFrom utils head tail
 #' @importFrom graphics matplot axis
 #' @exportS3Method plot Transition
-plot.Transition <- function(d, type = c("tp", "cdf", "pdf"), p = c(0.1, 99.9), len = 1000,
-                            all = FALSE, ...) {
-
+#' @rdname Transition
+plot.Transition <- function(x, type = c("tp", "cdf", "pdf"), all = FALSE, n = 8L, ...) {
+    stopifnot("'all' must be TRUE or FALSE" = isTRUE(all) || isFALSE(all))
+    n <- as.integer(n)[1]
+    stopifnot("'n' cannot be coerced to integer > 0L" =
+              is.integer(n) && length(n) == 1L && n > 0L)
 
     type <- match.arg(type)
     titles <- c("tp"  = "Transition Probabilities",
                "cdf" = "Distribution",
                "pdf" = "Density")
-    breaks <- attr(d, "breaks")
+    breaks <- attr(x, "breaks")
 
-    if (length(d) > 8 & !all) d <- d[1:8]
+    # Take first 1:n distributions only
+    if (length(x) > n & !all) x <- x[seq_len(n)]
 
-    breaks <- attr(d, "breaks")
+    breaks <- attr(x, "breaks")
 
     if (type == "tp") {
         x <- (head(breaks, -1) + tail(breaks, -1)) / 2 # Mid of bin
-        m <- as.matrix(d)
+        m <- as.matrix(x)
     } else if (type == "cdf") {
-        x <- seq(min(breaks), max(breaks), length.out = len)
-        m <- cdf(d, x, elementwise = FALSE, drop = FALSE)
+        x <- seq(min(breaks), max(breaks), length.out = length(x))
+        m <- cdf(x, x, elementwise = FALSE, drop = FALSE)
     } else {
-        x <- seq(min(breaks), max(breaks), length.out = len)
-        m <- pdf(d, x, elementwise = FALSE, drop = FALSE)
+        x <- seq(min(breaks), max(breaks), length.out = length(x))
+        m <- pdf(x, x, elementwise = FALSE, drop = FALSE)
     }
 
     matplot(x = x, y = t(m), type = "l",
