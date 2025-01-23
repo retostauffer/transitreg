@@ -419,10 +419,11 @@ transitreg_predict <- function(object, newdata = NULL,
     } else {
         newresponse <- rep(object$bins - 1, nrow(mf))
     }
-  } else {
+    mf[[object$response]] <- newresponse
+  } else if (!is.null(y)) {
     newresponse <- if (elementwise) y else rep(max(y), nrow(mf))
+    mf[[object$response]] <- newresponse
   }
-  mf[[object$response]] <- newresponse
 
   # -----------------------------------------------------------------
   ## Setting up transitreg response and model matrix for the binary
@@ -502,7 +503,6 @@ transitreg_predict <- function(object, newdata = NULL,
                discrete    = discrete)     # Discrete distribution?
 
   # Calling C
-  str(args)
   args <- check_args_for_treg_predict(args)
   res  <- do.call(function(...) .Call("treg_predict", ...), args)
 

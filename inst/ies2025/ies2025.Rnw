@@ -318,13 +318,15 @@ if(!file.exists("ts_hist.png")) {
   m <- transitreg(sqrt_pre ~ theta0 + s(theta,k=20), data = df, breaks = breaks)
 
   nd <- data.frame("sqrt_pre" = 0:m$maxcounts)
-  devtools::load_all("../../"); pm <- predict(m, newdata = nd, type = "pdf")
-
   pm <- predict(m, newdata = nd, type = "pdf")
 
   mids <- (breaks[-1] + breaks[-length(breaks)]) / 2
-  w <- diff(breaks)
-  dm <- pm/w
+
+  ## TODO(R): Da geht was schief mit der normalen predict methode
+  dm <- as.vector(predict(m, type = "pdf", y = mids)[1, ])
+  library("topmodels")
+  dm <- pdf(m[1], mids)
+
 
   b <- bamlss(sqrt_pre ~ 1, data = df, family = cnorm_bamlss)
   par <- predict(b, newdata = data.frame("sqrt_pre" = mids), type = "parameter")
@@ -345,10 +347,7 @@ if(!file.exists("ts_hist.png")) {
   g2 <- mqgam(sqrt_pre ~ s(day,k=20,bs="cc"), data = dtrain, qu = qu)
 
   nd <- data.frame("day" = 0:365)
-  pm2 <- do.call("cbind",
-    lapply(qu, function(j) {
-      predict(m2, newdata = dtest, prob = j)
-  }))
+  pm2 <- predict(m2, newdata = dtest, prob = qu, type = "quantile")
 
   par <- predict(b2, newdata = dtest, type = "parameter")
   pb2 <- do.call("cbind",
@@ -370,6 +369,7 @@ if(!file.exists("ts_hist.png")) {
   err_b <- sum(err_b)
   err_m <- sum(err_m)
   err_g <- sum(err_g)
+  print(c(err_bamlss = err_b, err_transitreg = err_m, err_qgam = err_g))
 
   png("ts_hist.png", units = "in", res = 200, width = 8, height = 4)
 

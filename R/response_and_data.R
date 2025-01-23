@@ -27,7 +27,6 @@ transitreg_response <- function(x, response, breaks, verbose = FALSE, ...) {
     stopifnot(
         "'x' must be a data.frame with positive dimensions" =
             is.data.frame(x) && length(dim(x)) == 2L && all(dim(x) > 0),
-        "all variables in 'x' must be numeric" = all(sapply(x, is.numeric)),
         "'response' must be character of length 1" = is.character(response) && length(response) == 1L,
         "'response' variable not found in 'x'!" = response %in% names(x),
         "'breaks' must be numeric or NULL" = is.numeric(breaks) || is.null(breaks)
