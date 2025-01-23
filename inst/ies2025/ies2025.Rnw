@@ -51,7 +51,7 @@
 <<preliminaries, echo=FALSE, results=hide>>=
 options(width = 70, prompt = "R> ", continue = "+  ",
   SweaveHooks = list(fig = function() par(mar = c(4.1, 4.1, 1, 1))))
-library("TransitionModels")
+library("transitreg")
 library("qgam")
 library("gamlss2")
 library("gamlss.cens")
@@ -312,12 +312,14 @@ if(!file.exists("ts_hist.png")) {
   i <- sample(1:2, size = nrow(df), prob = c(0.8, 0.4), replace = TRUE)
   dtrain <- subset(df, i < 2)
   dtest <- subset(df, i > 1)
-  
+
   breaks <- c(-0.15, seq(0.15, floor(max(df$sqrt_pre)) + 1, by = 0.3))
 
-  m <- tm(sqrt_pre ~ theta0 + s(theta,k=20), data = df, breaks = breaks)
+  m <- transitreg(sqrt_pre ~ theta0 + s(theta,k=20), data = df, breaks = breaks)
 
   nd <- data.frame("sqrt_pre" = 0:m$maxcounts)
+  devtools::load_all("../../"); pm <- predict(m, newdata = nd, type = "pdf")
+
   pm <- predict(m, newdata = nd, type = "pdf")
 
   mids <- (breaks[-1] + breaks[-length(breaks)]) / 2
@@ -333,7 +335,7 @@ if(!file.exists("ts_hist.png")) {
 
   breaks2 <- c(-0.1, seq(0.1, floor(max(df$sqrt_pre)) + 1, by = 0.05))
 
-  m2 <- tm(f, data = dtrain, breaks = breaks2)
+  m2 <- transitreg(f, data = dtrain, breaks = breaks2)
 
   f <- sqrt_pre ~ s(day,k=20,bs="cc") | s(day,k=20,bs="cc")
   b2 <- bamlss(f, data = dtrain, family = cnorm_bamlss, binning = TRUE)
@@ -445,7 +447,7 @@ if(!file.exists("premodel.png") & FALSE) {
     ti(theta,alt) +
     ti(theta,lon,lat,d=c(1,2),bs=c("cr","tp"),k=c(5,30))
 
-  m1 <- tm(f1, data = dtrain, breaks = breaks)
+  m1 <- transitreg(f1, data = dtrain, breaks = breaks)
 
   f2 <- sqrt_pre ~ s(day,bs="cc",k=20) + s(alt,k=5) + s(lon,lat) +
     te(day,lon,lat,d=c(1,2),bs=c("cr","tp"),k=c(5,30)) |

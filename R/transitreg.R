@@ -181,11 +181,11 @@ transitreg <- function(formula, data, subset, na.action,
   ff2[3L] <- ff[2L]
   ff2 <- update(ff2, ~ . - theta)
 
-  tv <- all.vars(ff2)
-  tv <- grep("theta", tv, value = TRUE)
-  tv <- tv[tv != "theta"]
-  if (length(tv)) {
-    for (j in tv)
+  theta_vars <- all.vars(ff2)
+  theta_vars <- grep("theta", theta_vars, value = TRUE)
+  theta_vars <- theta_vars[theta_vars != "theta"]
+  if (length(theta_vars)) {
+    for (j in theta_vars)
       ff2 <- eval(parse(text = paste0("update(ff2, . ~ . -", j, ")")))
   }
 
@@ -198,47 +198,29 @@ transitreg <- function(formula, data, subset, na.action,
 
   yscale <- NULL
 
-  ## Discretize response?
-  if (bin.y <- !is.null(breaks)) {
-    if (length(breaks) == 1L) {
-      breaks <- make_breaks(model.response(mf), breaks = breaks)
-    }
-    bins <- length(breaks) - 1L
+  ## ----------------------------------------------------------------
+  ## Setting up model response; discretizises the data if needed.
+  ## ----------------------------------------------------------------
+  tmp    <- transitreg_response(mf, response, breaks, ...)
+  # Store returned values
+  # TODO(R): This is not sexy but works
+  mf     <- tmp$mf
+  bins   <- tmp$bins
+  breaks <- tmp$breaks
+  ym     <- tmp$ym
+  yc     <- tmp$yc
+  rm(tmp)
 
-    ## Discretize numeric response into counts.
-    yc <- num2bin(model.response(mf), breaks)
-    ym <- (breaks[-1] + breaks[-length(breaks)]) / 2
+  ## Max. counts.
+  ymax <- max(mf[[response]], na.rm = TRUE)
+  k    <- min(c(ymax - 1L, 20L))
 
-    lower <- list(...)$lower
-    upper <- list(...)$upper
-
-    if (!is.null(lower))
-      ym[ym < lower] <- lower
-    if (!is.null(upper))
-      ym[ym > upper] <- upper
-
-    mf[[response]] <- yc
-  } else {
-    ## For the model we need an integer response; check if the response
-    ## is integer. If not, break.
-    if (!all(mf[[response]] %% 1 < sqrt(.Machine$double.eps)) &&
-        all(mf[[response]] > sqrt(.Machine$double.eps)))
-        stop("Response is not looking like count data (integers); binning via 'breaks' is required.")
-    mf[[response]] <- as.integer(round(mf[[response]], 1))
-
-    bins <- max(mf[[response]])
-    ## Setting highest 'bin' to max(response) * mp (multiplier)
-    mp     <- if (bins <= 10) { 3 } else if (bins <= 100) { 1.5 } else { 1.25 }
-    bins   <- as.integer(ceiling(bins * mp))
-    breaks <- seq_len(bins + 1) - 1.5 # 'Integer' bins
-    if (verbose) message("Response considered to be count data, using max count ", bins - 1)
-  }
-
-  ## Scaling data.
+  ## Scaling covariates if requrested by user.
   scaler <- NULL
-  if (scale.x & (ncol(mf) > 1L)) {
+  if (scale.x && ncol(mf) > 1L) {
     scaler <- list()
     for (j in names(mf)[-1L]) {
+        print(j)
       if (!is.factor(mf[[j]])) {
         scaler[[j]] <- list("mean" = mean(mf[[j]]), "sd" = sd(mf[[j]]))
         mf[[j]] <- (mf[[j]] - scaler[[j]]$mean) / scaler[[j]]$sd
@@ -246,20 +228,17 @@ transitreg <- function(formula, data, subset, na.action,
     }
   }
 
-  ## Max. counts.
-  ymax <- max(mf[[response]], na.rm = TRUE)
-  k <- min(c(ymax - 1L, 20L))
-
   ## Transform data.
-  tmf <- transitreg_data(mf, response = response, verbose = verbose)
+  tmf <- transitreg_data(mf, response = response, theta_vars = theta_vars, verbose = verbose)
 
+  ## Scaling 'theta' column
   if (!is.null(scaler)) {
     scaler$theta <- list("mean" = mean(tmf$theta), "sd" = sd(tmf$theta))
     tmf$theta <- (tmf$theta - scaler$theta$mean) / scaler$theta$sd
   }
 
-  if (length(tv)) {
-    for (j in tv) {
+  if (length(theta_vars)) {
+    for (j in theta_vars) {
       i <- as.integer(gsub("theta", "", j))
       tmf[[j]] <- as.integer(tmf$theta == i)
     }
@@ -302,7 +281,7 @@ transitreg <- function(formula, data, subset, na.action,
   rval$model.frame <- mf       # Model frame (with 'binned' response)
   rval$scaler      <- scaler
   rval$maxcounts   <- max(mf[[response]]) # Highest count in response
-  rval$theta_vars  <- tv
+  rval$theta_vars  <- theta_vars
   rval$factor      <- isTRUE(list(...)$factor)
 
   if (inherits(rval$model, "nnet")) {
@@ -336,15 +315,15 @@ transitreg <- function(formula, data, subset, na.action,
   rval$probs <- as.data.frame(tmp)
   rm(tmp)
 
-  ## We always store 'bins'. In case of bin.y this is he number
-  ## of bins (i.e., length(breaks) - 1), if !bin.y this is the higest
-  ## integer of the original response.
+  ## We always store 'bins'. In case 'breaks' are specified, the number of bins
+  ## is length(breaks) - 1L. If !is.null(breaks), 'bins' is the higest integer
+  ## of the original response.
   rval$bins <- bins
 
   ## If binning.
-  if (bin.y) {
-    rval$breaks <- breaks
-    rval$ym     <- ym
+  if (!is.null(breaks)) {
+    rval$breaks <- breaks       # breaks
+    rval$ym     <- ym           # bin mids
     rval$yc_tab <- table(yc)
   }
 
@@ -352,177 +331,6 @@ transitreg <- function(formula, data, subset, na.action,
   class(rval) <- "transitreg"
 
   return(rval)
-}
-
-
-#' Transition Model Data Preparer
-#'
-#' Transforms a data frame into the format required for estimating transition models.
-#' The function generates binary response data for fitting GLM-type models,
-#' specifically designed to represent transitions between counts or states in
-#' a probabilistic framework.
-#'
-#' @param data A data frame containing the raw input data.
-#' @param response Character string specifying the name of the response variable
-#'        to be used for transition modeling. This variable must represent
-#'        counts or categorical states.
-#' @param newresponse `NULL` or integer. New response vector to overwrite the one
-#'        in `data`.
-#' @param verbose Logical value indicating whether information about the transformation
-#'        process should be printed to the console. Default is `TRUE`.
-#'
-#' @details
-#' Transition models focus on modeling the conditional probabilities of transitions
-#' between states or counts. This function converts the input data into a long format
-#' suitable for such models. Each row in the resulting data frame corresponds to a
-#' binary transition indicator, representing whether a transition to a higher category
-#' occurred. For details on the modeling framework, see Berger and Tutz (2021).
-#'
-#' @return
-#'   A transformed data frame in the long format. Each row represents a binary transition
-#'   indicator (`Y`) for the response variable. Additional columns in the output include:
-#'
-#' * `index`: The original row index from the input data.
-#' * `Y`: The binary indicator for whether a transition to a higher
-#'       category occurred.
-#' * `theta`: The level corresponding to the current transition.
-#'
-#' This format is required for fitting transition models using GLM or GAM frameworks.
-#' For instance, a response variable with a value of 3 will generate rows with
-#' transitions up to its value (0, 1, 2, and 3).
-#'
-#' @seealso [transitreg()], [transitreg_dist()]
-#'
-#' @examples
-#' ## Raw data frame.
-#' d <- data.frame(
-#'   "id" = 1:5,
-#'   "counts" = c(1, 0, 2, 3, 1),
-#'   "x" = 1:5 * 10
-#' )
-#'
-#' ## Transformed data frame.
-#' dtm <- transitreg_data(d, response = "counts", verbose = TRUE)
-#' print(dtm)
-#'
-#' @keywords data transformation
-#' @concept transition
-#' @concept modeling
-#'
-#' @importFrom stats setNames
-#'
-#' @author Niki
-transitreg_data <- function(data, response = NULL, newresponse = NULL, verbose = TRUE) {
-
-  stopifnot(
-    "'response' must be NULL or a character of length 1" =
-        is.null(response) || (is.character(response) && length(response) == 1L),
-    "'newresponse' must be NULL or a numeric vector with length > 0" =
-        is.null(newresponse) || (is.numeric(newresponse) && length(newresponse > 0)),
-    "'verbose' must be TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
-    "'newresponse' must be NULL or bins (0, 1, 2, ...)" =
-        is.null(newresponse) || (is.integer(newresponse) && all(newresponse >= 0))
-  )
-
-  ## Ensure data is a data frame.
-  if (!is.data.frame(data))
-    data <- as.data.frame(data)
-
-  ## Determine response column if not specified by user.
-  if (is.null(response))
-    response <- names(data)[1L]
-
-  ## If newresponse is give, it must be length == 1 or the same length
-  ## as the number of observations in 'data'. Required as we 'blow up'
-  ## the data for the binary model.
-  if (!is.null(newresponse)) {
-      if (length(newresponse) == 1L) {
-          newresponse <- rep(newresponse, nrow(data))
-      } else if (length(newresponse) != nrow(data)) {
-          stop("'newresponse' must be of length one (recycled for all observations) ",
-               "or a vector of the same length as number of observations (rows) ",
-               "in 'data'.")
-      }
-  }
-
-  ## If 'response' is provided in 'data' and an additional 'newresponse'
-  ## is provided, we will replace 'data[[response]]' with the newresponse.
-  if (response %in% names(data) & !is.null(newresponse)) {
-    warning("'newresponse' will overwrite response provided in 'data'.")
-    data[[response]] <- newresponse
-  } else if (!response %in% names(data)) {
-    ## 'newresponse' must be provided. If missing, stop, else append.
-    if (is.null(newresponse))
-      stop("'response' not contained in 'data', must be provided via 'newresponse'.")
-    data <- cbind(setNames(data.frame(newresponse), response), data)
-  }
-  rm(newresponse) # Delete object, no longer needed
-
-  ## If any missing value in response: stop
-  if (any(is.na(data[[response]])))
-      stop("NA values in response data!")
-
-  ## response$values must all be bin indices, so integers >= 0
-  check <- all(data[[response]] > -sqrt(.Machine$double.eps) |
-               abs(data[[response]] %% 1) > sqrt(.Machine$double.eps))
-  if (!check)
-    stop("The response must be bin indices, so integers in the range of {0, Inf}.")
-  data[[response]] <- as.integer(data[[response]])
-
-  ## Setting up the new data.frame with (pseudo-)bins
-
-  ## Define length of vectors in list
-  ## Sum of response indices + nrow(data), the latter to account for the
-  ## additional "0" bin.
-  nout <- sum(data[[response]]) + nrow(data)
-
-  ## ------ building transitreg data -------
-
-  ## Names of list elements.
-  names_out <- c("index", "Y", "theta", names(data))
-
-  ## Building index vector; each observation 1:nrow(data) gets its unique index
-  result <- list()
-  result$index <- rep(seq_len(nrow(data)), times = data[[response]] + 1L)
-
-  ## Creating Y; always 1 except for the last entry per index.
-  fn_get_Y <- function(nout, resp) {
-    res <- rep(1L, nout); res[cumsum(resp + 1)] <- 0L; return(res)
-  }
-  result$Y <- fn_get_Y(nout, data[[response]])
-
-  ## Creating theta; a sequence from zero to the
-  ## response_value for each index. The following
-  ## Two lines create this sequence of sequences.
-  fn_get_theta <- function(nout, resp, idx) {
-    resettozero <- c(0, which(diff(idx) > 0))
-    return(seq_len(nout) - rep(resettozero, resp + 1) - 1)
-  }
-  result$theta <- fn_get_theta(nout, data[[response]], result$index)
-
-  ## TODO(R): Niki, I add theta0 in all situations. Needed/OK?
-  result$theta0 <- rep(0, length(result$theta))
-  result$theta0[result$theta == 0] <- 1
-
-  ## Appending the remaining data from 'data'.
-  for (n in names(data)) {
-      ## If data[[n]] is a simple vector
-      if (!is.matrix(data[[n]])) {
-        result[[n]] <- rep(data[[n]], data[[response]] + 1)
-      ## Else create matrix
-      } else {
-        result[[n]] <- matrix(rep(data[[n]], rep(data[[response]] + 1, ncol(data[[n]]))),
-                              ncol = ncol(data[[n]]),
-                              dimnames = list(NULL, colnames(data[[n]])))
-      }
-  }
-
-  result <- as.data.frame(result)
-
-  ## Attach the response column as an attribute.
-  attr(result, "response") <- response
-
-  return(result)
 }
 
 
@@ -566,64 +374,7 @@ transitreg_predict <- function(object, newdata = NULL,
   )
   ## TODO(R) Not all arguments are checked above
 
-  ## Depending on 'type' we need to ensure y/prob is set correctly.
-  ## Quantile:
-  ## - prob must be not NULL, all values must be in [0, 1].
-  ## PDF/CDF:
-  ## - If 'newdata = NULL' we take the model frame, so y can be missing.
-  ## - Else y must be not NULL, all values must be within support of 'breaks'.
-  if (type == "quantile") {
-    stopifnot(
-      "for 'type = \"quantile\"' argument 'prob' must be set" = !is.null(prob),
-      "'prob' must be numeric of length > 0" = is.numeric(prob) && length(prob) > 0,
-      "missing values in 'prob' not allowed" = all(!is.na(prob)),
-      "'prob' must be in [0, 1]" = all(prob >= 0.0) && all(prob <= 1.0)
-    )
-  } else if (type %in% c("cdf", "pdf") & !is.null(newdata)) {
-    stopifnot(
-      "for 'type = \"cdf\" or \"pdf\"' argument 'y' must be set if 'newdata' is given" =
-          !is.null(y),
-      "'y' must be numeric of length > 0" = is.numeric(y) && length(y) > 0,
-      "missing values in 'y' not allowed" = all(!is.na(y))
-    )
-    # Discrete distribution? y must be in range [0, object$bins].
-    if (is.null(object$breaks)) {
-      y <- as.integer(y)
-      if (!all(y >= 0 & y <= object$bins - 1L))
-          stop("elements in 'y' must be in {0, ..., ", object$bins - 1L, "}")
-    # Else continuous
-    } else {
-      if (!all(y >= min(object$breaks) & y <= max(object$breaks)))
-          stop(sprintf("elements in 'y' must be in range [%s, %s]",
-                       format(min(object$breaks), format(max(object$breaks)))))
-      ## If 'y' was set by the user, we must convert all values in 'y' from
-      ## it's original numeric value to it's pseudo-observation (bin; int).
-      if (!is.null(y)) y <- num2bin(y, object$breaks)
-    }
-  }
-
-  ## If newdata is empty, we are taking the model frame.
-  ## In addition, we take the pseudo-response from the model.frame
-  ## in case type %in% c("cdf", "pdf") and the user did not provide any 'y'.
-  ## Thus, we will evaluate the cdf/pdf a the observation used for fitting the model.
-  if (is.null(newdata)) {
-      newdata <- model.frame(object)
-      if (type %in% c("cdf", "pdf") && is.null(y))
-          y <- newdata[[object$response]] ## Integer in 0, 1, 2, ... Nbreaks
-  } else {
-    ## Applying scaler if needed; standardize data (except theta)
-    if (!is.null(object$scaler)) {
-        for (j in names(object$scaler)) {
-            if (j != "theta") {
-                newdata[[j]] <- (newdata[[j]] - object$scaler[[j]]$mean) / object$scaler[[j]]$sd
-            }
-        }
-    }
-  }
-
-  ## Scaling (standardizing) theta if requested
-  if (!is.null(theta_scaler))
-    newdata$theta <- (newdata$theta - theta_scaler$mean) / theta_scaler$sd
+  newdata <- get_newdata(object, newdata, y, prob, type)
 
   ## Guessing 'elementwise' if is NULL
   ##
@@ -668,7 +419,6 @@ transitreg_predict <- function(object, newdata = NULL,
       prob <- NA_real_    ## Dummy value required for .C call
   }
 
-
   ## Setting up 'newresponse'.
   ## Quantile, pmax:
   ##  - Setting the pseudo-response to the highest bin. This ensures
@@ -684,6 +434,24 @@ transitreg_predict <- function(object, newdata = NULL,
   } else {
     newresponse <- if (elementwise) y else rep(max(y), nrow(newdata))
   }
+
+  #######################################
+  #######################################
+  #######################################
+  #######################################
+  #######################################
+  #######################################
+
+
+
+
+
+    print(elementwise)
+  print(y)
+  print(" RETO giving up ")
+  print(type)
+  print(table(newresponse))
+  stop(3)
 
   ## Preparing data
   newdata <- transitreg_data(newdata, response = object$response,
@@ -705,6 +473,8 @@ transitreg_predict <- function(object, newdata = NULL,
     "gam"  = "response",
     "nnet" = "raw"
   )
+  print(head(newdata))
+  stop(" -------- ", what, " --------- ")
   tp <- as.numeric(predict(object$model, newdata = newdata, type = what))
 
   ## If 'type = "tp"' (transition probabilities) we already have our
@@ -756,6 +526,101 @@ transitreg_predict <- function(object, newdata = NULL,
   return(res)
 }
 
+
+# Helper function setting up 'newdata' when using predict.transitreg
+get_newdata <- function(object, newdata, y, prob, type) {
+    # Keep a logical flag for whether or not the user provided 'newdata'
+    newdata_provided = !is.null(newdata)
+
+    # Newdata not provided? Taking model.frame (outer model; not binary
+    # response model, see 'engine' in transitreg().
+    if (is.null(newdata)) newdata <- model.frame(object)
+
+    ## If 'newdata' is provided by user, apply scaling if required.
+    ## Scales all covariates except the 'theta' variables.
+    if (newdata_provided && !is.null(object$scaler)) {
+        for (j in names(object$scaler)) {
+            if (j != "theta") {
+                newdata[[j]] <- (newdata[[j]] - object$scaler[[j]]$mean) / object$scaler[[j]]$sd
+            }
+        }
+        ## Scaling (standardizing) theta if requested
+        if (!is.null(theta_scaler))
+          newdata$theta <- (newdata$theta - theta_scaler$mean) / theta_scaler$sd
+    }
+
+    ## Depending on 'type' we need to ensure y/prob is set correctly.
+    ## Quantile:
+    ## - prob must be not NULL, all values must be in [0, 1].
+    ## PDF/CDF:
+    ## - If 'newdata = NULL' we take the model frame, so y can be missing.
+    ## - Else y must be not NULL, all values must be within support of 'breaks'.
+    if (type == "quantile") {
+      stopifnot(
+        "for 'type = \"quantile\"' argument 'prob' must be set" = !is.null(prob),
+        "'prob' must be numeric of length > 0" = is.numeric(prob) && length(prob) > 0,
+        "missing values in 'prob' not allowed" = all(!is.na(prob)),
+        "'prob' must be in [0, 1]" = all(prob >= 0.0) && all(prob <= 1.0)
+      )
+    } else if (type %in% c("cdf", "pdf")) {
+      ## 'newdata' is provided by user (newdata_provided) we need to check
+      ## 1. If the response is not included in 'newdata', the user must provide the new
+      ##    response via 'y' (length 1 or same length as 'newdata').
+      ## 2. If the response is in both, 'newdata' and 'y' the response in newdata
+      ##    will be replaced with 'y' with an additional warning.
+      ## 3. No missing values are allowed in 'y'.
+
+      ## (1)
+      if (newdata_provided & !object$response %in% names(newdata)) {
+        if (is.null(y)) {
+          stop("If the response \"", object$response, "\" is not included in ",
+               "'newdata' it must be provided via the argument 'y'.")
+        } else if (length(y) != 1L || length(y) != nrow(newdata)) {
+          stop("'y' (if provided) must be of length `1` or the same length as the number of ",
+               "rows in 'newdata' (provided by user or taken from internal model.frame) ",
+               "which is nrow(newdata) = ", nrow(newdata), ".")
+        }
+        # Store new response
+        newdata[[object$response]] <- num2bin(y, object$breaks)
+      ## (2) If response is in 'newdata' but also provided via 'y', it must still
+      ##     be of the correct length, and we will overwrite newdata[[object$response]]
+      ##     with 'y' showing a warning.
+      } else if (!is.null(y)) {
+        if (length(y) != 1L || length(y) != nrow(newdata)) {
+          stop("'y' (if provided) must be of length `1` or the same length as the number of ",
+               "rows in 'newdata' (provided by user or taken from internal model.frame) ",
+               "which is nrow(newdata) = ", nrow(newdata), ".")
+        }
+        ## Else store
+        warning("Response provided via 'newdata' as well as 'y'. ",
+                "Response in 'newdata' will be overwritten by the values provided on 'y'.")
+        newdata[[object$response]] <- num2bin(y, object$breaks)
+      }
+      ## (3) Any missing values?
+      if (any(is.na(newdata[[object$response]]))) {
+        stop("Missing values in response (in 'newdata' or provided via argument 'y') ",
+             "are not allowed.")
+      }
+
+      # Discrete distribution? y must be in range [0, object$bins].
+      if (is.null(object$breaks)) {
+        y <- as.integer(y)
+        if (!all(y >= 0 & y <= object$bins - 1L))
+            stop("elements in 'y' must be in {0, ..., ", object$bins - 1L, "}")
+      # Else continuous
+      } else {
+        if (!all(y >= min(object$breaks) & y <= max(object$breaks)))
+            stop(sprintf("elements in 'y' must be in range [%s, %s]",
+                         format(min(object$breaks), format(max(object$breaks)))))
+        ## If 'y' was set by the user, we must convert all values in 'y' from
+        ## it's original numeric value to it's pseudo-observation (bin; int).
+        if (!is.null(y)) y <- num2bin(y, object$breaks)
+      }
+    }
+
+    # Returning prepared object
+    return(newdata)
+}
 
 
 #' Transition Model Probability Density Visualization
