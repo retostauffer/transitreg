@@ -226,19 +226,24 @@ transitreg_data <- function(data, response, theta_vars = NULL,
   if (any(is.na(data[[response]])))
       stop("NA values in response data!")
 
-  ## response$values must all be bin indices, so integers >= 0
-  check <- all(data[[response]] > -sqrt(.Machine$double.eps) |
+  ## data[[response]] must all be bin indices, so integers >= -1
+  check <- all(data[[response]] > -(1 + sqrt(.Machine$double.eps)) |
                abs(data[[response]] %% 1) > sqrt(.Machine$double.eps))
   if (!check)
-    stop("The response must be bin indices, so integers in the range of {0, Inf}.")
+    stop("The response must be bin indices, so integers in the range of {-1L, Inf}.")
   data[[response]] <- as.integer(data[[response]])
+
+  ## WARNING: Why do we allow for -1L in data[[response]]?
+  ## The pseudo index "-1" is for values falling below the lowest bound;
+  ## required to allow predictions outside the range. To properly handle some of the
+  ## methods we create a "pseudo_index" which is pmax(0, data[[response]]).
+  pseudo_index <- pmax(0L, data[[response]])
 
   ## Setting up the new data.frame with (pseudo-)bins
 
-  ## Define length of vectors in list
-  ## Sum of response indices + nrow(data), the latter to account for the
-  ## additional "0" bin.
-  nout <- sum(data[[response]]) + nrow(data)
+  ## Define length of vectors in list Sum of response pseudo indices +
+  ## nrow(data), the latter to account for the additional "0" bin.
+  nout <- sum(pseudo_index) + nrow(data)
 
   ## ------ building transitreg data -------
 
@@ -251,13 +256,13 @@ transitreg_data <- function(data, response, theta_vars = NULL,
 
   ## Building index vector; each observation 1:nrow(data) gets its unique index
   result <- list()
-  result$index <- rep(seq_len(nrow(data)), times = data[[response]] + 1L)
+  result$index <- rep(seq_len(nrow(data)), times = pseudo_index + 1L)
 
   ## Creating Y; always 1 except for the last entry per index.
   fn_get_Y <- function(nout, resp) {
     res <- rep(1L, nout); res[cumsum(resp + 1)] <- 0L; return(res)
   }
-  result$Y <- fn_get_Y(nout, data[[response]])
+  result$Y <- fn_get_Y(nout, pseudo_index)
 
   ## Creating theta; a sequence from zero to the response_value for each index.
   ## The following Two lines create this sequence of sequences.
@@ -265,7 +270,7 @@ transitreg_data <- function(data, response, theta_vars = NULL,
     resettozero <- c(0, which(diff(idx) > 0))
     return(seq_len(nout) - rep(resettozero, resp + 1) - 1)
   }
-  result$theta <- fn_get_theta(nout, data[[response]], result$index)
+  result$theta <- fn_get_theta(nout, pseudo_index, result$index)
 
   ## Adding theta_vars if needed.
   ## For 'theta99' in 'theta_vars' a new variable 'theta99' is generated which
@@ -284,7 +289,7 @@ transitreg_data <- function(data, response, theta_vars = NULL,
   for (n in names(data)) {
       ## If data[[n]] is a simple vector
       if (!is.matrix(data[[n]])) {
-        result[[n]] <- rep(data[[n]], data[[response]] + 1)
+        result[[n]] <- rep(data[[n]], pseudo_index + 1)
       ## Else create matrix
       } else {
         result[[n]] <- matrix(rep(data[[n]], rep(data[[response]] + 1, ncol(data[[n]]))),

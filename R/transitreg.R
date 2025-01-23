@@ -201,6 +201,7 @@ transitreg <- function(formula, data, subset, na.action,
   ## Setting up empty list for return value
   rval <- list()
   rval$response <- response_name(formula)
+  rval$ymax     <- max(mf[[rval$response]])
 
   ## ----------------------------------------------------------------
   ## Setting up model response; discretizises the data if needed.
@@ -235,10 +236,6 @@ transitreg <- function(formula, data, subset, na.action,
   tmf <- transitreg_data(mf, response = rval$response,
                          theta_vars = theta_vars,
                          scaler = scale.x, verbose = verbose)
-  print(" ---- her e--- ")
-  print(head(mf))
-  print(head(tmf))
-  print("      ---------- ")
 
   ## Store scailer, returned as attribute on 'tmf' if used.
   rval$scaler <- if (scale.x) attr(tmf, "scaler") else NULL
@@ -359,19 +356,26 @@ transitreg_predict <- function(object, newdata = NULL,
   ## If 'newdata' is not set we take the existing model.frame
   mf <- if (is.null(newdata)) model.frame(object) else newdata
 
-  ## If 'newdata' is provided but y is empty, the response MUST be in
-  ## the 'newdata' data.frame
-  if (is.null(y) && !is.null(newdata)) {
-      if (!object$response %in% names(newdata))
-          stop("response \"", object$response, "\" not found in 'newdata'. ",
-               "Must be in 'newdata' or provided via the extra 'y' argument.")
-  } else if (!is.null(y) && !is.null(newdata) && object$response %in% names(newdata)) {
-      warning("Response \"", object$response, "\" provided via 'newdata' as well as ",
-              "via the additional argument 'y'. 'y' will overwrite ",
-              "'newdata$", object$response, "' (w/ recycling).")
-      mf[[object$response]] <- rep(y, length.out = nrow(mf))
+  if (type %in% c("cdf", "pdf")) {
+      ## If 'newdata' is provided but y is empty, the response MUST be in
+      ## the 'newdata' data.frame
+      if (is.null(y) && !is.null(newdata)) {
+          if (!object$response %in% names(newdata))
+              stop("response \"", object$response, "\" not found in 'newdata'. ",
+                   "Must be in 'newdata' or provided via the extra 'y' argument.")
+      } else if (!is.null(y) && !is.null(newdata)) {
+          if (object$response %in% names(newdata)) {
+              warning("Response \"", object$response, "\" provided via 'newdata' as well as ",
+                      "via the additional argument 'y'. 'y' will overwrite ",
+                      "'newdata$", object$response, "' (w/ recycling).")
+              mf[[object$response]] <- rep(y, length.out = nrow(mf))
+          } else {
+              mf[[object$response]] <- rep(y, length.out = nrow(mf))
+          }
+      }
+  } else {
+      mf[[object$response]] <- max(object$breaks) # Absolute max
   }
-
 
   ## Guessing 'elementwise' if is NULL
   ##
@@ -410,10 +414,15 @@ transitreg_predict <- function(object, newdata = NULL,
   ##    max(y).
   if (type %in% c("quantile", "pmax", "tp")) {
     ## object$bins - 1 as we start with bin '0' again.
-    newresponse <- rep(object$bins - 1L, nrow(mf))
+    if (!is.null(object$breaks)) {
+        newresponse <- rep(max(object$breaks), nrow(mf))
+    } else {
+        newresponse <- rep(object$bins - 1, nrow(mf))
+    }
   } else {
     newresponse <- if (elementwise) y else rep(max(y), nrow(mf))
   }
+  mf[[object$response]] <- newresponse
 
   # -----------------------------------------------------------------
   ## Setting up transitreg response and model matrix for the binary
@@ -493,6 +502,7 @@ transitreg_predict <- function(object, newdata = NULL,
                discrete    = discrete)     # Discrete distribution?
 
   # Calling C
+  str(args)
   args <- check_args_for_treg_predict(args)
   res  <- do.call(function(...) .Call("treg_predict", ...), args)
 

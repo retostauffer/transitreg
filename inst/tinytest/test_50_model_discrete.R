@@ -24,11 +24,11 @@ m1   <- transitreg(cd4 ~ theta, data = CD4)
 expect_inherits(m1, "transitreg", info = "Returnclass")
 expect_true(is.list(m1))
 expected <- c("new_formula", "model", "response", "model.frame",
-              "maxcounts", "theta_vars", "factor", "probs", "bins", "ym", "yc_tab", "breaks")
+              "maxcounts", "theta_vars", "factor", "probs", "bins", "ymax")
 expect_true(all(names(m1) %in% expected),
             info = "Checking if all expected elements are there")
 
-expect_true(is.null(m1$ym),       info = "Checking that 'ym' is NULL (discrete)")
+expect_true(is.null(m1[["ym"]]),  info = "Checking that 'ym' is NULL (discrete)")
 expect_true(is.null(m1$breaks),   info = "Checking that 'breaks' is NULL (discrete)")
 expect_identical(m1$bins, as.integer(ceiling(max(CD4$cd4) * 1.25)),
                  info = "Checking number of bins (1.25 * max response as n > 100)")
