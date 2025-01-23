@@ -235,6 +235,10 @@ transitreg <- function(formula, data, subset, na.action,
   tmf <- transitreg_data(mf, response = rval$response,
                          theta_vars = theta_vars,
                          scaler = scale.x, verbose = verbose)
+  print(" ---- her e--- ")
+  print(head(mf))
+  print(head(tmf))
+  print("      ---------- ")
 
   ## Store scailer, returned as attribute on 'tmf' if used.
   rval$scaler <- if (scale.x) attr(tmf, "scaler") else NULL
@@ -351,7 +355,23 @@ transitreg_predict <- function(object, newdata = NULL,
   )
   ## TODO(R) Not all arguments are checked above
 
-  newdata <- get_newdata(object, newdata, y, prob, type)
+
+  ## If 'newdata' is not set we take the existing model.frame
+  mf <- if (is.null(newdata)) model.frame(object) else newdata
+
+  ## If 'newdata' is provided but y is empty, the response MUST be in
+  ## the 'newdata' data.frame
+  if (is.null(y) && !is.null(newdata)) {
+      if (!object$response %in% names(newdata))
+          stop("response \"", object$response, "\" not found in 'newdata'. ",
+               "Must be in 'newdata' or provided via the extra 'y' argument.")
+  } else if (!is.null(y) && !is.null(newdata) && object$response %in% names(newdata)) {
+      warning("Response \"", object$response, "\" provided via 'newdata' as well as ",
+              "via the additional argument 'y'. 'y' will overwrite ",
+              "'newdata$", object$response, "' (w/ recycling).")
+      mf[[object$response]] <- rep(y, length.out = nrow(mf))
+  }
+
 
   ## Guessing 'elementwise' if is NULL
   ##
@@ -364,15 +384,12 @@ transitreg_predict <- function(object, newdata = NULL,
   ##        ncol(newdata) times (length(y) | length(probs)) depending on type.
   if (is.null(elementwise)) {
       if (type == "quantile") {
-          elementwise <- length(prob) == 1L | length(prob) == nrow(newdata)
+          elementwise <- length(prob) == 1L | length(prob) == nrow(mf)
           ## Extending prob and sorting if !elementwise
           if (elementwise & length(prob) == 1L)
-              prob <- rep(prob, length.out = nrow(newdata))
+              prob <- rep(prob, length.out = nrow(mf))
       } else if (type %in% c("cdf", "pdf")) {
-          elementwise <- length(y) == 1L | length(y) == nrow(newdata)
-          ## Extending y and sorting if !elementwise
-          if (elementwise & length(y) == 1L)
-              y <- rep(y, length.out = nrow(newdata))
+          elementwise <- is.null(y) || length(y) == 1L || length(y) == nrow(mf)
       } else if (type == "pmax") {
           elementwise <- TRUE # for 'pmax' elementwise is always TRUE
       } else if (type == "tp") {
@@ -380,20 +397,6 @@ transitreg_predict <- function(object, newdata = NULL,
       } else {
           stop("Mode for type = \"", type, "\" must be implemented!")
       }
-  }
-
-  ## Setting dummy values (required by C later on)
-  if (type == "quantile") {
-      ## Sorting 'prob'. This is important for the .C routine!
-      if (!elementwise) prob <- sort(unique(prob))
-      y    <- NA_integer_ ## Dummy value required for .C call
-  } else if (type %in% c("cdf", "pdf")) {
-      ## Sorting 'y'. This is important for the .C routine!
-      if (!elementwise) y <- sort(unique(y))
-      prob <- NA_real_    ## Dummy value required for .C call
-  } else {
-      y    <- NA_integer_ ## Dummy value required for .C call
-      prob <- NA_real_    ## Dummy value required for .C call
   }
 
   ## Setting up 'newresponse'.
@@ -407,42 +410,34 @@ transitreg_predict <- function(object, newdata = NULL,
   ##    max(y).
   if (type %in% c("quantile", "pmax", "tp")) {
     ## object$bins - 1 as we start with bin '0' again.
-    newresponse <- rep(object$bins - 1L, nrow(newdata))
+    newresponse <- rep(object$bins - 1L, nrow(mf))
   } else {
-    newresponse <- if (elementwise) y else rep(max(y), nrow(newdata))
+    newresponse <- if (elementwise) y else rep(max(y), nrow(mf))
   }
 
-  #######################################
-  #######################################
-  #######################################
-  #######################################
-  #######################################
-  #######################################
+  # -----------------------------------------------------------------
+  ## Setting up transitreg response and model matrix for the binary
+  ## model (tmf = transition probability model frame) for the binary
+  ## model on object$model.
+  # -----------------------------------------------------------------
 
-
-
-
-
-    print(elementwise)
-  print(y)
-  print(" RETO giving up ")
-  print(type)
-  print(table(newresponse))
-  stop(3)
-
-  ## Preparing data
-  newdata <- transitreg_data(newdata, response = object$response,
-                             newresponse = newresponse, verbose = verbose)
-
-  if (factor)
-    newdata$theta <- as.factor(newdata$theta)
-
-  if (!is.null(theta_vars) && length(theta_vars) > 0L) {
-    for (j in theta_vars) {
-      i <- as.integer(gsub("theta", "", j))
-      newdata[[j]] <- as.integer(newdata$theta == i)
-    }
+  if (is.null(newdata)) {
+      scaler <- FALSE # Already scaled
+  } else {
+      scaler <- object$scaler
+      tmp    <- transitreg_response(mf, response = object$response,
+                                    breaks = object$breaks, verbose = verbose)
+      mf <- tmp$mf # Updating mf
+      rm(tmp)
   }
+
+  ## Creating 'transition model frame' for the prediction of the
+  ## transition probabilities using the object$model (binary response model).
+  tmf <- transitreg_data(mf, response = object$response,
+                         theta_vars = object$theta_vars,
+                         scaler = object$scaler, verbose = verbose)
+  ## TODO(R): Could do that in transitreg_data.
+  if (factor) tmf$theta <- as.factor(tmf$theta)
 
   ## Specify argument for generic prediction method called below
   what <- switch(class(object$model)[1L],
@@ -450,19 +445,31 @@ transitreg_predict <- function(object, newdata = NULL,
     "gam"  = "response",
     "nnet" = "raw"
   )
-  print(head(newdata))
-  stop(" -------- ", what, " --------- ")
-  tp <- as.numeric(predict(object$model, newdata = newdata, type = what))
+  tp <- as.numeric(predict(object$model, newdata = tmf, type = what))
 
   ## If 'type = "tp"' (transition probabilities) we already have our
-  ## result. Conver to matrix, and return.
+  ## result. Convert to matrix and return.
   if (type == "tp") {
       tmp <- list(NULL, paste0("tp_", seq_len(object$bins) - 1))
       return(matrix(tp, byrow = TRUE, ncol = object$bins, dimnames = tmp))
   }
 
   ## Extract unique indices
-  ui   <- unique(newdata$index)
+  ui   <- unique(tmf$index)
+
+  ## Setting dummy values (required by C later on)
+  if (type == "quantile") {
+      ## Sorting 'prob'. This is important for the .C routine!
+      if (!elementwise) prob <- sort(unique(prob))
+      y    <- NA_integer_ ## Dummy value required for .C call
+  } else if (type %in% c("cdf", "pdf")) {
+      ## Sorting 'y'. This is important for the .C routine!
+      y <- if (elementwise) mf[[object$response]] else num2bin(sort(unique(y)), object$breaks)
+      prob <- NA_real_    ## Dummy value required for .C call
+  } else {
+      y    <- NA_integer_ ## Dummy value required for .C call
+      prob <- NA_real_    ## Dummy value required for .C call
+  }
 
   ## If object$breaks is NULL, we have discrete bins (e.g., count data).
   if (is.null(object$breaks)) {
@@ -475,7 +482,7 @@ transitreg_predict <- function(object, newdata = NULL,
 
   ## Setting up arguments for the .C call
   args <- list(uidx   = ui,                # int; Unique distribution index (int)
-               idx    = newdata$index,     # int; Index vector (int)
+               idx    = tmf$index,         # int; Index vector (int)
                tp     = tp,                # num; Transition probabilities
                breaks = breaks,            # num; Point intersections of bins
                y      = y,                 # int; Response y, used for 'cdf/pdf'
@@ -504,100 +511,100 @@ transitreg_predict <- function(object, newdata = NULL,
 }
 
 
-# Helper function setting up 'newdata' when using predict.transitreg
-get_newdata <- function(object, newdata, y, prob, type) {
-    # Keep a logical flag for whether or not the user provided 'newdata'
-    newdata_provided = !is.null(newdata)
-
-    # Newdata not provided? Taking model.frame (outer model; not binary
-    # response model, see 'engine' in transitreg().
-    if (is.null(newdata)) newdata <- model.frame(object)
-
-    ## If 'newdata' is provided by user, apply scaling if required.
-    ## Scales all covariates except the 'theta' variables.
-    if (newdata_provided && !is.null(object$scaler)) {
-        for (j in names(object$scaler)) {
-            if (j != "theta") {
-                newdata[[j]] <- (newdata[[j]] - object$scaler[[j]]$mean) / object$scaler[[j]]$sd
-            }
-        }
-        ## Scaling (standardizing) theta if requested
-        if (!is.null(theta_scaler))
-          newdata$theta <- (newdata$theta - theta_scaler$mean) / theta_scaler$sd
-    }
-
-    ## Depending on 'type' we need to ensure y/prob is set correctly.
-    ## Quantile:
-    ## - prob must be not NULL, all values must be in [0, 1].
-    ## PDF/CDF:
-    ## - If 'newdata = NULL' we take the model frame, so y can be missing.
-    ## - Else y must be not NULL, all values must be within support of 'breaks'.
-    if (type == "quantile") {
-      stopifnot(
-        "for 'type = \"quantile\"' argument 'prob' must be set" = !is.null(prob),
-        "'prob' must be numeric of length > 0" = is.numeric(prob) && length(prob) > 0,
-        "missing values in 'prob' not allowed" = all(!is.na(prob)),
-        "'prob' must be in [0, 1]" = all(prob >= 0.0) && all(prob <= 1.0)
-      )
-    } else if (type %in% c("cdf", "pdf")) {
-      ## 'newdata' is provided by user (newdata_provided) we need to check
-      ## 1. If the response is not included in 'newdata', the user must provide the new
-      ##    response via 'y' (length 1 or same length as 'newdata').
-      ## 2. If the response is in both, 'newdata' and 'y' the response in newdata
-      ##    will be replaced with 'y' with an additional warning.
-      ## 3. No missing values are allowed in 'y'.
-
-      ## (1)
-      if (newdata_provided & !object$response %in% names(newdata)) {
-        if (is.null(y)) {
-          stop("If the response \"", object$response, "\" is not included in ",
-               "'newdata' it must be provided via the argument 'y'.")
-        } else if (length(y) != 1L || length(y) != nrow(newdata)) {
-          stop("'y' (if provided) must be of length `1` or the same length as the number of ",
-               "rows in 'newdata' (provided by user or taken from internal model.frame) ",
-               "which is nrow(newdata) = ", nrow(newdata), ".")
-        }
-        # Store new response
-        newdata[[object$response]] <- num2bin(y, object$breaks)
-      ## (2) If response is in 'newdata' but also provided via 'y', it must still
-      ##     be of the correct length, and we will overwrite newdata[[object$response]]
-      ##     with 'y' showing a warning.
-      } else if (!is.null(y)) {
-        if (length(y) != 1L || length(y) != nrow(newdata)) {
-          stop("'y' (if provided) must be of length `1` or the same length as the number of ",
-               "rows in 'newdata' (provided by user or taken from internal model.frame) ",
-               "which is nrow(newdata) = ", nrow(newdata), ".")
-        }
-        ## Else store
-        warning("Response provided via 'newdata' as well as 'y'. ",
-                "Response in 'newdata' will be overwritten by the values provided on 'y'.")
-        newdata[[object$response]] <- num2bin(y, object$breaks)
-      }
-      ## (3) Any missing values?
-      if (any(is.na(newdata[[object$response]]))) {
-        stop("Missing values in response (in 'newdata' or provided via argument 'y') ",
-             "are not allowed.")
-      }
-
-      # Discrete distribution? y must be in range [0, object$bins].
-      if (is.null(object$breaks)) {
-        y <- as.integer(y)
-        if (!all(y >= 0 & y <= object$bins - 1L))
-            stop("elements in 'y' must be in {0, ..., ", object$bins - 1L, "}")
-      # Else continuous
-      } else {
-        if (!all(y >= min(object$breaks) & y <= max(object$breaks)))
-            stop(sprintf("elements in 'y' must be in range [%s, %s]",
-                         format(min(object$breaks), format(max(object$breaks)))))
-        ## If 'y' was set by the user, we must convert all values in 'y' from
-        ## it's original numeric value to it's pseudo-observation (bin; int).
-        if (!is.null(y)) y <- num2bin(y, object$breaks)
-      }
-    }
-
-    # Returning prepared object
-    return(newdata)
-}
+## TODO(R) DELETE ME ## # Helper function setting up 'newdata' when using predict.transitreg
+## TODO(R) DELETE ME ## get_newdata <- function(object, newdata, y, prob, type) {
+## TODO(R) DELETE ME ##     # Keep a logical flag for whether or not the user provided 'newdata'
+## TODO(R) DELETE ME ##     newdata_provided = !is.null(newdata)
+## TODO(R) DELETE ME ## 
+## TODO(R) DELETE ME ##     # Newdata not provided? Taking model.frame (outer model; not binary
+## TODO(R) DELETE ME ##     # response model, see 'engine' in transitreg().
+## TODO(R) DELETE ME ##     if (is.null(newdata)) newdata <- model.frame(object)
+## TODO(R) DELETE ME ## 
+## TODO(R) DELETE ME ##     ## If 'newdata' is provided by user, apply scaling if required.
+## TODO(R) DELETE ME ##     ## Scales all covariates except the 'theta' variables.
+## TODO(R) DELETE ME ##     if (newdata_provided && !is.null(object$scaler)) {
+## TODO(R) DELETE ME ##         for (j in names(object$scaler)) {
+## TODO(R) DELETE ME ##             if (j != "theta") {
+## TODO(R) DELETE ME ##                 newdata[[j]] <- (newdata[[j]] - object$scaler[[j]]$mean) / object$scaler[[j]]$sd
+## TODO(R) DELETE ME ##             }
+## TODO(R) DELETE ME ##         }
+## TODO(R) DELETE ME ##         ## Scaling (standardizing) theta if requested
+## TODO(R) DELETE ME ##         if (!is.null(theta_scaler))
+## TODO(R) DELETE ME ##           newdata$theta <- (newdata$theta - theta_scaler$mean) / theta_scaler$sd
+## TODO(R) DELETE ME ##     }
+## TODO(R) DELETE ME ## 
+## TODO(R) DELETE ME ##     ## Depending on 'type' we need to ensure y/prob is set correctly.
+## TODO(R) DELETE ME ##     ## Quantile:
+## TODO(R) DELETE ME ##     ## - prob must be not NULL, all values must be in [0, 1].
+## TODO(R) DELETE ME ##     ## PDF/CDF:
+## TODO(R) DELETE ME ##     ## - If 'newdata = NULL' we take the model frame, so y can be missing.
+## TODO(R) DELETE ME ##     ## - Else y must be not NULL, all values must be within support of 'breaks'.
+## TODO(R) DELETE ME ##     if (type == "quantile") {
+## TODO(R) DELETE ME ##       stopifnot(
+## TODO(R) DELETE ME ##         "for 'type = \"quantile\"' argument 'prob' must be set" = !is.null(prob),
+## TODO(R) DELETE ME ##         "'prob' must be numeric of length > 0" = is.numeric(prob) && length(prob) > 0,
+## TODO(R) DELETE ME ##         "missing values in 'prob' not allowed" = all(!is.na(prob)),
+## TODO(R) DELETE ME ##         "'prob' must be in [0, 1]" = all(prob >= 0.0) && all(prob <= 1.0)
+## TODO(R) DELETE ME ##       )
+## TODO(R) DELETE ME ##     } else if (type %in% c("cdf", "pdf")) {
+## TODO(R) DELETE ME ##       ## 'newdata' is provided by user (newdata_provided) we need to check
+## TODO(R) DELETE ME ##       ## 1. If the response is not included in 'newdata', the user must provide the new
+## TODO(R) DELETE ME ##       ##    response via 'y' (length 1 or same length as 'newdata').
+## TODO(R) DELETE ME ##       ## 2. If the response is in both, 'newdata' and 'y' the response in newdata
+## TODO(R) DELETE ME ##       ##    will be replaced with 'y' with an additional warning.
+## TODO(R) DELETE ME ##       ## 3. No missing values are allowed in 'y'.
+## TODO(R) DELETE ME ## 
+## TODO(R) DELETE ME ##       ## (1)
+## TODO(R) DELETE ME ##       if (newdata_provided & !object$response %in% names(newdata)) {
+## TODO(R) DELETE ME ##         if (is.null(y)) {
+## TODO(R) DELETE ME ##           stop("If the response \"", object$response, "\" is not included in ",
+## TODO(R) DELETE ME ##                "'newdata' it must be provided via the argument 'y'.")
+## TODO(R) DELETE ME ##         } else if (length(y) != 1L || length(y) != nrow(newdata)) {
+## TODO(R) DELETE ME ##           stop("'y' (if provided) must be of length `1` or the same length as the number of ",
+## TODO(R) DELETE ME ##                "rows in 'newdata' (provided by user or taken from internal model.frame) ",
+## TODO(R) DELETE ME ##                "which is nrow(newdata) = ", nrow(newdata), ".")
+## TODO(R) DELETE ME ##         }
+## TODO(R) DELETE ME ##         # Store new response
+## TODO(R) DELETE ME ##         newdata[[object$response]] <- num2bin(y, object$breaks)
+## TODO(R) DELETE ME ##       ## (2) If response is in 'newdata' but also provided via 'y', it must still
+## TODO(R) DELETE ME ##       ##     be of the correct length, and we will overwrite newdata[[object$response]]
+## TODO(R) DELETE ME ##       ##     with 'y' showing a warning.
+## TODO(R) DELETE ME ##       } else if (!is.null(y)) {
+## TODO(R) DELETE ME ##         if (length(y) != 1L || length(y) != nrow(newdata)) {
+## TODO(R) DELETE ME ##           stop("'y' (if provided) must be of length `1` or the same length as the number of ",
+## TODO(R) DELETE ME ##                "rows in 'newdata' (provided by user or taken from internal model.frame) ",
+## TODO(R) DELETE ME ##                "which is nrow(newdata) = ", nrow(newdata), ".")
+## TODO(R) DELETE ME ##         }
+## TODO(R) DELETE ME ##         ## Else store
+## TODO(R) DELETE ME ##         warning("Response provided via 'newdata' as well as 'y'. ",
+## TODO(R) DELETE ME ##                 "Response in 'newdata' will be overwritten by the values provided on 'y'.")
+## TODO(R) DELETE ME ##         newdata[[object$response]] <- num2bin(y, object$breaks)
+## TODO(R) DELETE ME ##       }
+## TODO(R) DELETE ME ##       ## (3) Any missing values?
+## TODO(R) DELETE ME ##       if (any(is.na(newdata[[object$response]]))) {
+## TODO(R) DELETE ME ##         stop("Missing values in response (in 'newdata' or provided via argument 'y') ",
+## TODO(R) DELETE ME ##              "are not allowed.")
+## TODO(R) DELETE ME ##       }
+## TODO(R) DELETE ME ## 
+## TODO(R) DELETE ME ##       # Discrete distribution? y must be in range [0, object$bins].
+## TODO(R) DELETE ME ##       if (is.null(object$breaks)) {
+## TODO(R) DELETE ME ##         y <- as.integer(y)
+## TODO(R) DELETE ME ##         if (!all(y >= 0 & y <= object$bins - 1L))
+## TODO(R) DELETE ME ##             stop("elements in 'y' must be in {0, ..., ", object$bins - 1L, "}")
+## TODO(R) DELETE ME ##       # Else continuous
+## TODO(R) DELETE ME ##       } else {
+## TODO(R) DELETE ME ##         if (!all(y >= min(object$breaks) & y <= max(object$breaks)))
+## TODO(R) DELETE ME ##             stop(sprintf("elements in 'y' must be in range [%s, %s]",
+## TODO(R) DELETE ME ##                          format(min(object$breaks), format(max(object$breaks)))))
+## TODO(R) DELETE ME ##         ## If 'y' was set by the user, we must convert all values in 'y' from
+## TODO(R) DELETE ME ##         ## it's original numeric value to it's pseudo-observation (bin; int).
+## TODO(R) DELETE ME ##         if (!is.null(y)) y <- num2bin(y, object$breaks)
+## TODO(R) DELETE ME ##       }
+## TODO(R) DELETE ME ##     }
+## TODO(R) DELETE ME ## 
+## TODO(R) DELETE ME ##     # Returning prepared object
+## TODO(R) DELETE ME ##     return(newdata)
+## TODO(R) DELETE ME ## }
 
 
 #' Transition Model Probability Density Visualization

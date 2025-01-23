@@ -33,9 +33,6 @@ transitreg_response <- function(x, response, breaks, verbose = FALSE, ...) {
         "'breaks' must be numeric or NULL" = is.numeric(breaks) || is.null(breaks)
     )
 
-    # Store the name of the response for later
-    response <- names(x)[1L]
-
     ## Discretize response?
     if (!is.null(breaks)) {
         ## Create breaks automatically (if needed)
@@ -100,7 +97,7 @@ transitreg_response <- function(x, response, breaks, verbose = FALSE, ...) {
 #'        vector (or `NULL`) if there are no `theta_vars`.
 #' @param newresponse `NULL` or integer. New response vector to overwrite the one
 #'        in `data`.
-#' @param scaler Can be `FALSE`, `TRUE`, or a list. See section 'Scaler' for details.
+#' @param scaler Can be `FALSE`/`NULL`, `TRUE`, or a list. See section 'Scaler' for details.
 #' @param verbose Logical value indicating whether information about the transformation
 #'        process should be printed to the console. Default is `FALSE`.
 #'
@@ -118,7 +115,7 @@ transitreg_response <- function(x, response, breaks, verbose = FALSE, ...) {
 #' input `scaler` to this function is set `TRUE` the return of this function
 #' will provide an attribute `"scaler"` which contains a list, storing mean and
 #' standard deviation used for scaling such that it can be applied to new data
-#' (e.g., during prediction). If `FALSE` no scaling is applied, and no
+#' (e.g., during prediction). If `FALSE` or `NULL` no scaling is applied, and no
 #' attribute is set.
 #'
 #' If input `scaler` is a list, the scaling is applied given the content of that list.
@@ -178,8 +175,11 @@ transitreg_data <- function(data, response, theta_vars = NULL,
         is.null(newresponse) || (is.integer(newresponse) && all(newresponse >= 0)),
     "'verbose' must be TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
     "'scaler' must be either FALSE, TRUE, or a list" =
-        isTRUE(scaler) || isFALSE(scaler) || is.list(scaler)
+        isTRUE(scaler) || (isFALSE(scaler) || is.null(scaler)) || is.list(scaler)
   )
+
+  ## Using 'FALSE' instead of `NULL` for the rest of the function.
+  if (is.null(scaler)) scaler <- FALSE
 
   ## Ensure data is a data frame.
   if (!is.data.frame(data))

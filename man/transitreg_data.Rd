@@ -27,7 +27,7 @@ vector (or \code{NULL}) if there are no \code{theta_vars}.}
 \item{newresponse}{\code{NULL} or integer. New response vector to overwrite the one
 in \code{data}.}
 
-\item{scaler}{Can be \code{FALSE}, \code{TRUE}, or a list. See section 'Scaler' for details.}
+\item{scaler}{Can be \code{FALSE}/\code{NULL}, \code{TRUE}, or a list. See section 'Scaler' for details.}
 
 \item{verbose}{Logical value indicating whether information about the transformation
 process should be printed to the console. Default is \code{FALSE}.}
@@ -73,7 +73,7 @@ using \code{(z - mean(z)) / sd(z)} with \code{z} being a covariate or \code{thet
 input \code{scaler} to this function is set \code{TRUE} the return of this function
 will provide an attribute \code{"scaler"} which contains a list, storing mean and
 standard deviation used for scaling such that it can be applied to new data
-(e.g., during prediction). If \code{FALSE} no scaling is applied, and no
+(e.g., during prediction). If \code{FALSE} or \code{NULL} no scaling is applied, and no
 attribute is set.
 
 If input \code{scaler} is a list, the scaling is applied given the content of that list.
