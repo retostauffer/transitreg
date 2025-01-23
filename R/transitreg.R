@@ -216,13 +216,13 @@ transitreg <- function(formula, data, subset, na.action,
   ## if breaks have been specified, or the highest value of the original
   ## response variable.
   rval$bins   <- tmp$bins
+  rval$yc_tab <- table(tmp$yc)
 
   ## If breaks were specified by user (input argument), store
   ## actual breaks as well as bin mid and 'categorical' response yc.
   if (!is.null(breaks)) {
     rval$breaks <- tmp$breaks
     rval$ym     <- tmp$ym
-    rval$yc     <- tmp$yc
   }
   breaks <- tmp$breaks
   rm(tmp)
@@ -352,30 +352,22 @@ transitreg_predict <- function(object, newdata = NULL,
   )
   ## TODO(R) Not all arguments are checked above
 
-
-  ## If 'newdata' is not set we take the existing model.frame
-  mf <- if (is.null(newdata)) model.frame(object) else newdata
-
-  if (type %in% c("cdf", "pdf")) {
-      ## If 'newdata' is provided but y is empty, the response MUST be in
-      ## the 'newdata' data.frame
-      if (is.null(y) && !is.null(newdata)) {
-          if (!object$response %in% names(newdata))
-              stop("response \"", object$response, "\" not found in 'newdata'. ",
-                   "Must be in 'newdata' or provided via the extra 'y' argument.")
-      } else if (!is.null(y) && !is.null(newdata)) {
-          if (object$response %in% names(newdata)) {
-              warning("Response \"", object$response, "\" provided via 'newdata' as well as ",
-                      "via the additional argument 'y'. 'y' will overwrite ",
-                      "'newdata$", object$response, "' (w/ recycling).")
-              mf[[object$response]] <- rep(y, length.out = nrow(mf))
-          } else {
-              mf[[object$response]] <- rep(y, length.out = nrow(mf))
-          }
-      }
+  ## Convert 'y' if available
+  if (!is.null(object$breaks)) {
+      if (!is.null(y))
+          y <- num2bin(y, breaks = object$breaks)
+      if (!is.null(newdata))
+          newdata[[object$response]] <- num2bin(newdata[[object$response]], breaks = object$breaks)
   } else {
-      mf[[object$response]] <- max(object$breaks) # Absolute max
+      if (!is.null(y))
+          y <- num2bin(y, bins = object$bins)
+      if (!is.null(newdata))
+          newdata[[object$response]] <- num2bin(newdata[[object$response]], bins = object$bins)
   }
+
+  ## If 'newdata' is not set we take the existing model.frame; here the response
+  ## is already stored as 'bin indices', so we do not have to call numb2bin.
+  mf <- if (is.null(newdata)) model.frame(object) else newdata
 
   ## Guessing 'elementwise' if is NULL
   ##
@@ -407,22 +399,30 @@ transitreg_predict <- function(object, newdata = NULL,
   ## Quantile, pmax:
   ##  - Setting the pseudo-response to the highest bin. This ensures
   ##    that the entire Transition distribution is evaluated.
+  ##    (object$bins - 1) as we start with bin '0'. 3 bins? Pseudo-index 0, 1, 2 (not more).
   ## CDF/PDF:
   ##  - If elementwise = TRUE: We only need to evaluate each distribution
   ##    up to 'y[i]'.
   ##  - If elementwise = FALSE: We must evaluate each distribution up to
   ##    max(y).
   if (type %in% c("quantile", "pmax", "tp")) {
-    ## object$bins - 1 as we start with bin '0' again.
-    if (!is.null(object$breaks)) {
-        newresponse <- rep(max(object$breaks), nrow(mf))
-    } else {
-        newresponse <- rep(object$bins - 1, nrow(mf))
-    }
+    mf[[object$response]] <- rep(max(object$bins - 1), nrow(mf))
   } else {
-    newresponse <- if (elementwise) y else rep(max(y), nrow(mf))
+    ## Else highest bin specified on 'y' (if set) or highest
+    ## highest ever seen observation (yc_tab).
+    if (isTRUE(elementwise) && !is.null(y)) {
+        mf[[object$response]] <- rep(y, length.out = nrow(mf))
+    } else if (isFALSE(elementwise) && is.null(y)) {
+        mf[[object$response]] <- max(as.integer(names(object$yc_tab)))
+    } else if (!is.null(y)) {
+        mf[[object$response]] <- max(y)
+    }
   }
-  mf[[object$response]] <- newresponse
+  print(y)
+
+  message("elementwise == ", elementwise)
+  print(head(mf))
+  stop(" -------- mf ok? ----------- ")
 
   # -----------------------------------------------------------------
   ## Setting up transitreg response and model matrix for the binary
@@ -520,6 +520,27 @@ transitreg_predict <- function(object, newdata = NULL,
   return(res)
 }
 
+prediction_get_new_response <- function(newdata, y, response) {
+    ## Newdata provided (by user), y is null: Response must be in 'newdata'.
+    if (!is.null(newdata) && is.null(y)) {
+        if (!response %in% names(newdata))
+            stop("response \"", response, "\" not found in 'newdata'. ",
+                 "Must be in 'newdata' or provided via the extra 'y' argument.")
+        res <- newdata[[response]]
+    ## If both 'newdata' and 'y' are set, force to use 'y' but
+    ## throw a warning.
+    } else if (!is.null(newdata) && !is.null(y)) {
+        if (response %in% names(newdata)) {
+            warning("Response \"", response, "\" provided via 'newdata' as well
+                    as ", "via argument 'y'. 'y' will overwrite 'newdata$",
+                    object$response, "' (w/ recycling).")
+            res <- rep(y, length.out = nrow(newdata))
+        } else {
+            res <- rep(y, length.out = nrow(newdata))
+        }
+    }
+    return(res)
+}
 
 ## TODO(R) DELETE ME ## # Helper function setting up 'newdata' when using predict.transitreg
 ## TODO(R) DELETE ME ## get_newdata <- function(object, newdata, y, prob, type) {
