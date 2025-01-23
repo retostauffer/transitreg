@@ -97,6 +97,7 @@ transitreg_response <- function(x, response, breaks, ...) {
 #'        vector (or `NULL`) if there are no `theta_vars`.
 #' @param newresponse `NULL` or integer. New response vector to overwrite the one
 #'        in `data`.
+#' @param scaler Can be `FALSE`, `TRUE`, or a list. See section 'Scaler' for details.
 #' @param verbose Logical value indicating whether information about the transformation
 #'        process should be printed to the console. Default is `TRUE`.
 #'
@@ -107,14 +108,33 @@ transitreg_response <- function(x, response, breaks, ...) {
 #' binary transition indicator, representing whether a transition to a higher category
 #' occurred. For details on the modeling framework, see Berger and Tutz (2021).
 #'
+#' @section 'Scaler':
+#' When estimating new model ([transitreg()]), the user can specify `scale.x = TRUE`
+#' which will standardize all covariates as well as the `theta` variable
+#' using `(z - mean(z)) / sd(z)` with `z` being a covariate or `theta`. If the
+#' input `scaler` to this function is set `TRUE` the return of this function
+#' will provide an attribute `"scaler"` which contains a list, storing mean and
+#' standard deviation used for scaling such that it can be applied to new data
+#' (e.g., during prediction). If `FALSE` no scaling is applied, and no
+#' attribute is set.
+#'
+#' If input `scaler` is a list, the scaling is applied given the content of that list.
+#' No additional attribute will be set on the return value.
+#'
 #' @return
-#'   A transformed data frame in the long format. Each row represents a binary transition
-#'   indicator (`Y`) for the response variable. Additional columns in the output include:
+#' A transformed data frame in the long format. Each row represents a binary transition
+#' indicator (`Y`) for the response variable. Additional columns in the output include:
 #'
 #' * `index`: The original row index from the input data.
 #' * `Y`: The binary indicator for whether a transition to a higher
 #'       category occurred.
 #' * `theta`: The level corresponding to the current transition.
+#' * `theta[0-9]+`: Special binary variables which are `1L` for all rows where
+#'   (the unscaled) `theta` matches the integer `[0-9]+$`, else `0L`. Indicator
+#'   that we are in bin `[0-9]+$`. Only set if `theta_vars` is specified accordingly.
+#'
+#' The return will contain the response name as attribute `"response"` and (potentially)
+#' a `"scaler"` attribute (see section 'Scaler').
 #'
 #' This format is required for fitting transition models using GLM or GAM frameworks.
 #' For instance, a response variable with a value of 3 will generate rows with
@@ -142,7 +162,7 @@ transitreg_response <- function(x, response, breaks, ...) {
 #'
 #' @author Niki
 transitreg_data <- function(data, response, theta_vars = NULL,
-                            newresponse = NULL, verbose = TRUE) {
+                            newresponse = NULL, scaler = NULL, verbose = TRUE) {
 
   stopifnot(
     "'response' must be NULL or a character of length 1" =
@@ -153,7 +173,9 @@ transitreg_data <- function(data, response, theta_vars = NULL,
         is.null(theta_vars) || is.character(theta_vars),
     "'newresponse' must be NULL or bins (0, 1, 2, ...)" =
         is.null(newresponse) || (is.integer(newresponse) && all(newresponse >= 0)),
-    "'verbose' must be TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose)
+    "'verbose' must be TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
+    "'scaler' must be either FALSE, TRUE, or a list" =
+        isTRUE(scaler) || isFALSE(scaler) || is.list(scaler)
   )
 
   ## Ensure data is a data frame.
@@ -220,6 +242,10 @@ transitreg_data <- function(data, response, theta_vars = NULL,
   ## Names of list elements.
   names_out <- c("index", "Y", "theta", names(data))
 
+  ## Named of all elements which MUST NOT BE standardized, even if a scaler is
+  ## provided or scaler is set TRUE.
+  names_dont_scale <- c("index", "Y", response, theta_vars)
+
   ## Building index vector; each observation 1:nrow(data) gets its unique index
   result <- list()
   result$index <- rep(seq_len(nrow(data)), times = data[[response]] + 1L)
@@ -248,6 +274,7 @@ transitreg_data <- function(data, response, theta_vars = NULL,
           result[[tv]] <- integer(length(result$theta)) # Initialize 0s
           result[[tv]][result$theta == tint] <- 1L
       }
+
   }
 
   ## Appending the remaining data from 'data'.
@@ -265,10 +292,36 @@ transitreg_data <- function(data, response, theta_vars = NULL,
 
   result <- as.data.frame(result)
 
+  ## scaler == TRUE (comes from `scale.x = TRUE` when calling `transitreg()`; initial
+  ## standartizaion of all covariates as well as theta. Perform scaling and keep the
+  ## used first and second order momentum. Will be added as an attribute to the return.
+  if (isTRUE(scaler)) {
+      scaler <- list()
+      for (j in names(result)[!names(result) %in% names_dont_scale]) {
+        if (!is.factor(result[[j]])) {
+            scaler[[j]] <- list("mean" = mean(result[[j]]), "sd" = sd(result[[j]]))
+            result[[j]] <- (result[[j]] - scaler[[j]]$mean) / scaler[[j]]$sd
+        }
+      }
+      scaler$theta <- list("mean" = mean(result$theta), "sd" = sd(result$theta))
+      result$theta <- (result$theta - scaler$theta$mean) / scaler$theta$sd
+  ## Existing 'scaler' is provided, typically used when performing predictions and
+  ## new data ('newdata') are provided by the user on the original (unscaled) scale.
+  ## Will apply the ame scaling as on the initial model estimation.
+  } else if (is.list(scaler)) {
+      stop('apply existing scaler now Reto')
+  } else {
+      scaler <- NULL
+  }
+
   ## Attach the response column as an attribute.
   attr(result, "response") <- response
+  attr(result, "scaler")   <- scaler
 
   return(result)
 }
+
+
+
 
 

@@ -9,6 +9,7 @@ transitreg_data(
   response,
   theta_vars = NULL,
   newresponse = NULL,
+  scaler = NULL,
   verbose = TRUE
 )
 }
@@ -26,6 +27,8 @@ vector (or \code{NULL}) if there are no \code{theta_vars}.}
 \item{newresponse}{\code{NULL} or integer. New response vector to overwrite the one
 in \code{data}.}
 
+\item{scaler}{Can be \code{FALSE}, \code{TRUE}, or a list. See section 'Scaler' for details.}
+
 \item{verbose}{Logical value indicating whether information about the transformation
 process should be printed to the console. Default is \code{TRUE}.}
 }
@@ -37,7 +40,13 @@ indicator (\code{Y}) for the response variable. Additional columns in the output
 \item \code{Y}: The binary indicator for whether a transition to a higher
 category occurred.
 \item \code{theta}: The level corresponding to the current transition.
+\item \verb{theta[0-9]+}: Special binary variables which are \code{1L} for all rows where
+(the unscaled) \code{theta} matches the integer \verb{[0-9]+$}, else \code{0L}. Indicator
+that we are in bin \verb{[0-9]+$}. Only set if \code{theta_vars} is specified accordingly.
 }
+
+The return will contain the response name as attribute \code{"response"} and (potentially)
+a \code{"scaler"} attribute (see section 'Scaler').
 
 This format is required for fitting transition models using GLM or GAM frameworks.
 For instance, a response variable with a value of 3 will generate rows with
@@ -56,6 +65,21 @@ suitable for such models. Each row in the resulting data frame corresponds to a
 binary transition indicator, representing whether a transition to a higher category
 occurred. For details on the modeling framework, see Berger and Tutz (2021).
 }
+\section{'Scaler'}{
+
+When estimating new model (\code{\link[=transitreg]{transitreg()}}), the user can specify \code{scale.x = TRUE}
+which will standardize all covariates as well as the \code{theta} variable
+using \code{(z - mean(z)) / sd(z)} with \code{z} being a covariate or \code{theta}. If the
+input \code{scaler} to this function is set \code{TRUE} the return of this function
+will provide an attribute \code{"scaler"} which contains a list, storing mean and
+standard deviation used for scaling such that it can be applied to new data
+(e.g., during prediction). If \code{FALSE} no scaling is applied, and no
+attribute is set.
+
+If input \code{scaler} is a list, the scaling is applied given the content of that list.
+No additional attribute will be set on the return value.
+}
+
 \examples{
 ## Raw data frame.
 d <- data.frame(

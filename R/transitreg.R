@@ -162,7 +162,8 @@ transitreg <- function(formula, data, subset, na.action,
   ## Staying sane
   stopifnot(
     "'ncores' must be NULL or numeric" = is.null(ncores) || is.numeric(ncores),
-    "'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose)
+    "'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
+    "'scale.x' must be FALSE or TRUE" = isFALSE(scale.x) || isTRUE(scale.x)
   )
   ncores <- transitreg_get_number_of_cores(ncores, verbose = verbose)
 
@@ -194,58 +195,47 @@ transitreg <- function(formula, data, subset, na.action,
   mf <- eval(mf, parent.frame())
 
   ## Response name.
-  response <- response_name(formula)
-
   yscale <- NULL
+
+
+  ## Setting up empty list for return value
+  rval <- list()
+  rval$response <- response_name(formula)
 
   ## ----------------------------------------------------------------
   ## Setting up model response; discretizises the data if needed.
   ## ----------------------------------------------------------------
-  tmp    <- transitreg_response(mf, response, breaks, ...)
-  # Store returned values
-  # TODO(R): This is not sexy but works
-  mf     <- tmp$mf
-  bins   <- tmp$bins
-  breaks <- tmp$breaks
-  ym     <- tmp$ym
-  yc     <- tmp$yc
+  tmp    <- transitreg_response(mf, rval$response, breaks, ...)
+
+  # Store modified model.frame
+  mf <- tmp$mf
+
+  ## We always store the 'bins'. This is either length(breaks) - 1L
+  ## if breaks have been specified, or the highest value of the original
+  ## response variable.
+  rval$bins   <- tmp$bins
+
+  ## If breaks were specified by user (input argument), store
+  ## actual breaks as well as bin mid and 'categorical' response yc.
+  if (!is.null(breaks)) {
+    rval$breaks <- tmp$breaks
+    rval$ym     <- tmp$ym
+    rval$yc     <- tmp$yc
+  }
   rm(tmp)
 
+
   ## Max. counts.
-  ymax <- max(mf[[response]], na.rm = TRUE)
+  ymax <- max(mf[[rval$response]], na.rm = TRUE)
   k    <- min(c(ymax - 1L, 20L))
 
-  ## Scaling covariates if requrested by user.
-  scaler <- NULL
-  if (scale.x && ncol(mf) > 1L) {
-    scaler <- list()
-    for (j in names(mf)[-1L]) {
-        print(j)
-      if (!is.factor(mf[[j]])) {
-        scaler[[j]] <- list("mean" = mean(mf[[j]]), "sd" = sd(mf[[j]]))
-        mf[[j]] <- (mf[[j]] - scaler[[j]]$mean) / scaler[[j]]$sd
-      }
-    }
-  }
-
   ## Transform data.
-  tmf <- transitreg_data(mf, response = response, theta_vars = theta_vars, verbose = verbose)
+  tmf <- transitreg_data(mf, response = rval$response,
+                         theta_vars = theta_vars,
+                         scaler = scale.x, verbose = verbose)
 
-  ## Scaling 'theta' column
-  if (!is.null(scaler)) {
-    scaler$theta <- list("mean" = mean(tmf$theta), "sd" = sd(tmf$theta))
-    tmf$theta <- (tmf$theta - scaler$theta$mean) / scaler$theta$sd
-  }
-
-  if (length(theta_vars)) {
-    for (j in theta_vars) {
-      i <- as.integer(gsub("theta", "", j))
-      tmf[[j]] <- as.integer(tmf$theta == i)
-    }
-  }
-
-  ## Setup return value.
-  rval <- list()
+  ## Store scailer, returned as attribute on 'tmf' if used.
+  rval$scaler <- if (scale.x) attr(tmf, "scaler") else NULL
 
   ## New formula.
   if (engine %in% c("gam", "bam")) {
@@ -253,7 +243,6 @@ transitreg <- function(formula, data, subset, na.action,
       tmf$theta <- as.factor(tmf$theta)
       rval$new_formula <- update(formula, as.factor(Y) ~ theta + .)
     } else {
-      ##rval$new_formula <- eval(parse(text = paste0("update(formula, Y ~ s(theta,k=", k, ") + .)")))
       rval$new_formula <- update(formula, Y ~ .)
     }
   } else {
@@ -276,11 +265,9 @@ transitreg <- function(formula, data, subset, na.action,
   }
   options("warn" = warn)
 
-  ## Additional info.
-  rval$response    <- response # Name of the response variable
+  ## Storing additional info on return object.
   rval$model.frame <- mf       # Model frame (with 'binned' response)
-  rval$scaler      <- scaler
-  rval$maxcounts   <- max(mf[[response]]) # Highest count in response
+  rval$maxcounts   <- max(mf[[rval$response]]) # Highest count in response
   rval$theta_vars  <- theta_vars
   rval$factor      <- isTRUE(list(...)$factor)
 
@@ -301,11 +288,11 @@ transitreg <- function(formula, data, subset, na.action,
   ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.
   args <- list(uidx = ui, idx = tmf$index,
-               tp = tp, y = mf[[response]], breaks = breaks, ncores = ncores)
+               tp = tp, y = mf[[rval$response]], breaks = rval$breaks, ncores = ncores)
 
   ## Calling C
   args <- check_args_for_treg_predict_pdfcdf(args)
-  tmp <- do.call(function(...) .Call("treg_predict_pdfcdf", ...), args)
+  tmp  <- do.call(function(...) .Call("treg_predict_pdfcdf", ...), args)
 
   ## Fixing values close to 0/1
   tmp$pdf[tmp$pdf < 1e-15]    <- 1e-15
@@ -314,18 +301,6 @@ transitreg <- function(formula, data, subset, na.action,
 
   rval$probs <- as.data.frame(tmp)
   rm(tmp)
-
-  ## We always store 'bins'. In case 'breaks' are specified, the number of bins
-  ## is length(breaks) - 1L. If !is.null(breaks), 'bins' is the higest integer
-  ## of the original response.
-  rval$bins <- bins
-
-  ## If binning.
-  if (!is.null(breaks)) {
-    rval$breaks <- breaks       # breaks
-    rval$ym     <- ym           # bin mids
-    rval$yc_tab <- table(yc)
-  }
 
   ## Assign class.
   class(rval) <- "transitreg"
