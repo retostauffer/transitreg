@@ -10,7 +10,7 @@ transitreg_data(
   theta_vars = NULL,
   newresponse = NULL,
   scaler = NULL,
-  verbose = TRUE
+  verbose = FALSE
 )
 }
 \arguments{
@@ -30,7 +30,7 @@ in \code{data}.}
 \item{scaler}{Can be \code{FALSE}, \code{TRUE}, or a list. See section 'Scaler' for details.}
 
 \item{verbose}{Logical value indicating whether information about the transformation
-process should be printed to the console. Default is \code{TRUE}.}
+process should be printed to the console. Default is \code{FALSE}.}
 }
 \value{
 A transformed data frame in the long format. Each row represents a binary transition

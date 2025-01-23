@@ -205,7 +205,8 @@ transitreg <- function(formula, data, subset, na.action,
   ## ----------------------------------------------------------------
   ## Setting up model response; discretizises the data if needed.
   ## ----------------------------------------------------------------
-  tmp    <- transitreg_response(mf, rval$response, breaks, ...)
+  tmp    <- transitreg_response(mf, response = rval$response,
+                                breaks = breaks, verbose = verbose, ...)
 
   # Store modified model.frame
   mf <- tmp$mf
@@ -222,6 +223,7 @@ transitreg <- function(formula, data, subset, na.action,
     rval$ym     <- tmp$ym
     rval$yc     <- tmp$yc
   }
+  breaks <- tmp$breaks
   rm(tmp)
 
 
@@ -288,7 +290,7 @@ transitreg <- function(formula, data, subset, na.action,
   ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.
   args <- list(uidx = ui, idx = tmf$index,
-               tp = tp, y = mf[[rval$response]], breaks = rval$breaks, ncores = ncores)
+               tp = tp, y = mf[[rval$response]], breaks = breaks, ncores = ncores)
 
   ## Calling C
   args <- check_args_for_treg_predict_pdfcdf(args)

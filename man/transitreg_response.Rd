@@ -4,7 +4,7 @@
 \alias{transitreg_response}
 \title{Building Model Response for Transition Model}
 \usage{
-transitreg_response(x, response, breaks, ...)
+transitreg_response(x, response, breaks, verbose = FALSE, ...)
 }
 \arguments{
 \item{x}{model framme, a \code{data.frame} where the first variable is expected
@@ -14,6 +14,11 @@ to be the model response.}
 
 \item{breaks}{numeric vector with breaks for discretizing the original response.
 Can be \code{NULL} if no discretization is required.}
+
+\item{verbose}{Logical value indicating whether information about the transformation
+process should be printed to the console. Default is \code{FALSE}.}
+
+\item{\dots}{Additional options forwarded from \verb{[transitreg()]}.}
 }
 \value{
 Named list with the following three elements:

@@ -11,6 +11,9 @@
 #' @param response Character of length one, name of the response variable.
 #' @param breaks numeric vector with breaks for discretizing the original response.
 #'        Can be `NULL` if no discretization is required.
+#' @param verbose Logical value indicating whether information about the transformation
+#'        process should be printed to the console. Default is `FALSE`.
+#' @param \dots Additional options forwarded from `[transitreg()]`.
 #'
 #' @return Named list with the following three elements:
 #'
@@ -20,7 +23,7 @@
 #' * `bins`: Number of bins, same as `length(breaks) - 1L`.
 #' * `ym`: mid-point of the bins.
 #' * `yc`: index vector, (pseudo-)bin index/number.
-transitreg_response <- function(x, response, breaks, ...) {
+transitreg_response <- function(x, response, breaks, verbose = FALSE, ...) {
     stopifnot(
         "'x' must be a data.frame with positive dimensions" =
             is.data.frame(x) && length(dim(x)) == 2L && all(dim(x) > 0),
@@ -75,7 +78,7 @@ transitreg_response <- function(x, response, breaks, ...) {
         breaks <- seq_len(bins + 1) - 1.5 # 'Integer' bins
         if (verbose) message("Response considered to be count data, using max count ", bins - 1)
 
-        result <- list(mf = x, breaks = NULL, bins = bins, ym = NULL, yc = NULL)
+        result <- list(mf = x, breaks = breaks, bins = bins, ym = NULL, yc = NULL)
     }
 
     return(result)
@@ -99,7 +102,7 @@ transitreg_response <- function(x, response, breaks, ...) {
 #'        in `data`.
 #' @param scaler Can be `FALSE`, `TRUE`, or a list. See section 'Scaler' for details.
 #' @param verbose Logical value indicating whether information about the transformation
-#'        process should be printed to the console. Default is `TRUE`.
+#'        process should be printed to the console. Default is `FALSE`.
 #'
 #' @details
 #' Transition models focus on modeling the conditional probabilities of transitions
@@ -162,7 +165,7 @@ transitreg_response <- function(x, response, breaks, ...) {
 #'
 #' @author Niki
 transitreg_data <- function(data, response, theta_vars = NULL,
-                            newresponse = NULL, scaler = NULL, verbose = TRUE) {
+                            newresponse = NULL, scaler = NULL, verbose = FALSE) {
 
   stopifnot(
     "'response' must be NULL or a character of length 1" =
