@@ -763,20 +763,16 @@ plot.Transition <- function(x, type = c("tp", "cdf", "pdf"), all = FALSE, n = 8L
     # Take first 1:n distributions only
     if (length(x) > n & !all) x <- x[seq_len(n)]
 
-    breaks <- attr(x, "breaks")
-
+    binmid <- (head(breaks, -1) + tail(breaks, -1)) / 2 # Mid of bin
     if (type == "tp") {
-        x <- (head(breaks, -1) + tail(breaks, -1)) / 2 # Mid of bin
-        m <- as.matrix(x)
+        m  <- as.matrix(x)
     } else if (type == "cdf") {
-        x <- seq(min(breaks), max(breaks), length.out = length(x))
-        m <- cdf(x, x, elementwise = FALSE, drop = FALSE)
+        m  <- cdf(x, binmid, elementwise = FALSE, drop = FALSE)
     } else {
-        x <- seq(min(breaks), max(breaks), length.out = length(x))
-        m <- pdf(x, x, elementwise = FALSE, drop = FALSE)
+        m  <- pdf(x, binmid, elementwise = FALSE, drop = FALSE)
     }
 
-    matplot(x = x, y = t(m), type = "l",
+    matplot(x = binmid, y = t(m), type = "l",
             lty = 1, main = titles[type], ...)
 
     axis(side = 1, at = breaks, labels = FALSE, col = 1, tck = 0.015)

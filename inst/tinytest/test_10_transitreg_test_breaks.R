@@ -27,6 +27,14 @@ expect_identical(m1$bins, as.integer(max(ndp$y) * 3),
                info = "Checking number of bins (max response value * 3 as n <= 10)")
 expect_identical(m1$breaks, NULL,
                info = "No user-defined breaks, thus 'breaks' must be NULL")
+# The function get_braks will return 'pseudo breaks' centered arou nd 0, ..., m1$bins - 1L
+tmp <- seq.int(0L, m1$bins) - 0.5
+expect_equal(transitreg:::get_breaks(m1), tmp,
+               info = "Checking pseudo-breaks for count data response")
+# Mid points used get_breaks() and calculates mid points. In this model this
+# should be equal to 0, 1, 2, ..., m2$bins - 1L
+expect_equal(transitreg:::get_mids(m1), seq(0, m1$bins - 1L),
+               info = "Checking return of get_mids() helper function")
 rm(m1)
 
 
@@ -45,6 +53,13 @@ expect_identical(m2$bins, nbk - 1L,
                info = "Checking number of bins")
 expect_equal(m2$breaks, seq(-0.8, 8.8, length.out = m2$bins + 1),
                info = "Breaks are alculated automatically via make_breaks()")
+# Breaks are stored on the object, get_breaks should return the exact same.
+expect_equal((tmp <- transitreg:::get_breaks(m2)), m2$breaks,
+               info = "Checking response of get_breaks() helper function")
+# Checking get_mids helper function
+tmp_mid <- (tmp[-1L] + tmp[-length(tmp)]) / 2.0
+expect_equal(transitreg:::get_mids(m2), tmp_mid,
+               info = "Checking return of get_mids() helper function")
 rm(m2, nbk)
 
 
@@ -58,7 +73,14 @@ expect_inherits(m3, "transitreg",
 expect_identical(m3$bins, length(bk) - 1L,
                info = "Checking number of bins")
 expect_equal(m3$breaks, bk,
-               info = "Test that the breaks are our user-defined breaks.")
+               info = "Test that the breaks are our user-defined breaks")
+# Checking helper function 'get_breaks()'
+expect_equal(transitreg:::get_breaks(m3), bk,
+               info = "Testing return of get_breaks() helper function")
+# Checking get_mids helper function
+tmp_mid <- (bk[-1L] + bk[-length(bk)]) / 2.0
+expect_equal(transitreg:::get_mids(m3), tmp_mid,
+               info = "Checking return of get_mids() helper function")
 rm(m3)
 
 

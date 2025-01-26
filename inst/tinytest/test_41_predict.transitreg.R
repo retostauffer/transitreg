@@ -24,18 +24,19 @@ data <- data.frame(y = rnorm(truth$N, truth$mu, truth$sd),
 # distribution.
 w <- diff(range(data$y))
 breaks <- seq(min(data$y) - 0.2 * w, max(data$y) + 0.2 * w, length.out = 201)
+mids   <- (head(breaks, -1L) + tail(breaks, -1L)) / 2
 
 expect_silent(mod <- transitreg(y ~ s(theta), data = data, breaks = breaks),
               info = "Estimating transitional regression model")
 expect_inherits(mod, "transitreg", info = "Checking transitreg() return class")
 expect_identical(mod$breaks, breaks, info = "Testing if the breaks have been stored correctly")
-expect_identical(mod$bins, length(breaks) - 1L, info = "Testing number of bins")
+expect_identical(transitreg:::get_breaks(mod), breaks,
+               info = "Testing get_breaks() helper function")
+expect_identical(transitreg:::get_mids(mod), mids,
+               info = "Testing get_mids() helper function")
+expect_identical(mod$bins, length(mids),
+               info = "Testing number of bins")
 
-
-# Calculating center of the bins
-binmid <- (head(mod$breaks, -1) + tail(mod$breaks, -1)) / 2
-expect_identical(length(binmid), length(mod$breaks) - 1L) # <- safety measure
-expect_identical(length(binmid), mod$bins) # <- safety measure
 
 # Newdata for the prediction
 nd <- data.frame(dummy_value = 42)
@@ -45,15 +46,15 @@ nd <- data.frame(dummy_value = 42)
 # -------------------------------------------------------------------
 
 # Our ground truth
-expect_silent(true_pdf <- dnorm(binmid, truth$mu, truth$sd))
-
+expect_silent(true_pdf <- dnorm(mids, truth$mu, truth$sd))
 # This uses 'elementwise = FALSE' by default.
-expect_true(is.numeric(true_pdf) && length(true_pdf) == length(binmid),
+expect_true(is.numeric(true_pdf) && length(true_pdf) == length(mids),
                info = "Testing if 'true_pdf' has been calculated properly")
+
 # Testing against the same result using elementwise = FALSE
-expect_silent(mod_pdf  <- predict(mod, newdata = nd, y = binmid, type = "pdf"),
+expect_silent(mod_pdf  <- predict(mod, newdata = nd, y = mids, type = "pdf"),
                info = "Predicting PDF based on the transitreg model (elementwise = NULL)")
-expect_silent(mod_pdf2 <- predict(mod, newdata = nd, y = binmid, type = "pdf", elementwise = FALSE),
+expect_silent(mod_pdf2 <- predict(mod, newdata = nd, y = mids, type = "pdf", elementwise = FALSE),
                info = "Predicting PDF based on the transitreg model (elementwise = FALSE)")
 expect_identical(mod_pdf, mod_pdf2, info = "Comparing result (PDF) with elementwise NULL/FALSE")
 rm(mod_pdf2)
@@ -61,13 +62,14 @@ rm(mod_pdf2)
 # Checking returned object
 expect_inherits(mod_pdf, "matrix",
               info = "Testing return class")
-expect_identical(dim(mod_pdf), c(nrow(nd), length(binmid)),
+expect_identical(dim(mod_pdf), c(nrow(nd), length(mids)),
               info = "Dimension of returned matrix")
 expect_true(all(mod_pdf >= 0),
               info = "Quick check on range of PDF")
-expect_identical(dimnames(mod_pdf), list(NULL, sprintf("d_%d", seq_along(binmid) - 1)),
-              info = "Checking dimnames of returned matrix")
-
+expect_true(is.null(rownames(mod_pdf)),
+              info = "Checking rownames of returned matrix")
+expect_true(all(grepl("d_(-)?[0-9\\.]+(_[0-9]+)?$", colnames(mod_pdf))),
+              info = "Checking colnames of returned matrix")
 
 # If the model and the prediction method work as expected, the difference
 # between the true CDF and the predicted CDF should be small (elementwise)
@@ -83,15 +85,15 @@ rm(true_pdf, mod_pdf)
 # -------------------------------------------------------------------
 
 # Our ground truth
-expect_silent(true_cdf <- pnorm(binmid, truth$mu, truth$sd))
-
+expect_silent(true_cdf <- pnorm(mids, truth$mu, truth$sd))
 # This uses 'elementwise = FALSE' by default.
-expect_true(is.numeric(true_cdf) && length(true_cdf) == length(binmid),
+expect_true(is.numeric(true_cdf) && length(true_cdf) == length(mids),
                info = "Testing if 'true_cdf' has been calculated properly")
+
 # Testing against the same result using elementwise = FALSE
-expect_silent(mod_cdf  <- predict(mod, newdata = nd, y = binmid, type = "cdf"),
+expect_silent(mod_cdf  <- predict(mod, newdata = nd, y = mids, type = "cdf"),
                info = "Predicting CDF based on the transitreg model (elementwise = NULL)")
-expect_silent(mod_cdf2 <- predict(mod, newdata = nd, y = binmid, type = "cdf", elementwise = FALSE),
+expect_silent(mod_cdf2 <- predict(mod, newdata = nd, y = mids, type = "cdf", elementwise = FALSE),
                info = "Predicting CDF based on the transitreg model (elementwise = FALSE)")
 expect_identical(mod_cdf, mod_cdf2, info = "Comparing result (CDF) with elementwise NULL/FALSE")
 rm(mod_cdf2)
@@ -99,16 +101,18 @@ rm(mod_cdf2)
 # Checking returned object
 expect_inherits(mod_cdf, "matrix",
               info = "Testing return class")
-expect_identical(dim(mod_cdf), c(nrow(nd), length(binmid)),
+expect_identical(dim(mod_cdf), c(nrow(nd), length(mids)),
               info = "Dimension of returned matrix")
 expect_true(all(mod_cdf >= 0 & mod_cdf <= 1),
               info = "Quick check on range of CDF")
-expect_identical(dimnames(mod_cdf), list(NULL, sprintf("p_%d", seq_along(binmid) - 1)),
-              info = "Checking dimnames of returned matrix")
+expect_true(is.null(rownames(mod_cdf)),
+              info = "Checking rownames of returned matrix")
+expect_true(all(grepl("p_(-)?[0-9\\.]+(_[0-9]+)?$", colnames(mod_cdf))),
+              info = "Checking colnames of returned matrix")
 
 # If the model and the prediction method work as expected, the difference
 # between the true CDF and the predicted CDF should be small (elementwise)
-expect_true(all(abs(mod_cdf - true_cdf) < 1e-2),
+expect_true(all(abs(mod_cdf - true_cdf) < 5e-3),
               info = "Checking elementwise difference between predicted CDF and ground truth.")
 rm(true_cdf, mod_cdf)
 
@@ -172,9 +176,9 @@ expect_true(all(diff(tp) < 0),
                info = "Transition probabilities must be monotonically decreasing")
 
 # Calculate PDF, CDF
-expect_silent(tp_pdf <- predict(mod, newdata = nd, y = binmid, type = "pdf"),
+expect_silent(tp_pdf <- predict(mod, newdata = nd, y = mids, type = "pdf"),
                info = "Predicting PDF for a test")
-expect_silent(tp_cdf <- predict(mod, newdata = nd, y = binmid, type = "cdf"),
+expect_silent(tp_cdf <- predict(mod, newdata = nd, y = mids, type = "cdf"),
                info = "Predicting CDF for a test")
 expect_equal(convert_tp(tp, from = "tp", to = "cdf"), unname(tp_cdf[1, ]),
                info = "Testing conversion from TP to CDF")
@@ -206,7 +210,7 @@ expect_identical(tp2[1, ], tp2[2, ],
 rm(tp2)
 
 # CDF
-expect_silent(cdf2 <- predict(mod, newdata = nd2, binmid, type = "cdf"),
+expect_silent(cdf2 <- predict(mod, newdata = nd2, mids, type = "cdf"),
                info = "Predicting transition probabilities for two data points")
 expect_inherits(cdf2, "matrix",
                info = "Return is a matrix array")
@@ -214,7 +218,7 @@ expect_true(is.numeric(cdf2),
                info = "Matrix must be numeric")
 expect_identical(dim(cdf2), c(nrow(nd2), mod$bins),
                info = "Testing matrix dimension")
-expect_true(all(grepl("^p_[0-9]+$", colnames(cdf2))),
+expect_true(all(grepl("^p_(-)?[0-9\\.]+(_[0-9]+)?$", colnames(cdf2))),
                info = "Checking if matrix column name are as expected.")
 expect_true(is.null(rownames(cdf2)),
                info = "Checking if matrix row name are as expected.")
@@ -223,7 +227,7 @@ expect_identical(cdf2[1, ], cdf2[2, ],
 rm(cdf2)
 
 # PDF
-expect_silent(pdf2 <- predict(mod, newdata = nd2, binmid, type = "pdf"),
+expect_silent(pdf2 <- predict(mod, newdata = nd2, mids, type = "pdf"),
                info = "Predicting transition probabilities for two data points")
 expect_inherits(pdf2, "matrix",
                info = "Return is a matrix array")
@@ -231,7 +235,7 @@ expect_true(is.numeric(pdf2),
                info = "Matrix must be numeric")
 expect_identical(dim(pdf2), c(nrow(nd2), mod$bins),
                info = "Testing matrix dimension")
-expect_true(all(grepl("^d_[0-9]+$", colnames(pdf2))),
+expect_true(all(grepl("^d_(-)?[0-9\\.]+(_[0-9]+)?$", colnames(pdf2))),
                info = "Checking if matrix column name are as expected.")
 expect_true(is.null(rownames(pdf2)),
                info = "Checking if matrix row name are as expected.")

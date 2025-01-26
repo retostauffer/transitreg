@@ -74,7 +74,7 @@ plot(b, which = 3:4, spar = FALSE)
 
 }
 \seealso{
-\code{\link[=transitreg]{transitreg()}}, \code{\link[=transitreg_dist]{transitreg_dist()}}, \code{\link[=transitreg_data]{transitreg_data()}}, \code{\link[=predict.transitreg]{predict.transitreg()}}.
+\code{\link[=transitreg]{transitreg()}}, \code{\link[=transitreg_dist]{transitreg_dist()}}, \code{\link[=transitreg_tmf]{transitreg_tmf()}}, \code{\link[=predict.transitreg]{predict.transitreg()}}.
 }
 \keyword{methods}
 \keyword{models}

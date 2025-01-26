@@ -80,7 +80,7 @@ a fixed distribution for the response variable. Estimation relies on \pkg{mgcv}
 infrastructure for GLM-type binary modeling.
 }
 \details{
-The function transforms the input data using \code{\link[=transitreg_data]{transitreg_data()}} to a format
+The function transforms the input data using \code{\link[=transitreg_tmf]{transitreg_tmf()}} to a format
 compatible with transition models. Estimation relies on binary GLM-type techniques
 to model conditional transition probabilities. Note that the \code{theta} variable, representing
 the current transition level, must be included in the model by the user, please
@@ -191,7 +191,7 @@ matplot(nd$x, fit, type = "l", lty = 1, lwd = 2,
 
 }
 \seealso{
-\code{\link[=transitreg_data]{transitreg_data()}}, \code{\link[=transitreg_dist]{transitreg_dist()}}, \code{\link[mgcv:gam]{mgcv::gam()}}
+\code{\link[=transitreg_tmf]{transitreg_tmf()}}, \code{\link[=transitreg_dist]{transitreg_dist()}}, \code{\link[mgcv:gam]{mgcv::gam()}}
 }
 \author{
 Niki

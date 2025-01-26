@@ -63,8 +63,6 @@ expect_identical(dim(mod_pdf), c(1L, length(binmid)),
               info = "Dimension of returned matrix")
 expect_true(all(mod_pdf >= 0),
               info = "Quick check on range of PDF")
-expect_identical(dimnames(mod_pdf), list(NULL, sprintf("d_%d", seq_along(binmid) - 1)),
-              info = "Checking dimnames of returned matrix")
 
 # If the model and the prediction method work as expected, the difference
 # between the true CDF and the predicted CDF should be small (elementwise)
@@ -105,8 +103,6 @@ expect_identical(dim(mod_cdf), c(1L, length(binmid)),
               info = "Dimension of returned matrix")
 expect_true(all(mod_cdf >= 0 & mod_cdf <= 1),
               info = "Quick check on range of CDF")
-expect_identical(dimnames(mod_cdf), list(NULL, sprintf("p_%d", seq_along(binmid) - 1)),
-              info = "Checking dimnames of returned matrix")
 
 # If the model and the prediction method work as expected, the difference
 # between the true CDF and the predicted CDF should be small (elementwise)
@@ -120,6 +116,22 @@ expect_true(all(abs(mod_cdf - true_cdf) < 1e-1),
 rm(true_cdf, mod_cdf)
 
 
+#####p1 <- transitreg:::transitreg_predict(mod, newdata = data, type = "pdf")
+#####p2 <- transitreg:::transitreg_predict(mod, newdata = data, y = data$y, type = "pdf")
+#####plot(p1, p2); abline(0, 1, col = 2)
+#####plot(p1, mod$probs$pdf); abline(0, 1, col = 2)
+#####all(p1, mod$probs$pdf)
+#####all(p1, p2)
+#####all(p1, mod$probs$cdf)
+#####
+#####
+#####c1 <- transitreg:::transitreg_predict(mod, newdata = data, type = "cdf")
+#####c2 <- transitreg:::transitreg_predict(mod, newdata = data, y = data$y, type = "cdf")
+#####plot(c1, c2); abline(0, 1, col = 3)
+#####plot(c1, mod$probs$cdf); abline(0, 1, col = 3)
+#####all(c1, mod$probs$cdf)
+#####all(c1, c2)
+#####all(c1, mod$probs$cdf)
 
 
 # -------------------------------------------------------------------

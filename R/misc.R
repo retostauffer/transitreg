@@ -541,6 +541,21 @@ num2bin <- function(x, breaks = NULL, bins = NULL) {
     return(res)
 }
 
+# Converts bin index (idx) to numeric values, using the center
+# of the bin (defined by breaks) the index falls into. For
+# indices equal to -1, or indices > max bins the return will
+# be set to the minimum/maximum break (i.e., the edge of the
+# defined range).
+bin2num <- function(idx, breaks) {
+    # Bin mid
+    bm <- (head(breaks, -1) + tail(breaks, -1)) / 2
+    ## Append minimum on the lower end and maximum on the upper end,
+    ## used for 'indices' falling out of the range; they are set -1
+    ## on the lower end, and one index above the higehst bin.
+    bm <- c(min(breaks), bm, max(breaks))
+    bm[idx + 2L]
+}
+
 
 #' Create Breaks for (Pseudo-)bins
 #'

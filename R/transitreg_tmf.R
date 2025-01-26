@@ -1,86 +1,4 @@
 
-
-#' Building Model Response for Transition Model
-#'
-#' To estimate a model as well as to perform predictions the model frame needs
-#' to be built. This function (for internal use only) sets up the model
-#' response properly, scaling and discretizising the response (if requested).
-#'
-#' @param x model framme, a `data.frame` where the first variable is expected
-#'        to be the model response.
-#' @param response Character of length one, name of the response variable.
-#' @param breaks numeric vector with breaks for discretizing the original response.
-#'        Can be `NULL` if no discretization is required.
-#' @param verbose Logical value indicating whether information about the transformation
-#'        process should be printed to the console. Default is `FALSE`.
-#' @param \dots Additional options forwarded from `[transitreg()]`.
-#'
-#' @return Named list with the following three elements:
-#'
-#' * `mf`: Modified version of input `x`; altered response with (pseudo-)bins
-#'   if required.
-#' * `breaks`: Numeric vector with breaks, point intersection between (pseudo-)bins.
-#' * `bins`: Number of bins, same as `length(breaks) - 1L`.
-#' * `ym`: mid-point of the bins.
-#' * `yc`: index vector, (pseudo-)bin index/number.
-transitreg_response <- function(x, response, breaks, verbose = FALSE, ...) {
-    stopifnot(
-        "'x' must be a data.frame with positive dimensions" =
-            is.data.frame(x) && length(dim(x)) == 2L && all(dim(x) > 0),
-        "all variables in 'x' must be numeric" = all(sapply(x, is.numeric)),
-        "'response' must be character of length 1" = is.character(response) && length(response) == 1L,
-        "'response' variable not found in 'x'!" = response %in% names(x),
-        "'breaks' must be numeric or NULL" = is.numeric(breaks) || is.null(breaks)
-    )
-
-    ## Discretize response?
-    if (!is.null(breaks)) {
-        ## Create breaks automatically (if needed)
-        if (length(breaks) == 1L)
-            breaks <- make_breaks(model.response(x), breaks = breaks)
-        ## Number of bins (one less than 'breaks'; points of bin intersections)
-        bins <- length(breaks) - 1L
-
-        ## Discretize numeric response into counts.
-        yc <- num2bin(x[[response]], breaks)
-        ym <- (breaks[-1] + breaks[-length(breaks)]) / 2
-
-        lower <- list(...)$lower
-        upper <- list(...)$upper
-
-        if (!is.null(lower)) {
-            stopifnot("'lower' must be single numeric" = is.numeric(lower) && length(lower) == 1L)
-            ym[ym < lower] <- lower
-        }
-        if (!is.null(upper)) {
-            stopifnot("'upper' must be single numeric" = is.numeric(upper) && length(upper) == 1L)
-            ym[ym > upper] <- upper
-        }
-
-        x[[response]] <- yc
-
-        result <- list(mf = x, breaks = breaks, bins = bins, ym = ym, yc = yc)
-    } else {
-        ## For the model we need an integer response; check if the response
-        ## is integer. If not, break.
-        if (!all(x[[response]] %% 1 < sqrt(.Machine$double.eps)) &&
-             all(x[[response]]      > sqrt(.Machine$double.eps)))
-            stop("Response is not looking like count data (integers); binning via 'breaks' is required.")
-        x[[response]] <- as.integer(round(x[[response]], 1))
-
-        bins <- max(x[[response]])
-        ## Setting highest 'bin' to max(response) * mp (multiplier)
-        mp     <- if (bins <= 10) { 3 } else if (bins <= 100) { 1.5 } else { 1.25 }
-        bins   <- as.integer(ceiling(bins * mp))
-        breaks <- seq_len(bins + 1) - 1.5 # 'Integer' bins
-        if (verbose) message("Response considered to be count data, using max count ", bins - 1)
-
-        result <- list(mf = x, breaks = breaks, bins = bins, ym = NULL, yc = NULL)
-    }
-
-    return(result)
-}
-
 #' Transition Model Data Preparer
 #'
 #' Transforms a data frame into the format required for estimating transition models.
@@ -161,8 +79,8 @@ transitreg_response <- function(x, response, breaks, verbose = FALSE, ...) {
 #' @importFrom stats setNames
 #'
 #' @author Niki
-transitreg_data <- function(data, response, theta_vars = NULL,
-                            newresponse = NULL, scaler = NULL, verbose = FALSE) {
+transitreg_tmf <- function(data, response, breaks, theta_vars = NULL,
+                            newresponse = NULL, scaler = NULL, verbose = FALSE, ...) {
 
   stopifnot(
     "'response' must be NULL or a character of length 1" =
@@ -171,12 +89,44 @@ transitreg_data <- function(data, response, theta_vars = NULL,
         is.null(newresponse) || (is.numeric(newresponse) && length(newresponse > 0)),
     "'theta_vars' must be NULL or character vector" =
         is.null(theta_vars) || is.character(theta_vars),
+    "'breaks' must be numeric vector of length > 1L" =
+        is.numeric(breaks) && length(breaks) > 1L,
     "'newresponse' must be NULL or bins (0, 1, 2, ...)" =
         is.null(newresponse) || (is.integer(newresponse) && all(newresponse >= 0)),
     "'verbose' must be TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
     "'scaler' must be either FALSE, TRUE, or a list" =
         isTRUE(scaler) || (isFALSE(scaler) || is.null(scaler)) || is.list(scaler)
   )
+
+
+
+  # -----------------------------------------------------------------
+  # Converting response from original scale to (pseudo-)index
+  # -----------------------------------------------------------------
+
+  ## Discretize numeric response into counts.
+  yc <- num2bin(data[[response]], breaks)
+  ym <- (breaks[-1] + breaks[-length(breaks)]) / 2
+
+  lower <- list(...)$lower
+  upper <- list(...)$upper
+
+  if (!is.null(lower)) {
+      stopifnot("'lower' must be single numeric" = is.numeric(lower) && length(lower) == 1L)
+      ym[ym < lower] <- lower
+  }
+  if (!is.null(upper)) {
+      stopifnot("'upper' must be single numeric" = is.numeric(upper) && length(upper) == 1L)
+      ym[ym > upper] <- upper
+  }
+
+  data[[response]] <- yc
+
+
+
+  # -----------------------------------------------------------------
+  # Preparing the rest
+  # -----------------------------------------------------------------
 
   ## Using 'FALSE' instead of `NULL` for the rest of the function.
   if (is.null(scaler)) scaler <- FALSE
@@ -330,6 +280,83 @@ transitreg_data <- function(data, response, theta_vars = NULL,
 }
 
 
-
-
-
+### TODO(R): To be removed somewhen ###  #' Building Model Response for Transition Model
+### TODO(R): To be removed somewhen ###  #'
+### TODO(R): To be removed somewhen ###  #' To estimate a model as well as to perform predictions the model frame needs
+### TODO(R): To be removed somewhen ###  #' to be built. This function (for internal use only) sets up the model
+### TODO(R): To be removed somewhen ###  #' response properly, scaling and discretizising the response (if requested).
+### TODO(R): To be removed somewhen ###  #'
+### TODO(R): To be removed somewhen ###  #' @param x model framme, a `data.frame` where the first variable is expected
+### TODO(R): To be removed somewhen ###  #'        to be the model response.
+### TODO(R): To be removed somewhen ###  #' @param response Character of length one, name of the response variable.
+### TODO(R): To be removed somewhen ###  #' @param breaks numeric vector with breaks for discretizing the original response.
+### TODO(R): To be removed somewhen ###  #'        Can be `NULL` if no discretization is required.
+### TODO(R): To be removed somewhen ###  #' @param verbose Logical value indicating whether information about the transformation
+### TODO(R): To be removed somewhen ###  #'        process should be printed to the console. Default is `FALSE`.
+### TODO(R): To be removed somewhen ###  #' @param \dots Additional options forwarded from `[transitreg()]`.
+### TODO(R): To be removed somewhen ###  #'
+### TODO(R): To be removed somewhen ###  #' @return Named list with the following three elements:
+### TODO(R): To be removed somewhen ###  #'
+### TODO(R): To be removed somewhen ###  #' * `mf`: Modified version of input `x`; altered response with (pseudo-)bins
+### TODO(R): To be removed somewhen ###  #'   if required.
+### TODO(R): To be removed somewhen ###  #' * `breaks`: Numeric vector with breaks, point intersection between (pseudo-)bins.
+### TODO(R): To be removed somewhen ###  #' * `bins`: Number of bins, same as `length(breaks) - 1L`.
+### TODO(R): To be removed somewhen ###  #' * `ym`: mid-point of the bins.
+### TODO(R): To be removed somewhen ###  #' * `yc`: index vector, (pseudo-)bin index/number.
+### TODO(R): To be removed somewhen ###  transitreg_response <- function(x, response, breaks, verbose = FALSE, ...) {
+### TODO(R): To be removed somewhen ###      stopifnot(
+### TODO(R): To be removed somewhen ###          "'x' must be a data.frame with positive dimensions" =
+### TODO(R): To be removed somewhen ###              is.data.frame(x) && length(dim(x)) == 2L && all(dim(x) > 0),
+### TODO(R): To be removed somewhen ###          "all variables in 'x' must be numeric" = all(sapply(x, is.numeric)),
+### TODO(R): To be removed somewhen ###          "'response' must be character of length 1" = is.character(response) && length(response) == 1L,
+### TODO(R): To be removed somewhen ###          "'response' variable not found in 'x'!" = response %in% names(x),
+### TODO(R): To be removed somewhen ###          "'breaks' must be numeric or NULL" = is.numeric(breaks) || is.null(breaks)
+### TODO(R): To be removed somewhen ###      )
+### TODO(R): To be removed somewhen ###  
+### TODO(R): To be removed somewhen ###      ## Discretize response?
+### TODO(R): To be removed somewhen ###      if (!is.null(breaks)) {
+### TODO(R): To be removed somewhen ###          ## Create breaks automatically (if needed)
+### TODO(R): To be removed somewhen ###          if (length(breaks) == 1L)
+### TODO(R): To be removed somewhen ###              breaks <- make_breaks(model.response(x), breaks = breaks)
+### TODO(R): To be removed somewhen ###          ## Number of bins (one less than 'breaks'; points of bin intersections)
+### TODO(R): To be removed somewhen ###          bins <- length(breaks) - 1L
+### TODO(R): To be removed somewhen ###  
+### TODO(R): To be removed somewhen ###          ## Discretize numeric response into counts.
+### TODO(R): To be removed somewhen ###          yc <- num2bin(x[[response]], breaks)
+### TODO(R): To be removed somewhen ###          ym <- (breaks[-1] + breaks[-length(breaks)]) / 2
+### TODO(R): To be removed somewhen ###  
+### TODO(R): To be removed somewhen ###          lower <- list(...)$lower
+### TODO(R): To be removed somewhen ###          upper <- list(...)$upper
+### TODO(R): To be removed somewhen ###  
+### TODO(R): To be removed somewhen ###          if (!is.null(lower)) {
+### TODO(R): To be removed somewhen ###              stopifnot("'lower' must be single numeric" = is.numeric(lower) && length(lower) == 1L)
+### TODO(R): To be removed somewhen ###              ym[ym < lower] <- lower
+### TODO(R): To be removed somewhen ###          }
+### TODO(R): To be removed somewhen ###          if (!is.null(upper)) {
+### TODO(R): To be removed somewhen ###              stopifnot("'upper' must be single numeric" = is.numeric(upper) && length(upper) == 1L)
+### TODO(R): To be removed somewhen ###              ym[ym > upper] <- upper
+### TODO(R): To be removed somewhen ###          }
+### TODO(R): To be removed somewhen ###  
+### TODO(R): To be removed somewhen ###          x[[response]] <- yc
+### TODO(R): To be removed somewhen ###  
+### TODO(R): To be removed somewhen ###          result <- list(mf = x, breaks = breaks, bins = bins, ym = ym, yc = yc)
+### TODO(R): To be removed somewhen ###      } else {
+### TODO(R): To be removed somewhen ###          ## For the model we need an integer response; check if the response
+### TODO(R): To be removed somewhen ###          ## is integer. If not, break.
+### TODO(R): To be removed somewhen ###          if (!all(x[[response]] %% 1 < sqrt(.Machine$double.eps)) &&
+### TODO(R): To be removed somewhen ###               all(x[[response]]      > sqrt(.Machine$double.eps)))
+### TODO(R): To be removed somewhen ###              stop("Response is not looking like count data (integers); binning via 'breaks' is required.")
+### TODO(R): To be removed somewhen ###          x[[response]] <- as.integer(round(x[[response]], 1))
+### TODO(R): To be removed somewhen ###  
+### TODO(R): To be removed somewhen ###          bins <- max(x[[response]])
+### TODO(R): To be removed somewhen ###          ## Setting highest 'bin' to max(response) * mp (multiplier)
+### TODO(R): To be removed somewhen ###          mp     <- if (bins <= 10) { 3 } else if (bins <= 100) { 1.5 } else { 1.25 }
+### TODO(R): To be removed somewhen ###          bins   <- as.integer(ceiling(bins * mp))
+### TODO(R): To be removed somewhen ###          breaks <- seq_len(bins + 1) - 1.5 # 'Integer' bins
+### TODO(R): To be removed somewhen ###          if (verbose) message("Response considered to be count data, using max count ", bins - 1)
+### TODO(R): To be removed somewhen ###  
+### TODO(R): To be removed somewhen ###          result <- list(mf = x, breaks = breaks, bins = bins, ym = NULL, yc = NULL)
+### TODO(R): To be removed somewhen ###      }
+### TODO(R): To be removed somewhen ###  
+### TODO(R): To be removed somewhen ###      return(result)
+### TODO(R): To be removed somewhen ###  }
