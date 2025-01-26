@@ -30,7 +30,7 @@
 #' @param formula Object of class `transitreg`.
 #'
 #' @details
-#' The function transforms the input data using [transitreg_data()] to a format
+#' The function transforms the input data using [transitreg_tmf()] to a format
 #' compatible with transition models. Estimation relies on binary GLM-type techniques
 #' to model conditional transition probabilities. Note that the `theta` variable, representing
 #' the current transition level, must be included in the model by the user, please
@@ -61,7 +61,7 @@
 #'
 #' See [transitreg_detect_cores()] for some more details.
 #'
-#' @seealso [transitreg_data()], [transitreg_dist()], [mgcv::gam()]
+#' @seealso [transitreg_tmf()], [transitreg_dist()], [mgcv::gam()]
 #'
 #' @examples
 #' ## Example 1: Count data.
@@ -163,6 +163,9 @@ transitreg <- function(formula, data, subset, na.action,
   stopifnot(
     "'ncores' must be NULL or numeric" = is.null(ncores) || is.numeric(ncores),
     "'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
+    "'breaks' must be NULL, single positive numeric or numeric vector" =
+        is.null(breaks) || (is.numeric(breaks) && length(breaks) == 1L && breaks > 0) || is.numeric(breaks) && length(breaks) > 0,
+
     "'scale.x' must be FALSE or TRUE" = isFALSE(scale.x) || isTRUE(scale.x)
   )
   ncores <- transitreg_get_number_of_cores(ncores, verbose = verbose)
@@ -203,41 +206,48 @@ transitreg <- function(formula, data, subset, na.action,
   rval$response <- response_name(formula)
   rval$ymax     <- max(mf[[rval$response]])
 
-  ## ----------------------------------------------------------------
-  ## Setting up model response; discretizises the data if needed.
-  ## ----------------------------------------------------------------
-  tmp    <- transitreg_response(mf, response = rval$response,
-                                breaks = breaks, verbose = verbose, ...)
-
-  # Store modified model.frame
-  mf <- tmp$mf
-
-  ## We always store the 'bins'. This is either length(breaks) - 1L
-  ## if breaks have been specified, or the highest value of the original
-  ## response variable.
-  rval$bins   <- tmp$bins
-
-  ## If breaks were specified by user (input argument), store
-  ## actual breaks as well as bin mid and 'categorical' response yc.
-  if (!is.null(breaks)) {
-    rval$breaks <- tmp$breaks
-    rval$ym     <- tmp$ym
-    rval$yc     <- tmp$yc
+  ## Setting up 'breaks and bins'
+  if (is.numeric(breaks) && length(breaks) == 1L) {
+      # Create, and store breaks and bins
+      breaks <- rval$breaks <- make_breaks(mf[[rval$response]], breaks = breaks)
+      rval$bins <- length(breaks) - 1L ## 10 breaks = 9 bins
+  ## User-specified breaks, check if they span the required range
+  } else if (is.numeric(breaks)) {
+      tmp_bk <- range(breaks)
+      tmp_y  <- range(mf[[rval$response]])
+      if (tmp_bk[[1L]] > tmp_y[[1L]] || tmp_bk[[2L]] < tmp_y[[2L]])
+          stop("Breaks do not cover the full range of the response \"", rval$response, "\".")
+      # Store breaks and bins
+      rval$bins   <- length(breaks) - 1L
+      rval$breaks <- breaks
+  # No breaks specified? In this case the response must be count data
+  } else {
+      # Check that the response is positive integers only.
+      if (!all(mf[[rval$response]] >= 0L) ||
+          !all(abs(mf[[rval$response]] %% 1) < .Machine$doluble.eps)) {
+          stop("Response not count data. Breaks must be specified for binning.")
+      }
+      # There are no breaks, but bins
+      ymax <- as.integer(max(mf[[rval$response]], na.rm = TRUE))
+      tmp  <- ceiling(ymax * if (ymax <= 10) { 3 } else if (ymax <= 100) { 1.5 } else { 1.25 })
+      rval$bins <- as.integer(tmp)
+      # Will not be stored on 'rval' but used to convert data
+      breaks <- seq.int(0L, rval$bins) - 0.5
+      rm(tmp, ymax)
   }
-  breaks <- tmp$breaks
-  rm(tmp)
-
-
-  ## Max. counts.
-  ymax <- max(mf[[rval$response]], na.rm = TRUE)
-  k    <- min(c(ymax - 1L, 20L))
 
   ## Transform data.
-  tmf <- transitreg_data(mf, response = rval$response,
-                         theta_vars = theta_vars,
-                         scaler = scale.x, verbose = verbose)
+  tmf <- transitreg_tmf(mf,
+                        response   = rval$response,
+                        breaks     = breaks, # <- note: not rval$breaks
+                        theta_vars = theta_vars,
+                        scaler     = scale.x, verbose = verbose, ...)
 
-  ## Store scailer, returned as attribute on 'tmf' if used.
+  ## Response (as bins)
+  y    <- num2bin(mf[[rval$response]], breaks = breaks)
+  ymax <- max(y, na.rm = TRUE)
+
+  ## Store scaler, returned as attribute on 'tmf' if used.
   rval$scaler <- if (scale.x) attr(tmf, "scaler") else NULL
 
   ## New formula.
@@ -270,9 +280,11 @@ transitreg <- function(formula, data, subset, na.action,
 
   ## Storing additional info on return object.
   rval$model.frame <- mf       # Model frame (with 'binned' response)
-  rval$maxcounts   <- max(mf[[rval$response]]) # Highest count in response
   rval$theta_vars  <- theta_vars
   rval$factor      <- isTRUE(list(...)$factor)
+
+  # Highest count in response
+  rval$maxcounts   <- num2bin(max(mf[[rval$response]]), breaks = breaks)
 
   if (inherits(rval$model, "nnet")) {
     tp <- predict(rval$model, type = "raw")
@@ -291,7 +303,7 @@ transitreg <- function(formula, data, subset, na.action,
   ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.
   args <- list(uidx = ui, idx = tmf$index,
-               tp = tp, y = mf[[rval$response]], breaks = breaks, ncores = ncores)
+               tp = tp, y = y, breaks = breaks, ncores = ncores)
 
   ## Calling C
   args <- check_args_for_treg_predict_pdfcdf(args)
@@ -352,30 +364,12 @@ transitreg_predict <- function(object, newdata = NULL,
   )
   ## TODO(R) Not all arguments are checked above
 
+  ## Getting breaks from object
+  breaks <- get_breaks(object)
 
-  ## If 'newdata' is not set we take the existing model.frame
+  ## If 'newdata' is not set we take the existing model.frame; here the response
+  ## is already stored as 'bin indices', so we do not have to call numb2bin.
   mf <- if (is.null(newdata)) model.frame(object) else newdata
-
-  if (type %in% c("cdf", "pdf")) {
-      ## If 'newdata' is provided but y is empty, the response MUST be in
-      ## the 'newdata' data.frame
-      if (is.null(y) && !is.null(newdata)) {
-          if (!object$response %in% names(newdata))
-              stop("response \"", object$response, "\" not found in 'newdata'. ",
-                   "Must be in 'newdata' or provided via the extra 'y' argument.")
-      } else if (!is.null(y) && !is.null(newdata)) {
-          if (object$response %in% names(newdata)) {
-              warning("Response \"", object$response, "\" provided via 'newdata' as well as ",
-                      "via the additional argument 'y'. 'y' will overwrite ",
-                      "'newdata$", object$response, "' (w/ recycling).")
-              mf[[object$response]] <- rep(y, length.out = nrow(mf))
-          } else {
-              mf[[object$response]] <- rep(y, length.out = nrow(mf))
-          }
-      }
-  } else {
-      mf[[object$response]] <- max(object$breaks) # Absolute max
-  }
 
   ## Guessing 'elementwise' if is NULL
   ##
@@ -404,49 +398,37 @@ transitreg_predict <- function(object, newdata = NULL,
   }
 
   ## Setting up 'newresponse'.
-  ## Quantile, pmax:
-  ##  - Setting the pseudo-response to the highest bin. This ensures
-  ##    that the entire Transition distribution is evaluated.
+  ## Quantile, pmax, tp:
+  ##  - Setting response to "max bin mid" to ensure we calculate the
+  ##    transition probabilities for _all_ bins.
   ## CDF/PDF:
   ##  - If elementwise = TRUE: We only need to evaluate each distribution
   ##    up to 'y[i]'.
   ##  - If elementwise = FALSE: We must evaluate each distribution up to
   ##    max(y).
   if (type %in% c("quantile", "pmax", "tp")) {
-    ## object$bins - 1 as we start with bin '0' again.
-    if (!is.null(object$breaks)) {
-        newresponse <- rep(max(object$breaks), nrow(mf))
-    } else {
-        newresponse <- rep(object$bins - 1, nrow(mf))
-    }
-    mf[[object$response]] <- newresponse
-  } else if (!is.null(y)) {
-    newresponse <- if (elementwise) y else rep(max(y), nrow(mf))
-    mf[[object$response]] <- newresponse
-  }
-
-  # -----------------------------------------------------------------
-  ## Setting up transitreg response and model matrix for the binary
-  ## model (tmf = transition probability model frame) for the binary
-  ## model on object$model.
-  # -----------------------------------------------------------------
-
-  if (is.null(newdata)) {
-      scaler <- FALSE # Already scaled
+    mf[[object$response]] <- max(get_mids(object))
   } else {
-      scaler <- object$scaler
-      tmp    <- transitreg_response(mf, response = object$response,
-                                    breaks = object$breaks, verbose = verbose)
-      mf <- tmp$mf # Updating mf
-      rm(tmp)
+    ## Else highest bin specified on 'y' (if set) or highest
+    ## highest ever seen observation (yc_tab).
+    if (isTRUE(elementwise) && !is.null(y)) {
+        mf[[object$response]] <- rep(y, length.out = nrow(mf))
+    } else if (isFALSE(elementwise) && is.null(y)) {
+        mf[[object$response]] <- max(as.integer(names(object$yc_tab)))
+    } else if (!is.null(y)) {
+        mf[[object$response]] <- max(y)
+    }
   }
 
   ## Creating 'transition model frame' for the prediction of the
   ## transition probabilities using the object$model (binary response model).
-  tmf <- transitreg_data(mf, response = object$response,
-                         theta_vars = object$theta_vars,
-                         scaler = object$scaler, verbose = verbose)
-  ## TODO(R): Could do that in transitreg_data.
+  tmf <- transitreg_tmf(mf,
+                        response   = object$response,
+                        breaks     = breaks,
+                        theta_vars = object$theta_vars,
+                        scaler     = object$scaler, verbose = verbose)
+
+  ## TODO(R): Could do that in transitreg_tmf
   if (factor) tmf$theta <- as.factor(tmf$theta)
 
   ## Specify argument for generic prediction method called below
@@ -470,33 +452,31 @@ transitreg_predict <- function(object, newdata = NULL,
   ## Setting dummy values (required by C later on)
   if (type == "quantile") {
       ## Sorting 'prob'. This is important for the .C routine!
-      if (!elementwise) prob <- sort(unique(prob))
-      y    <- NA_integer_ ## Dummy value required for .C call
+      probC <- if (!elementwise) sort(unique(prob)) else prob
+      yC   <- NA_integer_ ## Dummy value required for .C call
   } else if (type %in% c("cdf", "pdf")) {
       ## Sorting 'y'. This is important for the .C routine!
-      y <- if (elementwise) mf[[object$response]] else num2bin(sort(unique(y)), object$breaks)
-      prob <- NA_real_    ## Dummy value required for .C call
+      if (elementwise) {
+          yC <- num2bin(mf[[object$response]], breaks = breaks)
+      } else {
+          yC <- num2bin(sort(unique(y)), breaks = breaks)
+      }
+      probC <- NA_real_    ## Dummy value required for .C call
   } else {
-      y    <- NA_integer_ ## Dummy value required for .C call
-      prob <- NA_real_    ## Dummy value required for .C call
+      yC    <- NA_integer_ ## Dummy value required for .C call
+      probC <- NA_real_    ## Dummy value required for .C call
   }
 
   ## If object$breaks is NULL, we have discrete bins (e.g., count data).
-  if (is.null(object$breaks)) {
-    discrete <- rep(TRUE, length(ui))
-    breaks   <- seq(-0.5, by = 1.0, length.out = object$bins + 1)
-  } else {
-    discrete <- rep(TRUE, length(ui))
-    breaks   <- object$breaks
-  }
+  discrete <- rep(is.null(object$breaks), length(ui))
 
   ## Setting up arguments for the .C call
   args <- list(uidx   = ui,                # int; Unique distribution index (int)
                idx    = tmf$index,         # int; Index vector (int)
                tp     = tp,                # num; Transition probabilities
                breaks = breaks,            # num; Point intersections of bins
-               y      = y,                 # int; Response y, used for 'cdf/pdf'
-               prob   = prob,              # num; Probabilities (used for 'quantile')
+               y      = yC,                # int; Response y, used for 'cdf/pdf'
+               prob   = probC,             # num; Probabilities (used for 'quantile')
                type   = type,              # str; to predict/calculate
                ncores = ncores,            # int; Number of cores to be used (OpenMP)
                elementwise = elementwise,  # Elementwise (one prob or y per ui)
@@ -512,14 +492,59 @@ transitreg_predict <- function(object, newdata = NULL,
     res <- matrix(res, byrow = TRUE, ncol = length(prob),
                   dimnames = list(NULL, get_elementwise_colnames(prob, NULL)))
   } else if (!elementwise) {
+    ## Convert from predicted 'bin' back to the numeric value.
     prefix <- if (type == "pdf") "d" else "p"
+    ym  <- bin2num(y, object$breaks)
     res <- matrix(res, byrow = TRUE, ncol = length(y),
-                  dimnames = list(NULL, get_elementwise_colnames(y, prefix)))
+                  dimnames = list(NULL, get_elementwise_colnames(ym, prefix)))
   }
 
   return(res)
 }
 
+
+# Helper function, returns breaks of a transitreg model.
+# If the model is a 'count data model' the breaks are not stored
+# on the object, but here calculcated on the fly.
+get_breaks <- function(x) {
+    stopifnot("'x' must be a transitreg model" = inherits(x, "transitreg"))
+    if (!is.null(x[["breaks"]])) {
+        res <- x$breaks
+    } else {
+        res <- seq.int(0, x$bins) - 0.5
+    }
+    return(res)
+}
+
+# Helper function to get bin mids of a transitreg model
+get_mids <- function(x) {
+    stopifnot("'x' must be a transitreg model" = inherits(x, "transitreg"))
+    res <- get_breaks(x)
+    res <- (res[-1L] + res[-length(res)]) / 2.0
+    return(res)
+}
+
+prediction_get_new_response <- function(newdata, y, response) {
+    ## Newdata provided (by user), y is null: Response must be in 'newdata'.
+    if (!is.null(newdata) && is.null(y)) {
+        if (!response %in% names(newdata))
+            stop("response \"", response, "\" not found in 'newdata'. ",
+                 "Must be in 'newdata' or provided via the extra 'y' argument.")
+        res <- newdata[[response]]
+    ## If both 'newdata' and 'y' are set, force to use 'y' but
+    ## throw a warning.
+    } else if (!is.null(newdata) && !is.null(y)) {
+        if (response %in% names(newdata)) {
+            warning("Response \"", response, "\" provided via 'newdata' as well
+                    as ", "via argument 'y'. 'y' will overwrite 'newdata$",
+                    object$response, "' (w/ recycling).")
+            res <- rep(y, length.out = nrow(newdata))
+        } else {
+            res <- rep(y, length.out = nrow(newdata))
+        }
+    }
+    return(res)
+}
 
 ## TODO(R) DELETE ME ## # Helper function setting up 'newdata' when using predict.transitreg
 ## TODO(R) DELETE ME ## get_newdata <- function(object, newdata, y, prob, type) {
@@ -648,7 +673,7 @@ transitreg_predict <- function(object, newdata = NULL,
 #' * Model diagnostics and parameters.
 #' * Visualization-ready data for plotting PDFs or transformed distributions.
 #'
-#' @seealso [transitreg()], [transitreg_data()].
+#' @seealso [transitreg()], [transitreg_tmf()].
 #'
 #' @examples
 #' ## Example 1: Count data.
@@ -801,7 +826,7 @@ transitreg_dist <- function(y, data = NULL, ...) {
 #'
 #' @return Returns `NULL` invisibly. Generates plots as a side effect.
 #'
-#' @seealso [transitreg()], [transitreg_dist()], [transitreg_data()], [predict.transitreg()].
+#' @seealso [transitreg()], [transitreg_dist()], [transitreg_tmf()], [predict.transitreg()].
 #'
 #' @examples
 #' ## Example: Fit a transition model and generate plots.
@@ -993,7 +1018,7 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 #' * For `"pmax"`, the expected value of the response.
 #' * For `"quantile"`, the quantile of the response distribution at the specified `prob`.
 #'
-#' @seealso [transitreg()], [transitreg_data()], [transitreg_dist()].
+#' @seealso [transitreg()], [transitreg_tmf()], [transitreg_dist()].
 #'
 #' @examples
 #' ## Example: Predicting PDF and CDF.

@@ -65,7 +65,7 @@ transitreg_dist(y, breaks = 50)
 
 }
 \seealso{
-\code{\link[=transitreg]{transitreg()}}, \code{\link[=transitreg_data]{transitreg_data()}}.
+\code{\link[=transitreg]{transitreg()}}, \code{\link[=transitreg_tmf]{transitreg_tmf()}}.
 }
 \keyword{distribution}
 \keyword{visualization}

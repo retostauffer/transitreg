@@ -517,15 +517,43 @@ get_elementwise_colnames <- function(x, prefix = NULL, digits = pmax(3L, getOpti
 }
 
 
-## Convert numeric values to bin index (integer). If x == NULL, NULL is returned.
-num2bin <- function(x, breaks) {
+## Convert response on original scale to (pseudo-)bin index.
+## Values outside the allowed range are set to -1 (below lowest)
+## and "bins" (one higher than the last valid bin) if above highest.
+## TODO(R): Write some tests for this.
+num2bin <- function(x, breaks = NULL, bins = NULL) {
     if (is.null(x)) return(x)
+    if (is.null(breaks) && is.null(bins))
+        stop("Either breaks (continuous response) or bins (discrete response) must be set")
     if (any(is.na(x)))
         stop("Response contains missing values (not allowed).")
-    res <- cut(x, breaks = breaks, labels = FALSE, include.lowest = TRUE) - 1L
-    res[x < min(breaks)] <- -1L                  # Outside range (below bin 0)
-    res[x > max(breaks)] <- length(breaks) - 1L  # Outside range (above highest bin)
+
+    # Continuous response: Use 'cut' to create integers.
+    if (!is.null(breaks)) {
+        res <- cut(x, breaks = breaks, labels = FALSE, include.lowest = TRUE) - 1L
+        res[x < min(breaks)] <- -1L                  # Outside range (below bin 0)
+        res[x > max(breaks)] <- length(breaks) - 1L  # Outside range (above highest bin)
+    # Else we convert the input to 'integer' but limit
+    # to -1 to 'bins' (both representing 'outside range') indices.
+    } else {
+        res <- pmax(-1L, pmin(as.integer(round(x)), bins))
+    }
     return(res)
+}
+
+# Converts bin index (idx) to numeric values, using the center
+# of the bin (defined by breaks) the index falls into. For
+# indices equal to -1, or indices > max bins the return will
+# be set to the minimum/maximum break (i.e., the edge of the
+# defined range).
+bin2num <- function(idx, breaks) {
+    # Bin mid
+    bm <- (head(breaks, -1) + tail(breaks, -1)) / 2
+    ## Append minimum on the lower end and maximum on the upper end,
+    ## used for 'indices' falling out of the range; they are set -1
+    ## on the lower end, and one index above the higehst bin.
+    bm <- c(min(breaks), bm, max(breaks))
+    bm[idx + 2L]
 }
 
 
