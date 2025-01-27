@@ -102,7 +102,7 @@ standard software for estimation \cite{Berger:2021}.
 
 A key strength of transition models lies in their ability to accommodate
 complex data structures. They handle phenomena such as excess zeros and varying
-coefficients with ease, offering both parametric and nonparametric extensions. Additionally,
+coefficients, offering both parametric and nonparametric extensions. Additionally,
 embedding transition models within the binary regression framework simplifies parameter
 estimation and enhances interpretability, as coefficients directly capture the effects of
 covariates on transition probabilities.
@@ -291,6 +291,18 @@ typically using the midpoints of the corresponding intervals as approximations.
 %Thus, the stepwise approximation $\hat{F}(y)$ converges uniformly to the true CDF $F(y)$ as
 %$m \to \infty$, provided that the bin widths shrink to zero, ensuring that the
 %discretization approach is a consistent method for approximating the smooth CDF $F(y)$.
+
+\section{Software} \label{sec:software}
+
+The proposed method is implemented in the \textsf{R} package \textbf{transitreg} \cite{transitreg},
+which is available on GitHub: \texttt{https://github.com/retostauffer/transitreg}.
+The development version can be installed using the following command
+\begin{verbatim}
+install.packages("transitreg",
+  repos = c("https://gamlss-dev.R-universe.dev",
+            "https://cloud.R-project.org"))
+\end{verbatim}
+The primary function for estimating transition models is \texttt{transireg()}.
 
 \section{Application} \label{sec:application}
 
