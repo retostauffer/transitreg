@@ -274,6 +274,10 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
                     res[i] = interpolate_linear(bkptr[j], tmp[j - 1], bkptr[j + 1], tmp[j], prob[i]);
                 }
                 break; // Found what we were looking for, break inner loop
+            // If probability is == 1.0, take most upper break point
+            } else if (prob[i] == 1.0) {
+                res[i] = bkptr[count];
+                break;
             }
         }
 
@@ -282,7 +286,7 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
         // bin we fall into. Outside support, return NA.
         if (j == count) {
             // Fill the results vector with "highest bin".
-            res[i] = disc ? (bkptr[count] + bkptr[count + 1]) * 0.5 : bkptr[count];
+            res[i] = disc ? (bkptr[count] + bkptr[count + 1]) * 0.5 : R_NaReal; //bkptr[count];
         }
     }
     // void function, no return, we have updated/modified 'res'

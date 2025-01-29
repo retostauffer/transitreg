@@ -642,7 +642,6 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
     ## Calling C to calculate the required values.
-    print('here')
     args <- list(uidx  = ui,                       # Unique distribution index (int)
                  idx   = idx,                      # Index vector (int)
                  tp    = t(as.matrix(x)),          # Transition probabilities
@@ -738,7 +737,7 @@ random.Transition <- function(x, n = 1L, drop = TRUE, ...) {
 #' @rdname Transition
 #' @exportS3Method is_discrete Transition
 is_discrete.Transition <- function(d, ...) {
-    x <- if (!is.null(attr(d, "censored"))) TRUE else attr(d, "discrete")
+    x <- if (is.null(attr(d, "censored")) & attr(d, "discrete")) TRUE else FALSE
     rep(x, length(d))
 }
 
@@ -748,7 +747,8 @@ is_discrete.Transition <- function(d, ...) {
 #' @rdname Transition
 #' @exportS3Method is_continuous Transition
 is_continuous.Transition <- function(d, ...) {
-    return(!is_discrete(d))
+    x <- is.null(attr(d, "censored")) & !attr(d, "discrete")
+    rep(x, length(d))
 }
 
 #' @importFrom distributions3 support
