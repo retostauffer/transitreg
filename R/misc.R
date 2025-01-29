@@ -614,10 +614,14 @@ check_args_for_treg_predict <- function(x) {
                 "double"    = c("tp", "breaks", "prob"),
                 "logical"   = c("elementwise", "discrete"),
                 "character" = c("censored"))
+
+    debug_stop <- function(e) { cat("\nDebugging output (str(args)):\n"); str(x); stop(e) }
     for (n in names(tmp)) {
         fn <- get(sprintf("is.%s", n))
         for (e in tmp[[n]]) {
-            if (!fn(x[[e]])) stop("Element '", e, "' in args list is not \"", n, "\"")
+            if (!fn(x[[e]])) {
+                debug_stop(paste0("Element '", e, "' in args list is not \"", n, "\""))
+            }
         }
     }
 
@@ -634,11 +638,7 @@ check_args_for_treg_predict <- function(x) {
                 all(enames %in% names(x)),
             "'args$censored' must be character of length 1" = length(x$censored) == 1L
         )},
-        error = function(e) {
-            cat("\nDebugging output (str(args)):\n")
-            str(x)
-            stop(e)
-        }
+        error = function(e) debug_stop(e)
     )
 
     # Return (re-ordered) list
@@ -654,10 +654,14 @@ check_args_for_treg_predict_pdfcdf <- function(x) {
     tmp <- list("integer" = c("uidx", "idx", "y", "ncores"),
                 "double"  = c("tp", "breaks"),
                 "character" = "censored")
+
+    debug_stop <- function(e) { cat("\nDebugging output (str(args)):\n"); str(x); stop(e) }
     for (n in names(tmp)) {
         fn <- get(sprintf("is.%s", n))
         for (e in tmp[[n]]) {
-            if (!fn(x[[e]])) stop("Element '", e, "' in args list is not \"", n, "\"")
+            if (!fn(x[[e]])) {
+                debug_stop(paste0("Element '", e, "' in args list is not \"", n, "\""))
+            }
         }
     }
 
@@ -670,11 +674,7 @@ check_args_for_treg_predict_pdfcdf <- function(x) {
                 length(x$y) == length(x$uidx),
             "'args$censored' must be character of length 1" = length(x$censored) == 1L
         )},
-        error = function(e) {
-            cat("\nDebugging output (str(args)):\n")
-            str(x)
-            stop(e)
-        }
+        error = function(e) debug_stop(e)
     )
 
     # Return (re-ordered) list

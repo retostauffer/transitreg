@@ -310,9 +310,9 @@ transitreg <- function(formula, data, subset, na.action,
 
   ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.
+  censored <- if (is.null(rval$censored)) "not-censored" else rval$censored
   args <- list(uidx = ui, idx = tmf$index,
-               tp = tp, y = y, breaks = breaks, ncores = ncores,
-               censored = censored)
+               tp = tp, y = y, breaks = breaks, ncores = ncores, censored = censored)
 
   ## Calling C
   args <- check_args_for_treg_predict_pdfcdf(args)
@@ -475,6 +475,7 @@ transitreg_predict <- function(object, newdata = NULL,
 
   ## If object$breaks is NULL, we have discrete bins (e.g., count data).
   discrete <- rep(is.null(object$breaks), length(ui))
+  censored <- if (is.null(object$censored)) "not-censored" else object$censored
 
   ## Setting up arguments for the .C call
   args <- list(uidx   = ui,                # int; Unique distribution index (int)
@@ -486,7 +487,8 @@ transitreg_predict <- function(object, newdata = NULL,
                type   = type,              # str; to predict/calculate
                ncores = ncores,            # int; Number of cores to be used (OpenMP)
                elementwise = elementwise,  # Elementwise (one prob or y per ui)
-               discrete    = discrete)     # Discrete distribution?
+               discrete    = discrete,     # Discrete distribution?
+               censored    = censored)
 
   # Calling C
   args <- check_args_for_treg_predict(args)

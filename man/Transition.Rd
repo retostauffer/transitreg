@@ -21,7 +21,7 @@
 \alias{plot.Transition}
 \title{Creates a Transition Distribution}
 \usage{
-Transition(x, breaks, discrete = NULL)
+Transition(x, breaks, discrete = NULL, censored = NULL)
 
 dtransit(x, d, log = FALSE, ncores = NULL)
 

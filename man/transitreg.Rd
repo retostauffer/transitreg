@@ -15,6 +15,7 @@ transitreg(
   engine = "bam",
   scale.x = FALSE,
   breaks = NULL,
+  censored = NULL,
   model = TRUE,
   ncores = NULL,
   verbose = FALSE,
@@ -47,6 +48,9 @@ Default is \code{"bam"}.}
 count response. If a single number is provided, equidistant intervals are used. If a
 numeric vector is provided, it is used directly as the breakpoints. This argument is
 critical for continuous responses.}
+
+\item{censored}{\code{NULL} or one of \code{"left"}, \code{"right"}, or \code{"both"}. Specifies
+if the distribution is censored on one or both ends.}
 
 \item{model}{Logical value indicating whether the model frame should be included in
 the return object.}

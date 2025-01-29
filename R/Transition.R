@@ -425,6 +425,22 @@ format.Transition <- function(x, digits = pmax(3L, getOption("digits") - 3L), ..
     if (length(x) < 1L) return(character(0))
     xnames <- names(x) # Keep for later
 
+    # Create string for censoring (if needed)
+    censored <- attr(x, "censored")
+    if (is.null(censored)) {
+        censored <- "" # <- not censored
+    } else {
+        sp <- support(x)
+        if (censored == "left") {
+            censored <- paste0(", left = ", format(min(sp)))
+        } else if (censored == "left") {
+            censored <- paste0(", right = ", format(max(sp)))
+        } else {
+            censored <- paste0(", left = ", format(min(sp)),
+                               ", right = ", format(max(sp)))
+        }
+    }
+
     # Extracting probabilites and breaks; 'censored' is scoped (same for all)
     fmtfun <- function(i) {
         y <- as.matrix(x[i], expand = FALSE)
@@ -439,8 +455,6 @@ format.Transition <- function(x, digits = pmax(3L, getOption("digits") - 3L), ..
                     censored)
         }
     }
-    censored <- attr(x, "censored")
-    censored <- if (is.null(censored)) "" else sprintf(", censored = '%s'", censored)
     f <- sapply(seq_along(x), fmtfun)
     setNames(f, xnames)
 }
@@ -641,7 +655,6 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
 
     # Calling C
     args <- check_args_for_treg_predict(args)
-    str(args)
     res  <- do.call(function(...) .Call("treg_predict", ...), args)
 
     # If elementwise: Return named vector
@@ -725,7 +738,8 @@ random.Transition <- function(x, n = 1L, drop = TRUE, ...) {
 #' @rdname Transition
 #' @exportS3Method is_discrete Transition
 is_discrete.Transition <- function(d, ...) {
-    rep(attr(d, "discrete"), length(d))
+    x <- if (!is.null(attr(d, "censored"))) TRUE else attr(d, "discrete")
+    rep(x, length(d))
 }
 
 #' @importFrom distributions3 is_continuous
