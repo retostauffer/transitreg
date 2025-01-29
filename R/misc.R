@@ -177,103 +177,6 @@ ff_replace <- function(formula) {
   return(formula)
 }
 
-## Histogram and density plot.
-#' @importFrom stats density na.omit
-#' @importFrom grDevices rgb
-#' @importFrom graphics hist lines rug
-plot_hist <- function(x, ...) {
-  x <- na.omit(x)
-  h <- hist(x, breaks = "Scott", plot = FALSE)
-  d <- density(x)
-  ylim <- list(...)$ylim
-  if (is.null(ylim))
-    ylim <- range(c(h$density, d$y))
-  main <- list(...)$main
-  if (is.null(main))
-    main <- "Histogram and Density"
-  xlab <- list(...)$xlab
-  if (is.null(xlab))
-    xlab <- "Quantile Residuals"
-  hist(x, breaks = "Scott", freq = FALSE, ylim = ylim,
-    xlab = xlab, main = main, ...)
-  lines(d, lwd = 2, col = 4)
-  rug(x, col = rgb(0.1, 0.1, 0.1, alpha = 0.3))
-}
-
-## Q-Q plot.
-#' @importFrom stats ppoints qqnorm
-plot_qq <- function(x, ...) {
-  z <- qnorm(ppoints(length(x)))
-  pch <- list(...)$pch
-  if (is.null(pch))
-    pch <- 19
-  col <- list(...)$col
-  if (is.null(col))
-    col <- rgb(0.1, 0.1, 0.1, alpha = 0.3)
-  qqnorm(x, col = col, pch = pch)
-  lines(z, z, lwd = 2, col = 4)
-}
-
-## Wormplot.
-#' @importFrom stats fitted lm na.omit
-#' @importFrom stats dnorm pnorm qnorm
-#' @importFrom graphics grid
-plot_wp <- function(x, ...) {
-  x <- na.omit(x)
-  d <- qqnorm(x, plot = FALSE)
-  probs <- c(0.25, 0.75)
-  y3 <- quantile(x, probs, type = 7, na.rm = TRUE)
-  x3 <- qnorm(probs)
-  slope <- diff(y3)/diff(x3)
-  int <- y3[1L] - slope * x3[1L]
-  d$y <- d$y - (int + slope * d$x)
-
-  xlim <- list(...)$xlim
-  if (is.null(xlim)) {
-    xlim <- range(d$x)
-    xlim <- xlim + c(-0.1, 0.1) * diff(xlim)
-  }
-
-  ylim <- list(...)$ylim
-  if (is.null(ylim)) {
-    ylim <- range(d$y)
-    ylim <- ylim + c(-0.3, 0.3) * diff(ylim)
-  }
-
-  main <- list(...)$main
-  if (is.null(main))
-    main <- "Worm Plot"
-  xlab <- list(...)$xlab
-  if (is.null(xlab))
-    xlab <- "Theoretical Quantiles"
-  ylab <- list(...)$ylab
-  if (is.null(ylab))
-    ylab <- "Deviation"
-  pch <- list(...)$pch
-  if (is.null(pch))
-    pch <- 19
-  col <- list(...)$col
-  if (is.null(col))
-    col <- rgb(0.1, 0.1, 0.1, alpha = 0.3)
-
-  plot(d$x, d$y, xlim = xlim, ylim = ylim,
-    xlab = xlab, ylab = ylab, main = main,
-    col = col, pch = pch)
-  grid(lty = "solid")
-
-  dz <- 0.25
-  z <- seq(xlim[1L], xlim[2L], dz)
-  p <- pnorm(z)
-  se <- (1/dnorm(z)) * (sqrt(p * (1 - p)/length(d$y)))
-  low <- qnorm((1 - 0.95)/2) * se
-  high <- -low
-  lines(z, low, lty = 2)
-  lines(z, high, lty = 2)
-
-  fit <- lm(d$y ~ d$x + I(d$x^2) + I(d$x^3))
-  i <- order(d$x)
-  lines(d$x[i], fitted(fit)[i], col = 4, lwd = 2)
-}
 
 # -------------------------------------------------------------------
 # Utility functions to convert between CDF, PDF, and Transition
@@ -521,23 +424,18 @@ get_elementwise_colnames <- function(x, prefix = NULL, digits = pmax(3L, getOpti
 ## Values outside the allowed range are set to -1 (below lowest)
 ## and "bins" (one higher than the last valid bin) if above highest.
 ## TODO(R): Write some tests for this.
-num2bin <- function(x, breaks = NULL, bins = NULL) {
+num2bin <- function(x, breaks = NULL) {
     if (is.null(x)) return(x)
-    if (is.null(breaks) && is.null(bins))
+    if (is.null(breaks))
         stop("Either breaks (continuous response) or bins (discrete response) must be set")
     if (any(is.na(x)))
         stop("Response contains missing values (not allowed).")
 
-    # Continuous response: Use 'cut' to create integers.
-    if (!is.null(breaks)) {
-        res <- cut(x, breaks = breaks, labels = FALSE, include.lowest = TRUE) - 1L
-        res[x < min(breaks)] <- -1L                  # Outside range (below bin 0)
-        res[x > max(breaks)] <- length(breaks) - 1L  # Outside range (above highest bin)
-    # Else we convert the input to 'integer' but limit
-    # to -1 to 'bins' (both representing 'outside range') indices.
-    } else {
-        res <- pmax(-1L, pmin(as.integer(round(x)), bins))
-    }
+    # 'Cut' data, limit to -1 to length(brekas) - 1.
+    res <- cut(x, breaks = breaks, labels = FALSE, include.lowest = TRUE) - 1L
+    res[x < min(breaks)] <- -1L                  # Outside range (below bin 0)
+    res[x > max(breaks)] <- length(breaks) - 1L  # Outside range (above highest bin)
+
     return(res)
 }
 
@@ -604,7 +502,7 @@ make_breaks <- function(y, breaks = 30, scale = FALSE , ...) {
 # are as expected by .C!
 
 #' @importFrom utils str
-check_args_for_treg_predict <- function(x) {
+check_args_for_treg_predict <- function(x, silent = FALSE) {
     ## Expected elements (in the order expected by C)
     enames <- c("uidx", "idx", "tp", "breaks", "y", "prob",
                 "type", "ncores", "elementwise", "discrete", "censored")
@@ -613,9 +511,9 @@ check_args_for_treg_predict <- function(x) {
     tmp <- list("integer"   = c("uidx", "idx", "y", "ncores"),
                 "double"    = c("tp", "breaks", "prob"),
                 "logical"   = c("elementwise", "discrete"),
-                "character" = c("censored"))
+                "character" = c("type", "censored"))
 
-    debug_stop <- function(e) { cat("\nDebugging output (str(args)):\n"); str(x); stop(e) }
+    debug_stop <- function(e) { if (!silent) { cat("\nDebugging output (str(args)):\n"); str(x) }; stop(e) }
     for (n in names(tmp)) {
         fn <- get(sprintf("is.%s", n))
         for (e in tmp[[n]]) {
@@ -647,7 +545,7 @@ check_args_for_treg_predict <- function(x) {
 }
 
 #' @importFrom utils str
-check_args_for_treg_predict_pdfcdf <- function(x) {
+check_args_for_treg_predict_pdfcdf <- function(x, silent = FALSE) {
     ## Required elements in the order as expected by C
     enames <- c("uidx", "idx", "tp", "y", "breaks", "ncores", "censored")
 
@@ -656,7 +554,7 @@ check_args_for_treg_predict_pdfcdf <- function(x) {
                 "double"  = c("tp", "breaks"),
                 "character" = "censored")
 
-    debug_stop <- function(e) { cat("\nDebugging output (str(args)):\n"); str(x); stop(e) }
+    debug_stop <- function(e) { if (!silent) { cat("\nDebugging output (str(args)):\n"); str(x) }; stop(e) }
     for (n in names(tmp)) {
         fn <- get(sprintf("is.%s", n))
         for (e in tmp[[n]]) {

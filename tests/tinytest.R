@@ -1,5 +1,5 @@
 
 if (requireNamespace("tinytest", quietly = TRUE)) {
-    test_package("transitreg")
+    tinytest::test_package("transitreg")
 }
 

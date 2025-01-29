@@ -20,6 +20,12 @@ expect_error(convert_tp(pp, from = 1, to = "cdf"), pattern = "'arg' should be on
 expect_error(convert_tp(pp, from = "cdf", to = "foo"), pattern = "'arg' should be one of", info = "Argument 'to' wrong")
 expect_error(convert_tp(LETTERS[1:3], "cdf", "tp"), info = "Argument 'x' not numeric")
 expect_error(convert_tp(numeric(), "cdf", "tp"), info = "Argument 'x' of length 0")
+expect_error(convert_tp(0.5, "pdf", "tp"),
+             pattern = "Requested conversions \\(from -> to\\) were:.*Not all allowed\\. Allowed conversions are",
+             info = "One conversion, not all allowed.")
+expect_error(convert_tp(0.5, "pdf", c("tp", "cdf")),
+             pattern = "Requested conversions \\(from -> to\\) were:.*Not all allowed\\. Allowed conversions are",
+             info = "Multiple conversions, not all allowed.")
 
 # If input is tp: All values must be in [0, 1] and monotonically decreasing
 expect_error(convert_tp(c(NA, 0.3, 0.5), "tp", "cdf"), info = "Missing value(s)")
