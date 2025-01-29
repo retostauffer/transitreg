@@ -22,7 +22,7 @@ i <- sample(1:2, size = nrow(df), prob = c(0.8, 0.4), replace = TRUE)
 dtrain <- subset(df, i < 2)
 dtest <- subset(df, i > 1)
 
-breaks <- c(0, seq(0.15, floor(max(df$sqrt_pre)) + 1, by = 0.3))
+breaks <- c(0, seq(0.2, floor(max(df$sqrt_pre)) + 1, by = 0.3))
 
 m <- transitreg(sqrt_pre ~ theta0 + s(theta, k = 20), data = df, breaks = breaks, censored = "left")
 #m <- transitreg(sqrt_pre ~ theta0 + s(theta, k = 20), data = df, breaks = breaks)
@@ -40,7 +40,7 @@ db <- family(b)$d(mids, par)
 f <- sqrt_pre ~ theta0 + s(theta, k = 20) + s(day, bs = "cc", k = 20) + te(theta, day, bs = c("cr", "cc"), k = 10)
 
 # ----------------------------------------------
-breaks2 <- c(0, seq(0.1, floor(max(df$sqrt_pre)) + 1, by = 0.05))
+breaks2 <- c(0, seq(0.2, floor(max(df$sqrt_pre)) + 1, by = 0.05))
 m2 <- transitreg(f, data = dtrain, breaks = breaks2, censored = "left")
 #m2 <- transitreg(f, data = dtrain, breaks = breaks2)
 
