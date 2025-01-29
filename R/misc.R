@@ -636,7 +636,8 @@ check_args_for_treg_predict <- function(x) {
                 length(x$uidx) == length(x$discrete),
             "not all required elements found in 'args'" =
                 all(enames %in% names(x)),
-            "'args$censored' must be character of length 1" = length(x$censored) == 1L
+            "'args$censored' must be character of length 1" =
+                length(x$censored) == 1L
         )},
         error = function(e) debug_stop(e)
     )
@@ -672,7 +673,8 @@ check_args_for_treg_predict_pdfcdf <- function(x) {
                 length(x$idx) == length(x$tp),
             "length of 'args$y' and 'args$uidx' must be identical" =
                 length(x$y) == length(x$uidx),
-            "'args$censored' must be character of length 1" = length(x$censored) == 1L
+            "'args$censored' must be character of length 1" =
+                length(x$censored) == 1L
         )},
         error = function(e) debug_stop(e)
     )

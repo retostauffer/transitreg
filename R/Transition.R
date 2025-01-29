@@ -167,14 +167,20 @@ dpq_get_results <- function(z, d, ncores, type) {
     # If length(y) == length(d): elementwise = TRUE
     elementwise <- length(z) == length(d)
 
+    ## Setting up character for C call
+    censored <- if (is.null(attr(d, "censored"))) "not-censored" else attr(d, "censored")
+
     # Setting up arguments to call .C predict function
-    args <- list(uidx    = ui,                       # Unique distribution index (int)
-                 idx     = idx,                      # Index vector (int)
-                 tp      = t(as.matrix(d)),          # Transition probabilities
-                 breaks  = breaks,                    # Point intersection of breaks
-                 type    = type, ncores = ncores, elementwise = elementwise,
-                 discrete = rep(FALSE, length(ui)), # <- dummy value
-                 censored = attr(z, "censored"))
+    args <- list(uidx        = ui,               # Unique distribution index (int)
+                 idx         = idx,              # Index vector (int)
+                 tp          = t(as.matrix(d)),  # Transition probabilities
+                 breaks      = breaks,           # Point intersection of breaks
+                 type        = type,
+                 ncores      = ncores,
+                 elementwise = elementwise,
+                 discrete    = is_discrete(d),
+                 censored    = censored)
+
     if (type == "quantile") {
         args$y    <- NA_integer_
         args$prob <- if (!elementwise) unique(sort(z)) else z # If !elementwise: take sorted unique
@@ -246,20 +252,24 @@ rtransit <- function(n, d, ncores = NULL) {
     binmid <- (head(breaks, -1) + tail(breaks, -1)) / 2.
     binwidth <- diff(breaks)
 
+    ## Setting up character for C call
+    censored <- if (is.null(attr(d, "censored"))) "not-censored" else attr(d, "censored")
+
     # Calculating densities for all distributions
     ui  <- seq_along(d)
     idx <- rep(seq_along(binmid), length(d))
     y   <- seq_along(binmid) - 1L
-    args <- list(uidx   = ui,                       # Unique distribution index (int)
-                 idx    = idx,                      # Index vector (int)
-                 tp     = t(as.matrix(d)),          # Transition probabilities
-                 breaks = breaks,                     # Point intersection of breaks
-                 y      = y,                        # Where to evaluate the pdf
-                 prob   = NA_real_,                 # <- Dummy value
-                 type   = "pdf", ncores = ncores,
+    args <- list(uidx        = ui,               # Unique distribution index (int)
+                 idx         = idx,              # Index vector (int)
+                 tp          = t(as.matrix(d)),  # Transition probabilities
+                 breaks      = breaks,           # Point intersection of breaks
+                 y           = y,                # Where to evaluate the pdf
+                 prob        = NA_real_,         # <- Dummy value
+                 type        = "pdf",
+                 ncores      = ncores,
                  elementwise = FALSE,
-                 discrete = is_discrete(d),
-                 censored = attr(d, "censored"))
+                 discrete    = is_discrete(d),
+                 censored    = censored)
 
     args <- check_args_for_treg_predict(args)
     p <- matrix(do.call(function(...) .Call("treg_predict", ...), args),
@@ -299,6 +309,9 @@ mean_transit <- function(x, ncores = NULL, ...) {
     ui   <- seq_along(x) # Unique index
     idx  <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
+    ## Setting up character for C call
+    censored <- if (is.null(attr(x, "censored"))) "not-censored" else attr(x, "censored")
+
     ## Calling C to calculate the required values.
     args <- list(uidx        = ui,               # Unique distribution index (int)
                  idx         = idx,              # Index vector (int)
@@ -310,7 +323,7 @@ mean_transit <- function(x, ncores = NULL, ...) {
                  ncores      = ncores,
                  elementwise = TRUE,             # Must always be TRUE for mean
                  discrete    = is_discrete(x),
-                 censored    = attr(x, "censored"))
+                 censored    = censored)
 
     # Calling C
     args <- check_args_for_treg_predict(args)
@@ -501,6 +514,9 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     ui  <- seq_along(d) # Unique index
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
+    ## Setting up character for C call
+    censored <- if (is.null(attr(d, "censored"))) "not-censored" else attr(d, "censored")
+
     # Setting up arguments to call .C predict function
     args <- list(uidx  = ui,                       # Unique distribution index (int)
                  idx   = idx,                      # Index vector (int)
@@ -510,7 +526,7 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
                  prob  = NA_real_,                 # Dummy, only used for 'quantile'
                  type  = "pdf", ncores = ncores, elementwise = elementwise,
                  discrete = is_discrete(d),
-                 censored = attr(d, "censored"))
+                 censored = censored)
 
     # Calling C
     args <- check_args_for_treg_predict(args)
@@ -569,16 +585,21 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     ui  <- seq_along(d) # Unique index
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
+    ## Setting up character for C call
+    censored <- if (is.null(attr(d, "censored"))) "not-censored" else attr(d, "censored")
+
     ## Calling C to calculate the required values.
-    args <- list(uidx  = ui,                       # Unique distribution index (int)
-                 idx   = idx,                      # Index vector (int)
-                 tp    = t(as.matrix(d)),          # Transition probabilities
-                 breaks  = breaks,                     # Point intersection of breaks
-                 y     = x,                        # Where to evaluate the pdf
-                 prob  = NA_real_,                 # Dummy, only used for 'quantile'
-                 type  = "cdf", ncores = ncores, elementwise = elementwise,
-                 discrete = is_discrete(d),
-                 censored = attr(d, "censored"))
+    args <- list(uidx        = ui,               # Unique distribution index (int)
+                 idx         = idx,              # Index vector (int)
+                 tp          = t(as.matrix(d)),  # Transition probabilities
+                 breaks      = breaks,           # Point intersection of breaks
+                 y           = x,                # Where to evaluate the pdf
+                 prob        = NA_real_,         # Dummy, only used for 'quantile'
+                 type        = "cdf",
+                 ncores      = ncores,
+                 elementwise = elementwise,
+                 discrete    = is_discrete(d),
+                 censored    = censored)
 
     # Calling C
     args <- check_args_for_treg_predict(args)
@@ -641,16 +662,21 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
     ui  <- seq_along(x) # Unique index
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
+    ## Setting up character for C call
+    censored <- if (is.null(attr(x, "censored"))) "not-censored" else attr(x, "censored")
+
     ## Calling C to calculate the required values.
-    args <- list(uidx  = ui,                       # Unique distribution index (int)
-                 idx   = idx,                      # Index vector (int)
-                 tp    = t(as.matrix(x)),          # Transition probabilities
-                 breaks  = breaks,                     # Point intersection of breaks
-                 y     = NA_integer_,              # Dummy, only used for cdf/pdf
-                 prob  = probs,                    # Probabilities where to evaluate the distribution
-                 type  = "quantile", ncores = ncores, elementwise = elementwise,
-                 discrete = is_discrete(x),
-                 censored = attr(x, "censored"))
+    args <- list(uidx        = ui,               # Unique distribution index (int)
+                 idx         = idx,              # Index vector (int)
+                 tp          = t(as.matrix(x)),  # Transition probabilities
+                 breaks      = breaks,           # Point intersection of breaks
+                 y           = NA_integer_,      # Dummy, only used for cdf/pdf
+                 prob        = probs,            # Probabilities where to evaluate the distribution
+                 type        = "quantile",
+                 ncores      = ncores,
+                 elementwise = elementwise,
+                 discrete    = is_discrete(x),
+                 censored    = censored)
 
     # Calling C
     args <- check_args_for_treg_predict(args)
