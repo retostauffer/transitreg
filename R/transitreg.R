@@ -428,9 +428,6 @@ transitreg_predict <- function(object, newdata = NULL,
                         theta_vars = object$theta_vars,
                         scaler     = object$scaler, verbose = verbose)
 
-  ## TODO(R): Could do that in transitreg_tmf
-  if (factor) tmf$theta <- as.factor(tmf$theta)
-
   ## Specify argument for generic prediction method called below
   what <- switch(class(object$model)[1L],
     "bam"  = "response",
@@ -945,17 +942,7 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
     ## Response name
     yn <- object$response
 
-    if (is.null(newdata)) {
-        newdata <- object$model.frame
-        # Discrete model
-        if (is.null(object$breaks)) {
-            newdata[[yn]] <- newdata[[yn]]
-        # Continuous model
-        } else {
-            newdata[[yn]] <- object$breaks[newdata[[yn]] + 1L]
-        }
-    }
-
+    if (is.null(newdata)) newdata <- model.frame(object)
     if (is.null(newdata[[object$response]]))
         stop("response missing in newdata!")
 
