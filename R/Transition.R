@@ -279,10 +279,13 @@ rtransit <- function(n, d, ncores = NULL) {
 
 mean_transit <- function(x, ncores = NULL, ...) {
     ## TODO(R): Not correct if the distribution does not cover
-    ## the entire range of the data. Throw a warning for now.
-    warning("mean.Transition is only experimental. The result is incorrect ",
-            "if the distribution provided does not span the full support/range ",
-            "of the response distribution.")
+    ##          the entire range of the data. We could check
+    ##          it by evaluating the CDF to see if it reaches
+    ##          near-zero and near-one and throw a warning if not?
+    ##          That would, however, require to calculate the CDF
+    ##          at both boundaries (calling .C again) or implement
+    ##          it in the C code calculating the mean - and report
+    ##          back to R?
 
     ## Get number of cores for OpenMP parallelization
     ncores <- transitreg_get_number_of_cores(ncores, FALSE)
@@ -290,18 +293,19 @@ mean_transit <- function(x, ncores = NULL, ...) {
     breaks <- attr(x, "breaks")
     ui   <- seq_along(x) # Unique index
     idx  <- rep(ui, each = length(breaks) - 1) # Index of distribution
-    discrete <- rep(FALSE, length(ui))
-    warning("TODO(R): Currently assuming discrete = TRUE in mean.Transition")
+    discrete <- rep(is_discrete(x), length(ui))
 
     ## Calling C to calculate the required values.
-    args <- list(uidx  = ui,                       # Unique distribution index (int)
-                 idx   = idx,                      # Index vector (int)
-                 tp    = t(as.matrix(x)),          # Transition probabilities
-                 breaks  = breaks,                     # Point intersection of breaks
-                 y     = NA_integer_,              # <- Dummy value
-                 prob  = NA_real_,                 # <- Dummy value
-                 type  = "mean", ncores = ncores,
-                 elementwise = TRUE, discrete = discrete) # <- Dummy values
+    args <- list(uidx        = ui,               # Unique distribution index (int)
+                 idx         = idx,              # Index vector (int)
+                 tp          = t(as.matrix(x)),  # Transition probabilities
+                 breaks      = breaks,           # Point intersection of breaks
+                 y           = NA_integer_,      # <- Dummy value
+                 prob        = NA_real_,         # <- Dummy value
+                 type        = "mean",
+                 ncores      = ncores,
+                 elementwise = TRUE,             # Must always be TRUE for mean
+                 discrete    = discrete)
 
     # Calling C
     args <- check_args_for_treg_predict(args)
