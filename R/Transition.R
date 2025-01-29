@@ -246,9 +246,6 @@ rtransit <- function(n, d, ncores = NULL) {
     binmid <- (head(breaks, -1) + tail(breaks, -1)) / 2.
     binwidth <- diff(breaks)
 
-    # Logical vector, is the distribution discrete?
-    discrete <- is_discrete(d)
-
     # Calculating densities for all distributions
     ui  <- seq_along(d)
     idx <- rep(seq_along(binmid), length(d))
@@ -260,7 +257,8 @@ rtransit <- function(n, d, ncores = NULL) {
                  y      = y,                        # Where to evaluate the pdf
                  prob   = NA_real_,                 # <- Dummy value
                  type   = "pdf", ncores = ncores,
-                 elementwise = FALSE, discrete = discrete, # <- Dummy values
+                 elementwise = FALSE,
+                 discrete = is_discrete(d),
                  censored = attr(d, "censored"))
 
     args <- check_args_for_treg_predict(args)
@@ -300,7 +298,6 @@ mean_transit <- function(x, ncores = NULL, ...) {
     breaks <- attr(x, "breaks")
     ui   <- seq_along(x) # Unique index
     idx  <- rep(ui, each = length(breaks) - 1) # Index of distribution
-    discrete <- rep(is_discrete(x), length(ui))
 
     ## Calling C to calculate the required values.
     args <- list(uidx        = ui,               # Unique distribution index (int)
@@ -312,7 +309,7 @@ mean_transit <- function(x, ncores = NULL, ...) {
                  type        = "mean",
                  ncores      = ncores,
                  elementwise = TRUE,             # Must always be TRUE for mean
-                 discrete    = discrete,
+                 discrete    = is_discrete(x),
                  censored    = attr(x, "censored"))
 
     # Calling C
@@ -428,18 +425,22 @@ format.Transition <- function(x, digits = pmax(3L, getOption("digits") - 3L), ..
     if (length(x) < 1L) return(character(0))
     xnames <- names(x) # Keep for later
 
-    # Extracting probabilites and breaks
+    # Extracting probabilites and breaks; 'censored' is scoped (same for all)
     fmtfun <- function(i) {
         y <- as.matrix(x[i], expand = FALSE)
         if (ncol(y) > 2L) {
-            sprintf("Transition_%d(%s, ..., %s)", ncol(y),
-                    format(y[1], digits = digits), format(y[ncol(y)], digits = digits))
+            sprintf("Transition_%d(%s, ..., %s%s)", ncol(y),
+                    format(y[1], digits = digits), format(y[ncol(y)], digits = digits),
+                    censored)
         } else {
             # Typically unused, that is two bins only!
-            sprintf("Transition_%d(%s, %s)", ncol(y),
-                    format(y[1], digits = digits), format(y[2], digits = digits))
+            sprintf("Transition_%d(%s, %s%s)", ncol(y),
+                    format(y[1], digits = digits), format(y[2], digits = digits),
+                    censored)
         }
     }
+    censored <- attr(x, "censored")
+    censored <- if (is.null(censored)) "" else sprintf(", censored = '%s'", censored)
     f <- sapply(seq_along(x), fmtfun)
     setNames(f, xnames)
 }
@@ -494,9 +495,8 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
                  y     = x,                        # Where to evaluate the pdf
                  prob  = NA_real_,                 # Dummy, only used for 'quantile'
                  type  = "pdf", ncores = ncores, elementwise = elementwise,
-                 discrete = rep(is_discrete(d), length(ui)),
+                 discrete = is_discrete(d),
                  censored = attr(d, "censored"))
-    str(args)
 
     # Calling C
     args <- check_args_for_treg_predict(args)
@@ -563,7 +563,7 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
                  y     = x,                        # Where to evaluate the pdf
                  prob  = NA_real_,                 # Dummy, only used for 'quantile'
                  type  = "cdf", ncores = ncores, elementwise = elementwise,
-                 discrete = rep(is_discrete(d), length(ui)),
+                 discrete = is_discrete(d),
                  censored = attr(d, "censored"))
 
     # Calling C
@@ -620,9 +620,6 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
     xnames <- names(x)
     breaks   <- as.numeric(attr(x, "breaks"))
 
-    # Discrete distributions?
-    discrete <- is_discrete(x)
-
     # Number of probabilities
     nprobs <- length(probs)
 
@@ -639,7 +636,7 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
                  y     = NA_integer_,              # Dummy, only used for cdf/pdf
                  prob  = probs,                    # Probabilities where to evaluate the distribution
                  type  = "quantile", ncores = ncores, elementwise = elementwise,
-                 discrete = as.logical(discrete),
+                 discrete = is_discrete(x),
                  censored = attr(x, "censored"))
 
     # Calling C
