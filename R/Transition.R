@@ -30,7 +30,7 @@
 #' @author Reto
 #' @rdname Transition
 #' @export
-Transition <- function(x, breaks, discrete = NULL) {
+Transition <- function(x, breaks, discrete = NULL, censored = NULL) {
 
     # Sanity checks
     stopifnot(
@@ -54,6 +54,11 @@ Transition <- function(x, breaks, discrete = NULL) {
     x[,] <- as.numeric(x)
     breaks <- as.numeric(breaks)
 
+    if (!is.null(censored)) {
+        censored <- tolower(censored)
+        censored <- match.arg(censored, c("left", "right", "both"))
+    }
+
     # Guessing 'discrete' option if needed.
     if (is.null(discrete)) {
         mids <- (head(breaks, -1) + tail(breaks, -1)) / 2
@@ -68,7 +73,8 @@ Transition <- function(x, breaks, discrete = NULL) {
     res <- setNames(as.data.frame(x),
                     paste("tp", seq_len(ncol(x)) - 1, sep = "_"))
 
-    structure(res, class = c("Transition", "distribution"), breaks = breaks, discrete = discrete)
+    structure(res, class = c("Transition", "distribution"), breaks = breaks,
+              censored = censored, discrete = discrete)
 }
 
 
@@ -161,14 +167,14 @@ dpq_get_results <- function(z, d, ncores, type) {
     # If length(y) == length(d): elementwise = TRUE
     elementwise <- length(z) == length(d)
 
-
     # Setting up arguments to call .C predict function
     args <- list(uidx    = ui,                       # Unique distribution index (int)
                  idx     = idx,                      # Index vector (int)
                  tp      = t(as.matrix(d)),          # Transition probabilities
                  breaks  = breaks,                    # Point intersection of breaks
                  type    = type, ncores = ncores, elementwise = elementwise,
-                 discrete = rep(FALSE, length(ui))) # <- dummy value
+                 discrete = rep(FALSE, length(ui)), # <- dummy value
+                 censored = attr(z, "censored"))
     if (type == "quantile") {
         args$y    <- NA_integer_
         args$prob <- if (!elementwise) unique(sort(z)) else z # If !elementwise: take sorted unique
@@ -254,7 +260,8 @@ rtransit <- function(n, d, ncores = NULL) {
                  y      = y,                        # Where to evaluate the pdf
                  prob   = NA_real_,                 # <- Dummy value
                  type   = "pdf", ncores = ncores,
-                 elementwise = FALSE, discrete = discrete) # <- Dummy values
+                 elementwise = FALSE, discrete = discrete, # <- Dummy values
+                 censored = attr(d, "censored"))
 
     args <- check_args_for_treg_predict(args)
     p <- matrix(do.call(function(...) .Call("treg_predict", ...), args),
@@ -305,7 +312,8 @@ mean_transit <- function(x, ncores = NULL, ...) {
                  type        = "mean",
                  ncores      = ncores,
                  elementwise = TRUE,             # Must always be TRUE for mean
-                 discrete    = discrete)
+                 discrete    = discrete,
+                 censored    = attr(x, "censored"))
 
     # Calling C
     args <- check_args_for_treg_predict(args)
@@ -486,7 +494,9 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
                  y     = x,                        # Where to evaluate the pdf
                  prob  = NA_real_,                 # Dummy, only used for 'quantile'
                  type  = "pdf", ncores = ncores, elementwise = elementwise,
-                 discrete = rep(FALSE, length(ui))) # <- dummy value
+                 discrete = rep(is_discrete(d), length(ui)),
+                 censored = attr(d, "censored"))
+    str(args)
 
     # Calling C
     args <- check_args_for_treg_predict(args)
@@ -553,7 +563,8 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
                  y     = x,                        # Where to evaluate the pdf
                  prob  = NA_real_,                 # Dummy, only used for 'quantile'
                  type  = "cdf", ncores = ncores, elementwise = elementwise,
-                 discrete = rep(FALSE, length(ui))) # <- dummy value
+                 discrete = rep(is_discrete(d), length(ui)),
+                 censored = attr(d, "censored"))
 
     # Calling C
     args <- check_args_for_treg_predict(args)
@@ -620,6 +631,7 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
     ## Calling C to calculate the required values.
+    print('here')
     args <- list(uidx  = ui,                       # Unique distribution index (int)
                  idx   = idx,                      # Index vector (int)
                  tp    = t(as.matrix(x)),          # Transition probabilities
@@ -627,10 +639,12 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
                  y     = NA_integer_,              # Dummy, only used for cdf/pdf
                  prob  = probs,                    # Probabilities where to evaluate the distribution
                  type  = "quantile", ncores = ncores, elementwise = elementwise,
-                 discrete = as.logical(discrete))
+                 discrete = as.logical(discrete),
+                 censored = attr(x, "censored"))
 
     # Calling C
     args <- check_args_for_treg_predict(args)
+    str(args)
     res  <- do.call(function(...) .Call("treg_predict", ...), args)
 
     # If elementwise: Return named vector

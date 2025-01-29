@@ -21,6 +21,8 @@
 #'        count response. If a single number is provided, equidistant intervals are used. If a
 #'        numeric vector is provided, it is used directly as the breakpoints. This argument is
 #'        critical for continuous responses.
+#' @param censored `NULL` or one of `"left"`, `"right"`, or `"both"`. Specifies
+#'        if the distribution is censored on one or both ends.
 #' @param model Logical value indicating whether the model frame should be included in
 #'        the return object.
 #' @param ncores `NULL` (default) or single numeric. See 'OpenMP' for more information.
@@ -155,9 +157,14 @@
 #' @export
 transitreg <- function(formula, data, subset, na.action,
                        engine = "bam", scale.x = FALSE, breaks = NULL,
+                       censored = NULL,
                        model = TRUE, ncores = NULL, verbose = FALSE, ...) {
 
   if (!is.null(breaks)) breaks <- as.numeric(breaks)
+  if (!is.null(censored)) {
+      censored <- tolower(censored)
+      censored <- match.arg(censored, c("left", "right", "both"))
+  }
 
   ## Staying sane
   stopifnot(
@@ -203,6 +210,7 @@ transitreg <- function(formula, data, subset, na.action,
 
   ## Setting up empty list for return value
   rval <- list()
+  rval$censored <- censored
   rval$response <- response_name(formula)
   rval$ymax     <- max(mf[[rval$response]])
 
@@ -303,7 +311,8 @@ transitreg <- function(formula, data, subset, na.action,
   ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.
   args <- list(uidx = ui, idx = tmf$index,
-               tp = tp, y = y, breaks = breaks, ncores = ncores)
+               tp = tp, y = y, breaks = breaks, ncores = ncores,
+               censored = censored)
 
   ## Calling C
   args <- check_args_for_treg_predict_pdfcdf(args)
@@ -778,7 +787,7 @@ transitreg_dist <- function(y, data = NULL, ...) {
     tp <- transitreg_predict(x, newdata = model.frame(x)[i, , drop = FALSE],
                             type = "tp")
     breaks <- if (is.null(x$breaks)) seq_len(x$bins + 1) - 1.5 else x$breaks
-    return(Transition(tp, breaks))
+    return(Transition(tp, breaks, censored = x$censored))
 }
 
 

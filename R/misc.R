@@ -607,12 +607,13 @@ make_breaks <- function(y, breaks = 30, scale = FALSE , ...) {
 check_args_for_treg_predict <- function(x) {
     ## Expected elements (in the order expected by C)
     enames <- c("uidx", "idx", "tp", "breaks", "y", "prob",
-                "type", "ncores", "elementwise", "discrete")
+                "type", "ncores", "elementwise", "discrete", "censored")
 
     ## Checking types first
-    tmp <- list("integer" = c("uidx", "idx", "y", "ncores"),
-                "double"  = c("tp", "breaks", "prob"),
-                "logical" = c("elementwise", "discrete"))
+    tmp <- list("integer"   = c("uidx", "idx", "y", "ncores"),
+                "double"    = c("tp", "breaks", "prob"),
+                "logical"   = c("elementwise", "discrete"),
+                "character" = c("censored"))
     for (n in names(tmp)) {
         fn <- get(sprintf("is.%s", n))
         for (e in tmp[[n]]) {
@@ -630,7 +631,8 @@ check_args_for_treg_predict <- function(x) {
             "length of 'args$discrete' and 'args$uidx' must be identical" =
                 length(x$uidx) == length(x$discrete),
             "not all required elements found in 'args'" =
-                all(enames %in% names(x))
+                all(enames %in% names(x)),
+            "'args$censored' must be character of length 1" = length(x$censored) == 1L
         )},
         error = function(e) {
             cat("\nDebugging output (str(args)):\n")
@@ -646,11 +648,12 @@ check_args_for_treg_predict <- function(x) {
 #' @importFrom utils str
 check_args_for_treg_predict_pdfcdf <- function(x) {
     ## Required elements in the order as expected by C
-    enames <- c("uidx", "idx", "tp", "y", "breaks", "ncores")
+    enames <- c("uidx", "idx", "tp", "y", "breaks", "ncores", "censored")
 
     ## Checking types first
     tmp <- list("integer" = c("uidx", "idx", "y", "ncores"),
-                "double"  = c("tp", "breaks"))
+                "double"  = c("tp", "breaks"),
+                "character" = "censored")
     for (n in names(tmp)) {
         fn <- get(sprintf("is.%s", n))
         for (e in tmp[[n]]) {
@@ -664,7 +667,8 @@ check_args_for_treg_predict_pdfcdf <- function(x) {
             "length of 'args$idx' and 'args$tp' must be identical" =
                 length(x$idx) == length(x$tp),
             "length of 'args$y' and 'args$uidx' must be identical" =
-                length(x$y) == length(x$uidx)
+                length(x$y) == length(x$uidx),
+            "'args$censored' must be character of length 1" = length(x$censored) == 1L
         )},
         error = function(e) {
             cat("\nDebugging output (str(args)):\n")
