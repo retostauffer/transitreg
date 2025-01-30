@@ -163,6 +163,7 @@ expect_silent(tmp <- transitreg:::ff_replace(f))
 #          does not throw any error, but does not return the intended result right?
 
 
+
 # -------------------------------------------------------------------
 # 'get_elementwise_colnames': A helper function to return proper
 # column names if cdf, pdf, quantile, ... are called with
@@ -314,4 +315,5 @@ args <- args_OK; args$censored <- c("left", "right")
 expect_error(transitreg:::check_args_for_treg_predict_pdfcdf(args, silent = TRUE), info = "args$censored must be of length 1")
 
 rm(args, args_OK)
+
 

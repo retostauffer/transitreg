@@ -217,8 +217,8 @@ transitreg_tmf <- function(data, response, breaks, theta_vars = NULL,
   ## Creating theta; a sequence from zero to the response_value for each index.
   ## The following Two lines create this sequence of sequences.
   fn_get_theta <- function(nout, resp, idx) {
-    resettozero <- c(0, which(diff(idx) > 0))
-    return(seq_len(nout) - rep(resettozero, resp + 1) - 1)
+    resettozero <- c(0L, which(diff(idx) > 0))
+    return(seq_len(nout) - rep(resettozero, resp + 1L) - 1L)
   }
   result$theta <- fn_get_theta(nout, pseudo_index, result$index)
 
@@ -229,6 +229,10 @@ transitreg_tmf <- function(data, response, breaks, theta_vars = NULL,
       theta_vars <- theta_vars[order(as.integer(regmatches(theta_vars, regexpr("[0-9]+$", theta_vars))))]
       for (tv in theta_vars) {
           tint <- as.integer(regmatches(tv, regexpr("[0-9]+$", tv)))
+          ## If this theta does not exist, skip (do not add a new variable
+          ## with constant zero values).
+          if (sum(result$theta == tint) == 0) break
+          ## Else setting up the new binary variable
           result[[tv]] <- integer(length(result$theta)) # Initialize 0s
           result[[tv]][result$theta == tint] <- 1L
       }
