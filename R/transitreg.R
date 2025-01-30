@@ -968,7 +968,7 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 
     if (is.null(newdata)) newdata <- model.frame(object)
     if (is.null(newdata[[object$response]]))
-        stop("response missing in newdata!")
+        stop("Response variable '", object$response, "' missing in newdata!")
 
     y <- setNames(data.frame(newdata[[object$response]]), yn)
     return(y)
