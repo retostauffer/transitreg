@@ -317,10 +317,6 @@ transitreg <- function(formula, data, subset, na.action,
     tp <- predict(rval$model, type = "response")
   }
 
-  ## Remove model frame.
-  if (!model)
-    rval$model$model <- NULL
-
   ## Compute probabilities.
   ui <- unique(tmf$index)
   probs <- cprobs <- numeric(length(ui))
