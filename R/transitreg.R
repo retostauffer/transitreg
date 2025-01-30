@@ -193,12 +193,11 @@ transitreg <- function(formula, data, subset, na.action,
   ff2 <- update(ff2, ~ . - theta)
 
   theta_vars <- all.vars(ff2)
-  theta_vars <- grep("theta", theta_vars, value = TRUE)
-  theta_vars <- theta_vars[theta_vars != "theta"]
-  if (length(theta_vars)) {
-    for (j in theta_vars)
-      ff2 <- eval(parse(text = paste0("update(ff2, . ~ . -", j, ")")))
-  }
+  theta_vars <- theta_vars[grep("^theta[0-9]+$", theta_vars)]
+
+  if (length(theta_vars) > 0L)
+    ff2 <- eval(parse(text = paste0("update(ff2, . ~ . -",
+                paste(theta_vars, collapse = " - "), ")")))
 
   mf[["formula"]] <- ff2
   mf[[1L]] <- quote(stats::model.frame)
@@ -231,8 +230,8 @@ transitreg <- function(formula, data, subset, na.action,
   # No breaks specified? In this case the response must be count data
   } else {
       # Check that the response is positive integers only.
-      if (!all(mf[[rval$response]] >= 0L) ||
-          !all(abs(mf[[rval$response]] %% 1) < .Machine$doluble.eps)) {
+      if (any(mf[[rval$response]] < 0) ||
+          any(abs(mf[[rval$response]] %% 1) > sqrt(.Machine$double.eps))) {
           stop("Response not count data. Breaks must be specified for binning.")
       }
       # There are no breaks, but bins
@@ -254,6 +253,24 @@ transitreg <- function(formula, data, subset, na.action,
   ## Response (as bins)
   y    <- num2bin(mf[[rval$response]], breaks = breaks)
   ymax <- max(y, na.rm = TRUE)
+
+  ## Testing theta_vars. Will fail if:
+  ## - We have no observations falling into bin X (thetaX)
+  ## - There are dedicated thetaX, thetaY, thetaZ, ..., covering all bins
+  ##   populated with observations (overspecified model).
+  if (length(theta_vars) > 0L) {
+    theta_int  <- as.integer(regmatches(theta_vars, regexpr("[0-9]+$", theta_vars)))
+    # Check if formula contains thetaX but no observations fall into bin X
+    tmp <- theta_int[!theta_int %in% unique(y)]
+    if (length(tmp) > 0L)
+        stop("Formula contains ", paste(sprintf("'theta%d'", tmp), collapse = ", "), ", ",
+             "but no observation falls into this bin (misspecified model formula).")
+    # Test if there is a thetaX for each bin we have observation (overspecified)
+    # throw an error as well.
+    if (all(!is.na(match(y, theta_int))))
+        stop("Formula contains ", paste(sprintf("'theta%d'", theta_int), collapse = ", "), ", ",
+             "covering all bins observations fall into (overspecified).")
+  }
 
   ## Store scaler, returned as attribute on 'tmf' if used.
   rval$scaler <- if (scale.x) attr(tmf, "scaler") else NULL
