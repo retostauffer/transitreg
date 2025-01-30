@@ -532,28 +532,28 @@ get_mids <- function(x) {
     return(res)
 }
 
-prediction_get_new_response <- function(newdata, y, response) {
-    ## Newdata provided (by user), y is null: Response must be in 'newdata'.
-    if (!is.null(newdata) && is.null(y)) {
-        if (!response %in% names(newdata))
-            stop("response \"", response, "\" not found in 'newdata'. ",
-                 "Must be in 'newdata' or provided via the extra 'y' argument.")
-        res <- newdata[[response]]
-    ## If both 'newdata' and 'y' are set, force to use 'y' but
-    ## throw a warning.
-    } else if (!is.null(newdata) && !is.null(y)) {
-        if (response %in% names(newdata)) {
-            warning("Response \"", response, "\" provided via 'newdata' as well
-                    as ", "via argument 'y'. 'y' will overwrite 'newdata$",
-                    object$response, "' (w/ recycling).")
-            res <- rep(y, length.out = nrow(newdata))
-        } else {
-            res <- rep(y, length.out = nrow(newdata))
-        }
-    }
-    return(res)
-}
-
+## TODO(R) DELETE ME ## prediction_get_new_response <- function(newdata, y, response) {
+## TODO(R) DELETE ME ##     ## Newdata provided (by user), y is null: Response must be in 'newdata'.
+## TODO(R) DELETE ME ##     if (!is.null(newdata) && is.null(y)) {
+## TODO(R) DELETE ME ##         if (!response %in% names(newdata))
+## TODO(R) DELETE ME ##             stop("response \"", response, "\" not found in 'newdata'. ",
+## TODO(R) DELETE ME ##                  "Must be in 'newdata' or provided via the extra 'y' argument.")
+## TODO(R) DELETE ME ##         res <- newdata[[response]]
+## TODO(R) DELETE ME ##     ## If both 'newdata' and 'y' are set, force to use 'y' but
+## TODO(R) DELETE ME ##     ## throw a warning.
+## TODO(R) DELETE ME ##     } else if (!is.null(newdata) && !is.null(y)) {
+## TODO(R) DELETE ME ##         if (response %in% names(newdata)) {
+## TODO(R) DELETE ME ##             warning("Response \"", response, "\" provided via 'newdata' as well
+## TODO(R) DELETE ME ##                     as ", "via argument 'y'. 'y' will overwrite 'newdata$",
+## TODO(R) DELETE ME ##                     object$response, "' (w/ recycling).")
+## TODO(R) DELETE ME ##             res <- rep(y, length.out = nrow(newdata))
+## TODO(R) DELETE ME ##         } else {
+## TODO(R) DELETE ME ##             res <- rep(y, length.out = nrow(newdata))
+## TODO(R) DELETE ME ##         }
+## TODO(R) DELETE ME ##     }
+## TODO(R) DELETE ME ##     return(res)
+## TODO(R) DELETE ME ## }
+## TODO(R) DELETE ME ## 
 ## TODO(R) DELETE ME ## # Helper function setting up 'newdata' when using predict.transitreg
 ## TODO(R) DELETE ME ## get_newdata <- function(object, newdata, y, prob, type) {
 ## TODO(R) DELETE ME ##     # Keep a logical flag for whether or not the user provided 'newdata'
