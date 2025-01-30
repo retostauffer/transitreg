@@ -205,13 +205,15 @@ expect_identical(dpdf, convert_tp(m[i, ], "tp", "pdf"),       info = "Compare re
 rm(dpdf, dcdf)
 
 
-# S3 method mean and median
+# S3 method mean
 dmean <- mean(d3)
 expect_silent(dmean <- mean(d3),                              info = "Calling S3 method mean")
 expect_true(is.double(dmean) && length(dmean) == length(d3),  info = "Checking return object")
 expect_identical(names(dmean), names(d3),                     info = "Testing if names were carried along")
 rm(dmean)
 
+
+# S3 method median
 expect_silent(dmedian <- median(d3),                              info = "Calling S3 method median")
 expect_true(is.double(dmedian) && length(dmedian) == length(d3),  info = "Checking return object")
 expect_identical(names(dmedian), names(d3),                       info = "Testing if names were carried along")
