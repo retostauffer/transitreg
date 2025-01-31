@@ -13,7 +13,6 @@ transitreg(
   subset,
   na.action,
   engine = "bam",
-  scale.x = FALSE,
   breaks = NULL,
   censored = NULL,
   model = TRUE,
@@ -41,8 +40,6 @@ fitting process.}
 \item{engine}{Character string specifying the estimation engine. Options include
 \code{"bam"}, \code{"gam"}, \code{"nnet"}, or \code{"glmnet"} (experimental).
 Default is \code{"bam"}.}
-
-\item{scale.x}{Logical value indicating whether covariates should be scaled before estimation.}
 
 \item{breaks}{Controls the splitting of continuous responses into intervals to mimic a
 count response. If a single number is provided, equidistant intervals are used. If a
@@ -176,7 +173,7 @@ x <- runif(n, -3, 3)
 y <- rpois(n, exp(2 + sin(x)))
 
 ## Fit NN transition count response model.
-b <- transitreg(y ~ theta + x, scale.x = TRUE, engine = "nnet",
+b <- transitreg(y ~ theta + x, engine = "nnet",
                 size = 5, maxit = 1000, decay = 0.001)
 
 ## Predictions and plotting.
@@ -195,7 +192,7 @@ matplot(nd$x, fit, type = "l", lty = 1, lwd = 2,
 
 }
 \seealso{
-\code{\link[=transitreg_tmf]{transitreg_tmf()}}, \code{\link[=transitreg_dist]{transitreg_dist()}}, \code{\link[mgcv:gam]{mgcv::gam()}}
+\code{\link[=transitreg_tmf]{transitreg_tmf()}}, \code{\link[mgcv:gam]{mgcv::gam()}}
 }
 \author{
 Niki

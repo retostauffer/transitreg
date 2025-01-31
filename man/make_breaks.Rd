@@ -4,21 +4,18 @@
 \alias{make_breaks}
 \title{Create Breaks for (Pseudo-)bins}
 \usage{
-make_breaks(y, breaks = 30, scale = FALSE, ...)
+make_breaks(y, breaks = 30)
 }
 \arguments{
-\item{y}{numeric vector with response data.}
+\item{y}{a numeric vector with response data.}
 
-\item{breaks}{number of breaks to be created (single integer).}
-
-\item{scale}{logical, scaling involved?}
-
-\item{\dots}{currently ignored.}
+\item{breaks}{a single numeric (integer) >= 1, number of breaks to be created.}
 }
 \value{
 Returns a numeric vector with the breaks.
 }
 \description{
 Calculates the breaks (point intersection between breaks)
-which span the range of \code{y}.
+which span the range of \code{y} if the user did not specify
+a vector of breaks, but only a single numeric (integer).
 }

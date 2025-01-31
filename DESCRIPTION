@@ -1,7 +1,7 @@
 Package: transitreg
 Title: Flexible Transition Models for Probabilistic Learning
-Version: 0.1-9009
-Date: 2024-01-30
+Version: 0.1-9010
+Date: 2024-01-31
 Authors@R: c(person(
                given = "Nikolaus", 
                family = "Umlauf", 

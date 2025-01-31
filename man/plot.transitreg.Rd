@@ -4,18 +4,16 @@
 \alias{plot.transitreg}
 \title{Plot Method for Transition Model Fits}
 \usage{
-\method{plot}{transitreg}(x, which = "effects", spar = TRUE, k = 5, ...)
+\method{plot}{transitreg}(x, which = "effects", ask = NULL, ...)
 }
 \arguments{
 \item{x}{An object of class \code{"transitreg"} resulting from a call to \code{\link[=transitreg]{transitreg()}}}
 
-\item{which}{A character string or integer specifying the type of plot(s) to
+\item{which}{A character or integer, specifying the type of plot(s) to
 generate (See 'Details').}
 
-\item{spar}{Logical. If \code{TRUE}, multiple plots are arranged in a
-single window. Default is \code{TRUE}.}
-
-\item{k}{Integer, TODO(N): Describe argument. Defaults to \code{5}.}
+\item{ask}{Either \code{NULL}, \code{TRUE} or \code{FALSE}. If \code{NULL} it will evaluate to
+\code{TRUE} if more than one plot is requested via \code{which}.}
 
 \item{\dots}{Additional arguments passed to the underlying plotting functions.}
 }
@@ -31,12 +29,12 @@ residual diagnostic plots.
 The function allows to control what to plot via the argument \code{which}.
 Options include:
 \itemize{
-\item \code{"effects"} Plots the effects of the predictors on the response.
-Requires that the model is estimated by \code{\link[mgcv:gam]{mgcv::gam()}}
-or \code{\link[mgcv:bam]{mgcv::bam()}}.
-\item \code{"hist-resid"} Plots a histogram of the qauntile residuals.
-\item \code{"qq-resid"} Generates a Q-Q plot of the quantile residuals.
-\item \code{"wp-resid"} Creates a worm plot of the quantile residuals.
+\item \code{"effects"} Effects of the predictors on the response.
+Requires that the model is estimated by \code{\link[mgcv:gam]{mgcv::gam()}} or \code{\link[mgcv:bam]{mgcv::bam()}}.
+\item \code{"rootogram"}: Rootogram for assessing goodness of fit.
+\item \code{"qqrplot"}: Q-Q plot for quantile residuals.
+\item \code{"wormplot"}: Worm plot for quantile residuals.
+\item \code{"pithist"}: Probability integral transform (PIT) histogram.
 }
 
 Multiple options can be specified as a character vector or numeric indices.
@@ -46,13 +44,14 @@ evaluating transition model fits. Users can choose to:
 \itemize{
 \item Visualize the effects of predictors on the response variable
 (if the model is a GAM, see \code{\link[mgcv:gam]{mgcv::gam()}}).
-\item Evaluate quantile residuals through histograms, Q-Q plots, or worm plots.
+\item Evaluate quantile residuals through histograms, Q-Q plots, or worm plots
+employing the \code{topmodels} framework for model evaluation.
 }
 
 The \code{which} argument controls the type of plots generated. By default, the
 \code{"effects"} plot is shown if the model supports it. Residual-based plots
-(\code{"hist-resid"}, \code{"qq-resid"}, \code{"wp-resid"}) provide insights into model
-calibration.
+(\code{"rootogram"}, \code{"qqrplot"}, \code{"wormplot"}, \code{"pithist"}) provide insights into
+the goodness of fit of the model and model calibration.
 }
 \examples{
 ## Example: Fit a transition model and generate plots.
@@ -74,7 +73,7 @@ plot(b, which = 3:4, spar = FALSE)
 
 }
 \seealso{
-\code{\link[=transitreg]{transitreg()}}, \code{\link[=transitreg_dist]{transitreg_dist()}}, \code{\link[=transitreg_tmf]{transitreg_tmf()}}, \code{\link[=predict.transitreg]{predict.transitreg()}}.
+\code{\link[=transitreg]{transitreg()}}, \code{\link[=predict.transitreg]{predict.transitreg()}}.
 }
 \keyword{methods}
 \keyword{models}

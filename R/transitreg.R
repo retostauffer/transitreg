@@ -16,7 +16,6 @@
 #' @param engine Character string specifying the estimation engine. Options include
 #'        `"bam"`, `"gam"`, `"nnet"`, or `"glmnet"` (experimental).
 #'        Default is `"bam"`.
-#' @param scale.x Logical value indicating whether covariates should be scaled before estimation.
 #' @param breaks Controls the splitting of continuous responses into intervals to mimic a
 #'        count response. If a single number is provided, equidistant intervals are used. If a
 #'        numeric vector is provided, it is used directly as the breakpoints. This argument is
@@ -63,7 +62,7 @@
 #'
 #' See [transitreg_detect_cores()] for some more details.
 #'
-#' @seealso [transitreg_tmf()], [transitreg_dist()], [mgcv::gam()]
+#' @seealso [transitreg_tmf()], [mgcv::gam()]
 #'
 #' @examples
 #' ## Example 1: Count data.
@@ -131,7 +130,7 @@
 #' y <- rpois(n, exp(2 + sin(x)))
 #'
 #' ## Fit NN transition count response model.
-#' b <- transitreg(y ~ theta + x, scale.x = TRUE, engine = "nnet",
+#' b <- transitreg(y ~ theta + x, engine = "nnet",
 #'                 size = 5, maxit = 1000, decay = 0.001)
 #'
 #' ## Predictions and plotting.
@@ -156,7 +155,7 @@
 #' @author Niki
 #' @export
 transitreg <- function(formula, data, subset, na.action,
-                       engine = "bam", scale.x = FALSE, breaks = NULL,
+                       engine = "bam", breaks = NULL,
                        censored = NULL,
                        model = TRUE, ncores = NULL, verbose = FALSE, ...) {
 
@@ -166,18 +165,29 @@ transitreg <- function(formula, data, subset, na.action,
       censored <- match.arg(censored, c("left", "right", "both"))
   }
 
+
   ## Staying sane
   stopifnot(
     "'ncores' must be NULL or numeric" = is.null(ncores) || is.numeric(ncores),
     "'verbose' must be logical TRUE or FALSE" = isTRUE(verbose) || isFALSE(verbose),
     "'breaks' must be NULL, single positive numeric or numeric vector" =
         is.null(breaks) || (is.numeric(breaks) && length(breaks) == 1L && breaks > 0) || is.numeric(breaks) && length(breaks) > 0,
-
-    "'scale.x' must be FALSE or TRUE" = isFALSE(scale.x) || isTRUE(scale.x)
+    "'engine' must be character of length 1" = is.character(engine) && length(engine) == 1L
   )
   ncores <- transitreg_get_number_of_cores(ncores, verbose = verbose)
 
-  cl <- match.call()
+  ## Evaluate 'engine' argument
+  engine <- tolower(engine)
+  engine <- match.arg(engine, c("bam", "gam", "nnet", "glmnet"))
+
+  ## Check if `scale.x` was specified via the `...` argument (hidden feature).
+  ## If so, it must be TRUE or FALSE. Else it is set TRUE if `engine = "nnet"`
+  ## and `FALSE` else.
+  scale.x <- list(...)$scale.x
+  if (!is.null(scale.x))
+      stopifnot("'scale.x' (if specified via '...') must be TRUE or FALSE" =
+                isTRUE(scale.x) || isFALSE(scale.x))
+  if (is.null(scale.x)) scale.x <- engine == "nnet" ## defaults to TRUE if engine = "nnet"
 
   ## Evaluate the model frame
   mf <- match.call(expand.dots = FALSE)
@@ -202,10 +212,6 @@ transitreg <- function(formula, data, subset, na.action,
   mf[["formula"]] <- ff2
   mf[[1L]] <- quote(stats::model.frame)
   mf <- eval(mf, parent.frame())
-
-  ## Response name.
-  yscale <- NULL
-
 
   ## Setting up empty list for return value
   rval <- list()
@@ -545,256 +551,6 @@ get_mids <- function(x) {
     return(res)
 }
 
-## TODO(R) DELETE ME ## prediction_get_new_response <- function(newdata, y, response) {
-## TODO(R) DELETE ME ##     ## Newdata provided (by user), y is null: Response must be in 'newdata'.
-## TODO(R) DELETE ME ##     if (!is.null(newdata) && is.null(y)) {
-## TODO(R) DELETE ME ##         if (!response %in% names(newdata))
-## TODO(R) DELETE ME ##             stop("response \"", response, "\" not found in 'newdata'. ",
-## TODO(R) DELETE ME ##                  "Must be in 'newdata' or provided via the extra 'y' argument.")
-## TODO(R) DELETE ME ##         res <- newdata[[response]]
-## TODO(R) DELETE ME ##     ## If both 'newdata' and 'y' are set, force to use 'y' but
-## TODO(R) DELETE ME ##     ## throw a warning.
-## TODO(R) DELETE ME ##     } else if (!is.null(newdata) && !is.null(y)) {
-## TODO(R) DELETE ME ##         if (response %in% names(newdata)) {
-## TODO(R) DELETE ME ##             warning("Response \"", response, "\" provided via 'newdata' as well
-## TODO(R) DELETE ME ##                     as ", "via argument 'y'. 'y' will overwrite 'newdata$",
-## TODO(R) DELETE ME ##                     object$response, "' (w/ recycling).")
-## TODO(R) DELETE ME ##             res <- rep(y, length.out = nrow(newdata))
-## TODO(R) DELETE ME ##         } else {
-## TODO(R) DELETE ME ##             res <- rep(y, length.out = nrow(newdata))
-## TODO(R) DELETE ME ##         }
-## TODO(R) DELETE ME ##     }
-## TODO(R) DELETE ME ##     return(res)
-## TODO(R) DELETE ME ## }
-## TODO(R) DELETE ME ## 
-## TODO(R) DELETE ME ## # Helper function setting up 'newdata' when using predict.transitreg
-## TODO(R) DELETE ME ## get_newdata <- function(object, newdata, y, prob, type) {
-## TODO(R) DELETE ME ##     # Keep a logical flag for whether or not the user provided 'newdata'
-## TODO(R) DELETE ME ##     newdata_provided = !is.null(newdata)
-## TODO(R) DELETE ME ## 
-## TODO(R) DELETE ME ##     # Newdata not provided? Taking model.frame (outer model; not binary
-## TODO(R) DELETE ME ##     # response model, see 'engine' in transitreg().
-## TODO(R) DELETE ME ##     if (is.null(newdata)) newdata <- model.frame(object)
-## TODO(R) DELETE ME ## 
-## TODO(R) DELETE ME ##     ## If 'newdata' is provided by user, apply scaling if required.
-## TODO(R) DELETE ME ##     ## Scales all covariates except the 'theta' variables.
-## TODO(R) DELETE ME ##     if (newdata_provided && !is.null(object$scaler)) {
-## TODO(R) DELETE ME ##         for (j in names(object$scaler)) {
-## TODO(R) DELETE ME ##             if (j != "theta") {
-## TODO(R) DELETE ME ##                 newdata[[j]] <- (newdata[[j]] - object$scaler[[j]]$mean) / object$scaler[[j]]$sd
-## TODO(R) DELETE ME ##             }
-## TODO(R) DELETE ME ##         }
-## TODO(R) DELETE ME ##         ## Scaling (standardizing) theta if requested
-## TODO(R) DELETE ME ##         if (!is.null(theta_scaler))
-## TODO(R) DELETE ME ##           newdata$theta <- (newdata$theta - theta_scaler$mean) / theta_scaler$sd
-## TODO(R) DELETE ME ##     }
-## TODO(R) DELETE ME ## 
-## TODO(R) DELETE ME ##     ## Depending on 'type' we need to ensure y/prob is set correctly.
-## TODO(R) DELETE ME ##     ## Quantile:
-## TODO(R) DELETE ME ##     ## - prob must be not NULL, all values must be in [0, 1].
-## TODO(R) DELETE ME ##     ## PDF/CDF:
-## TODO(R) DELETE ME ##     ## - If 'newdata = NULL' we take the model frame, so y can be missing.
-## TODO(R) DELETE ME ##     ## - Else y must be not NULL, all values must be within support of 'breaks'.
-## TODO(R) DELETE ME ##     if (type == "quantile") {
-## TODO(R) DELETE ME ##       stopifnot(
-## TODO(R) DELETE ME ##         "for 'type = \"quantile\"' argument 'prob' must be set" = !is.null(prob),
-## TODO(R) DELETE ME ##         "'prob' must be numeric of length > 0" = is.numeric(prob) && length(prob) > 0,
-## TODO(R) DELETE ME ##         "missing values in 'prob' not allowed" = all(!is.na(prob)),
-## TODO(R) DELETE ME ##         "'prob' must be in [0, 1]" = all(prob >= 0.0) && all(prob <= 1.0)
-## TODO(R) DELETE ME ##       )
-## TODO(R) DELETE ME ##     } else if (type %in% c("cdf", "pdf")) {
-## TODO(R) DELETE ME ##       ## 'newdata' is provided by user (newdata_provided) we need to check
-## TODO(R) DELETE ME ##       ## 1. If the response is not included in 'newdata', the user must provide the new
-## TODO(R) DELETE ME ##       ##    response via 'y' (length 1 or same length as 'newdata').
-## TODO(R) DELETE ME ##       ## 2. If the response is in both, 'newdata' and 'y' the response in newdata
-## TODO(R) DELETE ME ##       ##    will be replaced with 'y' with an additional warning.
-## TODO(R) DELETE ME ##       ## 3. No missing values are allowed in 'y'.
-## TODO(R) DELETE ME ## 
-## TODO(R) DELETE ME ##       ## (1)
-## TODO(R) DELETE ME ##       if (newdata_provided & !object$response %in% names(newdata)) {
-## TODO(R) DELETE ME ##         if (is.null(y)) {
-## TODO(R) DELETE ME ##           stop("If the response \"", object$response, "\" is not included in ",
-## TODO(R) DELETE ME ##                "'newdata' it must be provided via the argument 'y'.")
-## TODO(R) DELETE ME ##         } else if (length(y) != 1L || length(y) != nrow(newdata)) {
-## TODO(R) DELETE ME ##           stop("'y' (if provided) must be of length `1` or the same length as the number of ",
-## TODO(R) DELETE ME ##                "rows in 'newdata' (provided by user or taken from internal model.frame) ",
-## TODO(R) DELETE ME ##                "which is nrow(newdata) = ", nrow(newdata), ".")
-## TODO(R) DELETE ME ##         }
-## TODO(R) DELETE ME ##         # Store new response
-## TODO(R) DELETE ME ##         newdata[[object$response]] <- num2bin(y, object$breaks)
-## TODO(R) DELETE ME ##       ## (2) If response is in 'newdata' but also provided via 'y', it must still
-## TODO(R) DELETE ME ##       ##     be of the correct length, and we will overwrite newdata[[object$response]]
-## TODO(R) DELETE ME ##       ##     with 'y' showing a warning.
-## TODO(R) DELETE ME ##       } else if (!is.null(y)) {
-## TODO(R) DELETE ME ##         if (length(y) != 1L || length(y) != nrow(newdata)) {
-## TODO(R) DELETE ME ##           stop("'y' (if provided) must be of length `1` or the same length as the number of ",
-## TODO(R) DELETE ME ##                "rows in 'newdata' (provided by user or taken from internal model.frame) ",
-## TODO(R) DELETE ME ##                "which is nrow(newdata) = ", nrow(newdata), ".")
-## TODO(R) DELETE ME ##         }
-## TODO(R) DELETE ME ##         ## Else store
-## TODO(R) DELETE ME ##         warning("Response provided via 'newdata' as well as 'y'. ",
-## TODO(R) DELETE ME ##                 "Response in 'newdata' will be overwritten by the values provided on 'y'.")
-## TODO(R) DELETE ME ##         newdata[[object$response]] <- num2bin(y, object$breaks)
-## TODO(R) DELETE ME ##       }
-## TODO(R) DELETE ME ##       ## (3) Any missing values?
-## TODO(R) DELETE ME ##       if (any(is.na(newdata[[object$response]]))) {
-## TODO(R) DELETE ME ##         stop("Missing values in response (in 'newdata' or provided via argument 'y') ",
-## TODO(R) DELETE ME ##              "are not allowed.")
-## TODO(R) DELETE ME ##       }
-## TODO(R) DELETE ME ## 
-## TODO(R) DELETE ME ##       # Discrete distribution? y must be in range [0, object$bins].
-## TODO(R) DELETE ME ##       if (is.null(object$breaks)) {
-## TODO(R) DELETE ME ##         y <- as.integer(y)
-## TODO(R) DELETE ME ##         if (!all(y >= 0 & y <= object$bins - 1L))
-## TODO(R) DELETE ME ##             stop("elements in 'y' must be in {0, ..., ", object$bins - 1L, "}")
-## TODO(R) DELETE ME ##       # Else continuous
-## TODO(R) DELETE ME ##       } else {
-## TODO(R) DELETE ME ##         if (!all(y >= min(object$breaks) & y <= max(object$breaks)))
-## TODO(R) DELETE ME ##             stop(sprintf("elements in 'y' must be in range [%s, %s]",
-## TODO(R) DELETE ME ##                          format(min(object$breaks), format(max(object$breaks)))))
-## TODO(R) DELETE ME ##         ## If 'y' was set by the user, we must convert all values in 'y' from
-## TODO(R) DELETE ME ##         ## it's original numeric value to it's pseudo-observation (bin; int).
-## TODO(R) DELETE ME ##         if (!is.null(y)) y <- num2bin(y, object$breaks)
-## TODO(R) DELETE ME ##       }
-## TODO(R) DELETE ME ##     }
-## TODO(R) DELETE ME ## 
-## TODO(R) DELETE ME ##     # Returning prepared object
-## TODO(R) DELETE ME ##     return(newdata)
-## TODO(R) DELETE ME ## }
-
-
-#' Transition Model Probability Density Visualization
-#'
-#' Visualizes the probability density function (PDF) and raw count or continuous data
-#' based on transition models estimated using [transitreg()]. This function provides
-#' an intuitive way to understand the distribution of the modeled response.
-#'
-#' @param y A response vector or a formula specifying the relationship between the
-#'        response and covariates. For count data, this is typically a vector of counts.
-#'        For continuous data, this can be paired with the `breaks` argument to
-#'        discretize the response.
-#' @param data Optional. If `y` is a formula, this specifies the data frame to
-#'        be used for model fitting.
-#' @param \dots Additional arguments to be passed to [transitreg()], including
-#'        settings for the estimation engine, formula, and other relevant parameters.
-#'
-#' @details
-#' This function estimates and visualizes the underlying probability density function
-#' (PDF) for count or continuous response data using transition models. For continuous
-#' data, the response is discretized based on the `breaks` argument passed through
-#' \dots
-#'
-#' The function supports visualizations for raw counts, zero-inflated data, and transformed
-#' distributions, providing insights into the modeled distribution of the response variable.
-#'
-#' @return
-#' An object of class `"transitreg"`, as described in [transitreg()]. This includes:
-#'
-#' * Fitted transition model details.
-#' * Model diagnostics and parameters.
-#' * Visualization-ready data for plotting PDFs or transformed distributions.
-#'
-#' @seealso [transitreg()], [transitreg_tmf()].
-#'
-#' @examples
-#' ## Example 1: Count data.
-#' set.seed(123)
-#' n <- 3000
-#' y <- rpois(n, 10)
-#'
-#' # Visualize PDF for count data.
-#' transitreg_dist(y)
-#'
-#' ## Example 2: Zero-inflated data.
-#' y <- c(y, rep(0, 500))
-#'
-#' ## Include a zero-inflation term.
-#' transitreg_dist(y ~ s(theta) + theta0)
-#'
-#' ## Example 3: Continuous data.
-#' set.seed(123)
-#' n <- 1000
-#' y <- rgamma(n, shape = 10, rate = 0.1)
-#'
-#' ## Visualize PDF for continuous data with discretization.
-#' transitreg_dist(y, breaks = 50)
-#'
-#' @keywords distribution visualization
-#'
-#' @importFrom stats model.response predict
-#' @importFrom grDevices rgb
-#' @importFrom graphics barplot lines points
-transitreg_dist <- function(y, data = NULL, ...) {
-  if (is.null(y))
-    stop("argument y is NULL!")
-
-  is_f <- FALSE
-  if (inherits(y, "formula")) {
-    yn <- response_name(y)
-    f <- y
-    is_f <- TRUE
-  } else {
-    yn <- deparse(substitute(y), backtick = TRUE, width.cutoff = 500)
-    f <- y ~ s(theta)
-    environment(f) <- environment(y)
-    data <- list()
-    data[["y"]] <- y
-  }
-
-  ## Estimate model.
-  b <- transitreg(f, data = data, ...)
-
-  if (inherits(y, "formula"))
-    y <- model.response(b$model.frame)
-
-  ## Predict probabilities.
-  nd <- data.frame("y" = 0:b$maxcounts)
-  if ((yn != "y") & is_f)
-    names(nd) <- yn
-  pb <- predict(b, newdata = nd)
-
-  nl <- NULL
-
-  if (is.null(b$yc_tab)) {
-    if (!is.null(data) & is_f)
-      y <- data[[yn]]
-    tab <- prop.table(table(y))
-  } else {
-    tab <- prop.table(b$yc_tab)
-    nl <- format(b$ym, digits = 2)
-  }
-
-  tab2 <- numeric(b$maxcounts + 1L)
-  names(tab2) <- as.character(0:b$maxcounts)
-  tab2[names(tab)] <- tab
-  tab <- tab2
-
-  ## Set labels.
-  ylim <- list(...)$ylim
-  if (is.null(ylim)) 
-    ylim <- range(c(0, tab, pb * 1.1), na.rm = TRUE)
-  ylab <- list(...)$ylab
-  if (is.null(ylab))
-    ylab <- "Probability"
-  xlab <- list(...)$xlab
-  if (is.null(xlab)) {
-    xlab <- if (is.null(b$yc_tab)) "#Counts" else yn
-  }
-
-  ## Plot.
-  if (!is.null(nl)) {
-    names(tab) <- nl[as.integer(names(tab)) + 1L]
-  }
-  x <- barplot(tab, xlab = xlab, ylab = ylab, ylim = ylim)
-  lines(pb ~ x, col = 4, lwd = 2, type = "h")
-  points(x, pb, col = 4, pch = 16)
-  points(x, pb, col = rgb(0.1, 0.1, 0.1, alpha = 0.6))
-
-  return(invisible(b))
-}
-
-
-
 
 #' @exportS3Method "[" transitreg
 #' @author Reto
@@ -813,23 +569,22 @@ transitreg_dist <- function(y, data = NULL, ...) {
 #' residual diagnostic plots.
 #'
 #' @param x An object of class `"transitreg"` resulting from a call to [transitreg()]
-#' @param which A character string or integer specifying the type of plot(s) to
+#' @param which A character or integer, specifying the type of plot(s) to
 #'        generate (See 'Details').
-#' @param spar Logical. If `TRUE`, multiple plots are arranged in a
-#'        single window. Default is `TRUE`.
-#' @param k Integer, TODO(N): Describe argument. Defaults to `5`.
+#' @param ask Either `NULL`, `TRUE` or `FALSE`. If `NULL` it will evaluate to
+#'        `TRUE` if more than one plot is requested via `which`.
 #' @param \dots Additional arguments passed to the underlying plotting functions.
 #'
 #' @details
 #' The function allows to control what to plot via the argument `which`.
 #' Options include:
 #'
-#' * `"effects"` Plots the effects of the predictors on the response.
-#'   Requires that the model is estimated by [mgcv::gam()]
-#'   or [mgcv::bam()].
-#' * `"hist-resid"` Plots a histogram of the qauntile residuals.
-#' * `"qq-resid"` Generates a Q-Q plot of the quantile residuals.
-#' * `"wp-resid"` Creates a worm plot of the quantile residuals.
+#' * `"effects"` Effects of the predictors on the response.
+#'   Requires that the model is estimated by [mgcv::gam()] or [mgcv::bam()].
+#' * `"rootogram"`: Rootogram for assessing goodness of fit.
+#' * `"qqrplot"`: Q-Q plot for quantile residuals.
+#' * `"wormplot"`: Worm plot for quantile residuals.
+#' * `"pithist"`: Probability integral transform (PIT) histogram.
 #'
 #' Multiple options can be specified as a character vector or numeric indices.
 #'
@@ -838,16 +593,17 @@ transitreg_dist <- function(y, data = NULL, ...) {
 #'
 #' * Visualize the effects of predictors on the response variable
 #'   (if the model is a GAM, see [mgcv::gam()]).
-#' * Evaluate quantile residuals through histograms, Q-Q plots, or worm plots.
+#' * Evaluate quantile residuals through histograms, Q-Q plots, or worm plots
+#'   employing the `topmodels` framework for model evaluation.
 #'
 #' The `which` argument controls the type of plots generated. By default, the
 #' `"effects"` plot is shown if the model supports it. Residual-based plots
-#' (`"hist-resid"`, `"qq-resid"`, `"wp-resid"`) provide insights into model
-#' calibration.
+#' (`"rootogram"`, `"qqrplot"`, `"wormplot"`, `"pithist"`) provide insights into
+#' the goodness of fit of the model and model calibration.
 #'
 #' @return Returns `NULL` invisibly. Generates plots as a side effect.
 #'
-#' @seealso [transitreg()], [transitreg_dist()], [transitreg_tmf()], [predict.transitreg()].
+#' @seealso [transitreg()], [predict.transitreg()].
 #'
 #' @examples
 #' ## Example: Fit a transition model and generate plots.
@@ -870,47 +626,56 @@ transitreg_dist <- function(y, data = NULL, ...) {
 #' @keywords methods models visualization
 #'
 #' @exportS3Method plot transitreg
-#' @importFrom topmodels qqrplot wormplot rootogram
+#' @importFrom topmodels qqrplot wormplot rootogram pithist
 #' @importFrom stats residuals
 #' @importFrom graphics par
-plot.transitreg <- function(x, which = "effects", spar = TRUE, k = 5, ...)
-{
-  ## What should be plotted?
-  which.match <- c("effects", "hist-resid", "qq-resid", "wp-resid")
-  if (!is.character(which)) {
-    if (any(which > 4L))
-      which <- which[which <= 4L]
-    which <- which.match[which]
-  } else which <- which.match[grep2(tolower(which), which.match, fixed = TRUE)]
-  if (length(which) > length(which.match) || !any(which %in% which.match))
-    stop("argument which is specified wrong!")
+plot.transitreg <- function(x, which = "effects", ask = NULL, ...) {
+  ## Staying sane
+  stopifnot(
+    "'effects' must be numeric or character" = is.character(which) || is.numeric(which),
+    "'ask' must be NULL, TRUE, or FALSE" = is.null(ask) || isFALSE(ask) || isTRUE(ask)
+  )
 
-  if (any("effects" %in% which) & inherits(x$model, "gam")) {
-    plot(x$model, ...)
-    return(invisible(NULL))
-  } else {
-    which <- which[which != "effects"]
-    if (length(which) < 1L) {
-      which <- c("hist-resid", "qq-resid", "wp-resid")
+  ## What should be plotted?
+  which.match <- c("effects", "rootogram", "qqrplot", "wormplot", "pithist")
+
+  ## Evaluate 'which'; can be numeric or string
+  if (is.numeric(which)) {
+      which <- as.integer(which)
+      which <- which.match[which[which >= 1L & which <= length(which.match)]]
+  }
+  which <- match.arg(unique(which), which.match, several.ok = TRUE)
+
+  ## 'effects' only for "gam" models
+  if (!inherits(x$model, "gam")) {
+    warning("'effects' plot only available for 'gam'-based transitreg models")
+    which <- which[!which == "effects"]
+    if (length(which) == 0L) {
+      warning("nothing to plot, returning invisible NULL")
+      invisible(NULL)
     }
   }
 
-  resids <- NULL
-  for (j in 1:k)
-    resids <- cbind(resids, residuals(x, newdata = list(...)$newdata))
-  resids <- apply(resids, 1, median)
+  # Helper function
+  effects_gam <- function(x, ...) plot(x$model, ...)
 
-  ## Number of plots.
-  if (spar) {
-    oma <- par(no.readonly = TRUE)
-    par(mfrow = c(1, length(which)))
-    on.exit(par(oma))
+  ## Plotting functions called below in the order requested by the user
+  fns <- list(effects   = effects_gam,
+              rootogram = rootogram,
+              qqrplot   = qqrplot,
+              pithist   = pithist,
+              wormplot  = wormplot)
+
+  if (length(which) > 1L && (isTRUE(ask)) || is.null(ask)) {
+    on.exit(par(ask = FALSE)); par(ask = TRUE)
   }
 
-  if ("hist-resid" %in% which) rootogram(x, ...)
-  if ("qq-resid" %in% which) qqrplot(x, ...)
-  if ("wp-resid" %in% which) wormplot(b, ...)
+  # Plotting user requests in the order requested
+  for (w in which) fns[[w]](x, ...)
+
+  invisible(NULL)
 }
+
 
 #' @exportS3Method summary transitreg
 summary.transitreg <- function(object, ...) {
@@ -1080,9 +845,11 @@ predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
   type <- tolower(type)
   type <- match.arg(type)
 
+  # TODO(R): Write test for this
   if (!is.null(prob))
     type <- "quantile"
 
+  # TODO(R): Write test for this
   if (is.null(prob) && type == "quantile")
     prob <- 0.5
 

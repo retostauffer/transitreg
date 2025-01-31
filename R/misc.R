@@ -458,34 +458,22 @@ bin2num <- function(idx, breaks) {
 #' Create Breaks for (Pseudo-)bins
 #'
 #' Calculates the breaks (point intersection between breaks)
-#' which span the range of `y`.
+#' which span the range of `y` if the user did not specify 
+#' a vector of breaks, but only a single numeric (integer).
 #'
-#' @param y numeric vector with response data.
-#' @param breaks number of breaks to be created (single integer).
-#' @param scale logical, scaling involved?
-#' @param \dots currently ignored.
+#' @param y a numeric vector with response data.
+#' @param breaks a single numeric (integer) >= 1, number of breaks to be created.
 #'
 #' @return Returns a numeric vector with the breaks.
-make_breaks <- function(y, breaks = 30, scale = FALSE , ...) {
+make_breaks <- function(y, breaks = 30) {
   stopifnot(
     "'y' must be numeric" = is.numeric(y),
     "'breaks' must be numeric of length 1" = is.numeric(breaks) && length(breaks) == 1L,
-    "'breaks' must be >= 2" = breaks >= 2,
-    "'scale' must be TRUE or FALSE" = isTRUE(scale) || isFALSE(scale)
+    "'breaks' must be >= 1" = breaks >= 1
   )
-  if (scale) {
-    my <- min(y)
-    y <- sqrt(y - my + 0.01)
-    dy <- diff(range(y))
-    breaks <- (seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks))^2 - 0.01 + my
-  } else {
-    dy <- diff(range(y))
-    breaks <- seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks)
-    #breaks <- c(min(y) - 0.5*dy, quantile(y, probs = seq(0, 1, length = breaks)), max(y) + 0.5*dy)
-  }
-  return(breaks)
+  dy     <- diff(range(y))
+  return(seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks))
 }
-
 
 
 # Helper functions to check the arguments we hand over to C. This

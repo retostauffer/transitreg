@@ -1,7 +1,5 @@
 # -------------------------------------------------------------------
 # Testing 'transitreg' for discrete response (count data).
-# TODO(R): Remove useC and comparison against the R version
-#          once we removed that.
 # -------------------------------------------------------------------
 
 
