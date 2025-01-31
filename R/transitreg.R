@@ -636,15 +636,22 @@ plot.transitreg <- function(x, which = "effects", ask = NULL, ...) {
     "'ask' must be NULL, TRUE, or FALSE" = is.null(ask) || isFALSE(ask) || isTRUE(ask)
   )
 
-  ## What should be plotted?
-  which.match <- c("effects", "rootogram", "qqrplot", "wormplot", "pithist")
+  # Helper function
+  effects_gam <- function(x, ...) plot(x$model, ...)
+
+  ## Defines the plotting functions, as well as what is available
+  avail <- list(effects   = effects_gam,
+                rootogram = rootogram,
+                qqrplot   = qqrplot,
+                pithist   = pithist,
+                wormplot  = wormplot)
 
   ## Evaluate 'which'; can be numeric or string
   if (is.numeric(which)) {
       which <- as.integer(which)
-      which <- which.match[which[which >= 1L & which <= length(which.match)]]
+      which <- names(avail)[which[which >= 1L & which <= length(avail)]]
   }
-  which <- match.arg(unique(which), which.match, several.ok = TRUE)
+  which <- match.arg(unique(which), names(avail), several.ok = TRUE)
 
   ## 'effects' only for "gam" models
   if (!inherits(x$model, "gam")) {
@@ -656,22 +663,12 @@ plot.transitreg <- function(x, which = "effects", ask = NULL, ...) {
     }
   }
 
-  # Helper function
-  effects_gam <- function(x, ...) plot(x$model, ...)
-
-  ## Plotting functions called below in the order requested by the user
-  fns <- list(effects   = effects_gam,
-              rootogram = rootogram,
-              qqrplot   = qqrplot,
-              pithist   = pithist,
-              wormplot  = wormplot)
-
-  if (length(which) > 1L && (isTRUE(ask)) || is.null(ask)) {
+  if (length(which) > 1L && ((isTRUE(ask)) || is.null(ask))) {
     on.exit(par(ask = FALSE)); par(ask = TRUE)
   }
 
   # Plotting user requests in the order requested
-  for (w in which) fns[[w]](x, ...)
+  for (w in which) avail[[w]](x, ...)
 
   invisible(NULL)
 }
