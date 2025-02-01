@@ -4,7 +4,7 @@
 \alias{transitreg_get_number_of_cores}
 \title{Get number of cores for OpenMP}
 \usage{
-transitreg_get_number_of_cores(ncores = NULL, verbose = verbose)
+transitreg_get_number_of_cores(ncores = NULL, verbose = FALSE)
 }
 \arguments{
 \item{ncores}{\code{NULL} or a positive integer.}

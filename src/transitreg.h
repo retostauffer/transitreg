@@ -3,17 +3,17 @@
 
 #include <stdbool.h>
 
-/* Most compilers with openMP support supply a pre-defined compiler macro
- * _OPENMP. Following facilitates selective turning off (by testing value or
- * defining multiple versions OPENMP_ON1, OPENMP_ON2...)
- */
-#ifdef _OPENMP
-//#pragma message(" [dev] Defining OPENMP_ON 1")
-#define OPENMP_ON 1
-#else
-//#pragma message(" [dev] Defining OPENMP_ON 0")
-#define OPENMP_ON 0
-#endif
+// /* Most compilers with openMP support supply a pre-defined compiler macro
+//  * _OPENMP. Following facilitates selective turning off (by testing value or
+//  * defining multiple versions OPENMP_ON1, OPENMP_ON2...)
+//  */
+// #ifdef _OPENMP
+// //#pragma message(" [dev] Defining OPENMP_ON 1")
+// #define OPENMP_ON 1
+// #else
+// //#pragma message(" [dev] Defining OPENMP_ON 0")
+// #define OPENMP_ON 0
+// #endif
 
 
 /* ... note also that there is no actual *need* to protect #pragmas with #ifdef

@@ -23,7 +23,7 @@
  * */
 SEXP treg_detect_cores() {
     int ncores = 0;
-    #ifdef OPENMP_ON
+    #ifdef _OPENMP
         ncores = omp_get_num_procs();
     #endif
     return ScalarInteger(ncores);

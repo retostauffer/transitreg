@@ -17,7 +17,7 @@
 
 #include <stdbool.h>
 #include <stdlib.h>
-#include "transitreg.h" // Include header, required to have the OPENMP_ON macro available.
+#include "transitreg.h" // Include header
 
 /* Helper function to find position of x in y
  *
@@ -446,7 +446,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
     integerVec which;
     doubleVec tmp;
 
-    #if OPENMP_ON
+    #if _OPENMP
     #pragma omp parallel for num_threads(nthreads) private(which, tmp, j)
     #endif
     for (i = 0; i < un; i++) {
@@ -574,7 +574,7 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
     na[0] = NA_REAL; // Assign missing value
 
     /* Warning for future me: Do not use Rprintf inside omp -> segfault */
-    #if OPENMP_ON
+    #if _OPENMP
     #pragma omp parallel for num_threads(nthreads) private(which, tmppdf, tmpcdf)
     #endif
     for (i = 0; i < un; i++) {
