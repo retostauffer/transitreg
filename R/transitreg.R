@@ -469,14 +469,6 @@ transitreg_predict <- function(object, newdata = NULL,
     # TODO(R): Create tests for this
   }
 
-  ## Creating 'transition model frame' for the prediction of the
-  ## transition probabilities using the object$model (binary response model).
-  tmf <- transitreg_tmf(mf[!obs_na, , drop = FALSE],
-                        response   = object$response,
-                        breaks     = breaks,
-                        theta_vars = object$theta_vars,
-                        scaler     = object$scaler, verbose = verbose)
-
   ## Specify argument for generic prediction method called below
   what <- switch(class(object$model)[1L],
     "bam"  = "response",
@@ -484,8 +476,36 @@ transitreg_predict <- function(object, newdata = NULL,
     "nnet" = "raw"
   )
 
-  tp <- as.numeric(predict(object$model, newdata = tmf, type = what))
 
+  ## ------------------------------------------------
+  ## Calculating how long the tmf matrix will be.
+  ## tmf_rc is the 'tmf data.frame row count' we expect.
+  tmf_rc <- integer(nrow(mf))
+  tmf_rc[!obs_na] <- num2bin(mf[!obs_na, object$response], get_breaks(object))
+  tmf_rc <- cumsum(tmf_rc) # Cumulative sum
+
+  tmf_maxrows <- 1e7
+  blockindex  <- tmf_rc %/% tmf_maxrows + 1L
+
+  tp <- list()
+  for (block in seq_len(max(blockindex))) {
+    idx <- which(blockindex == block)
+    if (all(obs_na[idx])) next
+
+    ## Creating 'transition model frame' for the prediction of the
+    ## transition probabilities using the object$model (binary response model).
+    tmf <- transitreg_tmf(mf[blockindex == block & !obs_na, , drop = FALSE],
+                          response   = object$response,
+                          breaks     = breaks,
+                          theta_vars = object$theta_vars,
+                          scaler     = object$scaler, verbose = verbose)
+
+    tp[[block]] <- as.numeric(predict(object$model, newdata = tmf, type = what))
+  }
+  tp <- do.call(c, tp)
+
+
+  ## ------------------------------------------------
   ## If 'type = "tp"' (transition probabilities) we already have our
   ## result. Convert to matrix and return.
   if (type == "tp") {

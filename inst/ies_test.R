@@ -26,11 +26,11 @@ dtest <- subset(df, i > 1)
 breaks <- c(0, seq(0.2, floor(max(df$sqrt_pre)) + 1, by = 0.3))
 
 m <- transitreg(sqrt_pre ~ theta0 + s(theta, k = 20), data = df, breaks = breaks, censored = "left")
+library("devtools"); load_all("../"); m[1]
 
 nd <- data.frame("sqrt_pre" = seq(0, max(df$sqrt_pre), length.out = 101))
 py <- nd$sqrt_pre
 
-library("devtools"); load_all("../")
 pm <- predict(m, newdata = nd, y = nd$sqrt_pre, type = "pdf")
 
 mids <- (head(breaks, -1) + tail(breaks, -1)) / 2
