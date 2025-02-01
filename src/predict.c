@@ -108,7 +108,7 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
         if ((y[i] < 0) & cens_left) {
             res.values[i] = tmp[0]; // Point mass on left (lower) end
         } else if ((y[i] >= nbins) & cens_right) {
-        } else if ((y[i] < 0) | (y[i] >= nbins)) {
+        } else if ((y[i] < 0) || (y[i] >= nbins)) {
             res.values[i] = 0.0; // Below or above support
         } else {
             // discrete? Take pdf of the bin. Else interpolate
@@ -171,7 +171,7 @@ doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
 
 /* Linear interpolation for finer quantiles */
 double interpolate_linear(double x1, double y1, double x2, double y2, double p) {
-    if (ISNAN(x1) | ISNAN(y1) | ISNAN(x2) | ISNAN(y2)) {
+    if (ISNAN(x1) || ISNAN(y1) || ISNAN(x2) || ISNAN(y2)) {
         return NA_REAL;
     } else if (x1 == x2) {
         return x1;
@@ -253,12 +253,12 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
     // j: Loops over calculated quantiles
     j = disc ? 1 : 0; // Discrete distributions: start at j = 1, else j = 0
     for (i = 0; i < np; i++) {
-        for (j = j; j < count; j++) {
+        for (; j < count; j++) {
             // Probability we are looking for too low?
             if (ISNAN(tmp[j])) { break; }
 
-            // If prob[i] < 0 | > 1: Store NA
-            if ((prob[i] < 0.0) | (prob[i] > 1.0)) {
+            // If prob[i] < 0 || > 1: Store NA
+            if ((prob[i] < 0.0) || (prob[i] > 1.0)) {
                 res[i] = R_NaReal;
                 break;
             } else if (prob[i] < (tmp[0] + eps)) {
@@ -408,8 +408,8 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
     // Evaluate 'censored'. Can be 'left', 'right', or 'both'. If
     // we get anything else, we handle is at 'neither left nor right censored'.
     const char* thecens = CHAR(STRING_ELT(censored, 0));
-    bool cens_left  = (strcmp(thecens, "left") == 0) | (strcmp(thecens, "both") == 0);
-    bool cens_right = (strcmp(thecens, "both") == 0) | (strcmp(thecens, "right") == 0);
+    bool cens_left  = (strcmp(thecens, "left") == 0) || (strcmp(thecens, "both") == 0);
+    bool cens_right = (strcmp(thecens, "both") == 0) || (strcmp(thecens, "right") == 0);
 
     // Allocating return vector.
     //
@@ -418,7 +418,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
     // times number of probabilites/thresholds at which each distribution is
     // evaluated).
     SEXP res;
-    if (do_pdf | do_cdf) {
+    if (do_pdf || do_cdf) {
         if (ewise & (LENGTH(y) != un)) { Rf_error("[C]: Length of 'y' must be equal to length of 'u'."); }
         np = (ewise) ? 1 : LENGTH(y);
         PROTECT(res = allocVector(REALSXP, un * np));
@@ -452,7 +452,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
     for (i = 0; i < un; i++) {
         which = find_positions(uidxptr[i], idxptr, n);
 
-        if (do_pdf | do_cdf | do_q) {
+        if (do_pdf || do_cdf || do_q) {
             // --- Calculating probability density
             if (do_pdf) {
                 // Single PDF
@@ -558,8 +558,8 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
     // Evaluate 'censored'. Can be 'left', 'right', or 'both'. If
     // we get anything else, we handle is at 'neither left nor right censored'.
     const char* thecens = CHAR(STRING_ELT(censored, 0));
-    bool cens_left  = (strcmp(thecens, "left") == 0) | (strcmp(thecens, "both") == 0);
-    bool cens_right = (strcmp(thecens, "both") == 0) | (strcmp(thecens, "right") == 0);
+    bool cens_left  = (strcmp(thecens, "left") == 0) || (strcmp(thecens, "both") == 0);
+    bool cens_right = (strcmp(thecens, "both") == 0) || (strcmp(thecens, "right") == 0);
 
     // Initialize results vector
     int nProtected = 0;
