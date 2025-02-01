@@ -109,10 +109,11 @@ automatically, and \code{ncores} is set to \code{N - 2L}.
 
 \examples{
 ## Example 1: Count data.
+library("transitreg")
 set.seed(123)
 n <- 1000
 x <- runif(n, -3, 3)
-y <- rpois(n, exp(2 + sin(x)))
+y <- rpois(n, exp(2 + sin(x))) + 12
 
 ## Fit transition count response model.
 b <- transitreg(y ~ s(theta) + s(x))
@@ -126,22 +127,32 @@ coef(b)
 ## Effect plots.
 plot(b)
 
-## Quantile residuals.
-plot(b, which = 2:4)
+## Plotting hanging rootogram, quantile residuals, and
+## a probability integral transform (PIT) histogram.
+plot(b, which = c("rootogram", "qqrplot", "pithist"))
 
 ## Predictions and plotting.
 nd <- data.frame(x = seq(-3, 3, length = 100))
 fit <- cbind(
-  predict(b, nd, type = "pmax"),
-  predict(b, nd, type = "quantile", p = 0.05/2),
-  predict(b, nd, type = "quantile", p = 0.5),
-  predict(b, nd, type = "quantile", p = 1 - 0.05/2)
+  "97.5\%"  = predict(b, nd, type = "quantile", p = 1 - 0.05/2),
+  "median" = predict(b, nd, type = "quantile", p = 0.5),
+  "2.5\%"   = predict(b, nd, type = "quantile", p = 0.05/2),
+  "mode"   = predict(b, nd, type = "mode")
 )
 
 ## Plot data and fitted counts.
 plot(y ~ x, pch = 16, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
-matplot(nd$x, fit, type = "l", lty = 1, lwd = 2,
-  col = c(2, 4, 4, 4), add = TRUE)
+matplot(nd$x, fit, type = "l", add = TRUE, lwd = 2,
+       col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
+legend("topleft", legend = colnames(fit),
+       col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
+
+## Visualizing three predicted distributions via Transitreg distributions
+idx <- c(25, 50, 75)
+d3 <- Transition(predict(b, nd[idx, , drop = FALSE], type = "tp"), breaks = seq.int(0, b$bins) - 0.5)
+plot(d3, type = "pdf")
+abline(v = predict(b, nd[idx, , drop = FALSE], type = "mode"), col = 1:3, lty = 3)
+
 
 ## Example 2: Continuous response.
 set.seed(123)
@@ -155,16 +166,25 @@ b <- transitreg(y ~ s(theta) + s(x) + te(x, theta), breaks = 200)
 ## Predictions and plotting
 nd <- data.frame(x = seq(-3, 3, length = 100))
 fit <- cbind(
-  predict(b, nd, type = "pmax"),
-  predict(b, nd, type = "quantile", p = 0.05/2),
-  predict(b, nd, type = "quantile", p = 0.5),
-  predict(b, nd, type = "quantile", p = 1 - 0.05/2)
+  "97.5\%"  = predict(b, nd, type = "quantile", p = 1 - 0.05/2),
+  "median" = predict(b, nd, type = "quantile", p = 0.5),
+  "2.5\%"   = predict(b, nd, type = "quantile", p = 0.05/2),
+  "mode"   = predict(b, nd, type = "mode")
 )
 
 ## Plot data and fitted curves.
 plot(y ~ x, pch = 16, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
-matplot(nd$x, fit, type = "l", lty = 1, lwd = 2,
-  col = c(2, 4, 4, 4), add = TRUE)
+matplot(nd$x, fit, type = "l", add = TRUE, lwd = 2,
+       col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
+legend("topleft", legend = colnames(fit),
+       col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
+
+## Visualizing 5 randomly selected fitted distributions
+idx <- sample(seq_len(nrow(model.frame(b))), 5L)
+plot(b[idx], type = "pdf")
+plot(b[idx], type = "cdf")
+plot(b[idx], type = "tp")
+
 
 ## Example 3: Count response with neural network.
 set.seed(123)
@@ -179,16 +199,18 @@ b <- transitreg(y ~ theta + x, engine = "nnet",
 ## Predictions and plotting.
 nd <- data.frame(x = seq(-3, 3, length = 100))
 fit <- cbind(
-  predict(b, nd, type = "pmax"),
-  predict(b, nd, type = "quantile", p = 0.05/2),
-  predict(b, nd, type = "quantile", p = 0.5),
-  predict(b, nd, type = "quantile", p = 1 - 0.05/2)
+  "97.5\%"  = predict(b, nd, type = "quantile", p = 1 - 0.05/2),
+  "median" = predict(b, nd, type = "quantile", p = 0.5),
+  "2.5\%"   = predict(b, nd, type = "quantile", p = 0.05/2),
+  "mode"   = predict(b, nd, type = "mode")
 )
 
 ## Plot data and fitted counts.
 plot(y ~ x, pch = 16, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
-matplot(nd$x, fit, type = "l", lty = 1, lwd = 2,
-  col = c(2, 4, 4, 4), add = TRUE)
+matplot(nd$x, fit, type = "l", add = TRUE, lwd = 2,
+       col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
+legend("topleft", legend = colnames(fit),
+       col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
 
 }
 \seealso{

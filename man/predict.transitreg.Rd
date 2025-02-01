@@ -9,7 +9,7 @@
   newdata = NULL,
   y = NULL,
   prob = NULL,
-  type = c("pdf", "cdf", "quantile", "pmax", "tp"),
+  type = c("pdf", "cdf", "quantile", "mode", "tp"),
   ncores = NULL,
   elementwise = NULL,
   verbose = FALSE,
@@ -49,7 +49,7 @@ means that \code{elementwise = TRUE} is used if the lengths match and otherwise
 Returns predictions of the specified type:
 \itemize{
 \item For \code{"pdf"} and \code{"cdf"}, a vector or matrix of probabilities evaluated at \code{y}.
-\item For \code{"pmax"}, the expected value of the response.
+\item For \code{"mode"}, the expected value of the response.
 \item For \code{"quantile"}, the quantile of the response distribution at the specified \code{prob}.
 }
 }
@@ -70,7 +70,7 @@ The argument \code{type} controls the return, the following types are allowed:
 \itemize{
 \item \code{"pdf"}: The predicted probability density function (PDF).
 \item \code{"cdf"}: The cumulative distribution function (CDF).
-\item \code{"pmax"}: The expected value of the response (maximum probability).
+\item \code{"mode"}: The expected value of the response (maximum probability).
 \item \code{"quantile"}: The quantile of the response specified by \code{prob}.
 }
 
@@ -91,8 +91,8 @@ p <- list()
 p$pdf <- predict(b, type = "pdf", y = 3)
 p$cdf <- predict(b, type = "cdf", y = 3)
 
-## Predict maximum probability (expected value).
-p$pmax <- predict(b, type = "pmax")
+## Predict mode (expected value at highest probability)
+p$mode <- predict(b, type = "mode")
 
 ## Predict quantiles.
 p$qu95 <- predict(b, prob = 0.95)

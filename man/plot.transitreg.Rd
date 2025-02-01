@@ -65,11 +65,11 @@ b <- transitreg(y ~ s(theta) + s(x))
 plot(b, which = "effects")
 
 ## Plot residuals.
-plot(b, which = c("hist-resid", "qq-resid"))
+plot(b, which = c("rootogram", "pithist", "qqrplot", "wormplot"))
 
 ## Custom plot layout.
-par(mfrow = c(2, 1))
-plot(b, which = 3:4, spar = FALSE)
+par(mfrow = c(2, 2))
+plot(b, which = 2:5, ask = FALSE)
 
 }
 \seealso{
