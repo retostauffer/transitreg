@@ -381,10 +381,14 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
 
     int    *uidxptr   = INTEGER(uidx);     // Unique indices in the dtaa
     int    *idxptr    = INTEGER(idx);      // Distribution index
-    int    nthreads   = asInteger(ncores); // Number of threads for OMP
     int    n          = LENGTH(idx);
     int    un         = LENGTH(uidx);
     int    i, j, np;
+
+    // Number of threads for OMP, only used if _OPENMP support available.
+    #if _OPENMP
+    int    nthreads   = asInteger(ncores);
+    #endif
 
     double* tpptr     = REAL(tp);            // Transition probabilities
     double* bkptr     = REAL(breaks);        // Breaks, points of intersection
@@ -545,10 +549,14 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
     double* bkptr    = REAL(breaks);        // Point intersection of bins
     int*    discptr  = LOGICAL(discrete);   // Discrete distribution?
     int     nbins    = LENGTH(breaks) - 1;  // Number of bins. 3 breaks -> 2 bins, bin "0" and bin "1"
-    int     nthreads = asInteger(ncores);   // Number of threads for OMP
     int     n        = LENGTH(idx);
     int     un       = LENGTH(uidx);
     int     i;
+
+    // Number of threads for OMP, only used if _OPENMP support available.
+    #if _OPENMP
+    int    nthreads   = asInteger(ncores);
+    #endif
 
     // Custom struct object to mimik "which()"
     integerVec which;
