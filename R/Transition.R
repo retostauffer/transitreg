@@ -827,12 +827,15 @@ plot.Transition <- function(x, type = c("tp", "cdf", "pdf"), all = FALSE, n = 8L
         m  <- pdf(x, binmid, elementwise = FALSE, drop = FALSE)
     }
 
-    print(breaks)
-    print(binmid)
-    matplot(x = binmid, y = t(m), type = "l",
-            lty = 1, main = titles[type], ...)
+    type <- if (is_discrete(x[1])) "p" else "l"
+    matplot(x = binmid, y = t(m), type = type,
+            lwd = 2, lty = 1,
+            pch = 19, cex = 0.75,
+            xlim = range(breaks),
+            main = titles[type], ...)
 
-    axis(side = 1, at = breaks, labels = FALSE, col = 1, tck = 0.015)
+    for (s in c(1, 3))
+        axis(side = s, at = breaks, labels = FALSE, col = 1, tck = 0.025)
     invisible(NULL)
 }
 
