@@ -77,12 +77,14 @@ double interpolate_linear(double x1, double y1, double x2, double y2, double p);
 doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
         double* bkptr, int nbins, int* y, int ny,
         bool disc, bool cens_left, bool cens_right);
+
 doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
         double* bkptr, int nbins, int* y, int ny);
+
 doubleVec treg_calc_quantile(int* positions, int count, double* tpptr,
         double* bkptr, double* prob, int np, bool disc);
 
-double treg_calc_pmax(int* positions, int count, double* pptr);
+double treg_calc_mode(int* positions, int count, double* pptr, double* binsptr);
 double treg_calc_mean(int* positions, int count, double* tpptr, double* binsptr);
 
 SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,

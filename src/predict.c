@@ -296,35 +296,50 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
 }
 
 
-/* Helper function for type = "pmax"
+/* Helper function for type = "mode"
  */
-double treg_calc_pmax(int* positions, int count, double* pptr) {
+double treg_calc_mode(int* positions, int count, double* tpptr, double* bkptr) {
+
+    // Temporary double vector to calculate PDF along i = 0, ..., count - 1
+    double* tmp = malloc(count * sizeof(double)); // Single double pointer
+
     // If the first value is NA: return NA immediately
-    if (ISNAN(pptr[positions[0]])) { return R_NaReal; }
+    if (ISNAN(tpptr[positions[0]])) { return R_NaReal; }
 
-    // Initialize with (1 - p[0])
-    double res = 1.0 - pptr[positions[0]];
-    double max_res = res; // Current maximum
-    int    pmax = 0;      // Position of highest value (max cdf)
+    // Calculate PDF for each bin given by the distribution for i = 0, ..., count - 1.
+    // Store in double 'tmp', the required values will be extracted after this loop.
+    int i = 0;
+    double prod = 1.0; // Initialize product
+    for (i = 0; i < count; i++) {
+        if (ISNAN(tpptr[positions[i]])) {
+            Rf_error("TODO(R): First element ISNAN, must be adressed in C");
+            //return R_NaReal; 
+        }
+        // Updating temporary PDF vector
+        tmp[i] = prod * (1.0 - tpptr[positions[i]]);
+        // Updating product of transition probabilities
+        prod *= tpptr[positions[i]];
+    }
+    // Divide PDF by width of the bin
+    for (i = 0; i < count; i++) { tmp[i] = tmp[i] / (bkptr[i + 1] - bkptr[i]); }
 
-    // Does the same as treg_calc_cdf except summing up, and only
-    // keeps the index of the highest value. As soon as we
-    // detect a missing value - return NA.
+    // Find bin with highest density
+    i = 0;
+    double pmax = tmp[0];
+    int imode = 0;
     if (count > 0) {
-        double pprod = 1.0; // Initialize with 1.0 for product
-        for (int i = 1; i < count; i++) {
-            if (ISNAN(pptr[positions[i - 1]])) { return R_NaReal; }
-            pprod *= pptr[positions[i - 1]]; // Multiply with previous element
-            res    = (1.0 - pptr[positions[i]]) * pprod;
-            if (res > max_res) {
-                max_res = res;
-                pmax = i;
-            }
+        for (i = 1; i < count; i++) {
+            if (tmp[i] > pmax) { pmax = tmp[i]; imode = i; }
         }
     }
-    return pmax; // Return as is (zero based)
-}
 
+    // Calculate mode; taking numeric bin midpoint
+    double res = (bkptr[imode] + bkptr[imode + 1]) / 2.0;
+
+    free(tmp);
+    // Return highest value
+    return res;
+}
 
 /* Calculating elementwise pdf
  *
@@ -340,11 +355,11 @@ double treg_calc_pmax(int* positions, int count, double* pptr) {
  * @param y only used if type is 'quantile'; can be NULL (as not used) if
  *        the type is different. Else it is expected to be a vector of doubles
  *        with the same length as 'uidx'.
- * @param type character, either 'pdf', 'cdf', or 'pmax'.
+ * @param type character, either 'pdf', 'cdf', or 'mode'.
  * @param ncores integer, number of cores to be used (ignored if OMP not available).
  *
  * @details This function has a series of different 'modes' for different purposes.
- * Allows to calculate the CDF, PDF, quantiles, as well as the expectation (pmax).
+ * Allows to calculate the CDF, PDF, quantiles, as well as the expectation (mode).
  * 
  * The three inputs which are always required are:
  *
@@ -353,7 +368,7 @@ double treg_calc_pmax(int* positions, int count, double* pptr) {
  * * \code{lower}: Lower edge of the bin.
  * * \code{upper}: Upper edge of the bin.
  * * \code{y}: Where to evaluate the CDF, PDF, quantile. Unused for 
- *             type = "pmax" and type = "mean".
+ *             type = "mode" and type = "mean".
  * * \code{type}: What to return.
  * * \code{ncores}: Number of cores to be used when OpenMP is available.
  * * \code{elementwise}: Logical, should the 'type' be evaluated elementwise?
@@ -406,8 +421,8 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
     bool do_cdf  = strcmp(thetype, "cdf")  == 0;
     bool do_q    = strcmp(thetype, "quantile") == 0;
     bool do_mean = strcmp(thetype, "mean") == 0;
-    // ... if none of them is true, it must be "do pmax"
-    // bool do_pmax = strcmp(thetype, "pmax") == 0;
+    // ... if none of them is true, it must be "do mode"
+    // bool do_mode = strcmp(thetype, "modex") == 0;
 
     // Evaluate 'censored'. Can be 'left', 'right', or 'both'. If
     // we get anything else, we handle is at 'neither left nor right censored'.
@@ -430,7 +445,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
         if (LENGTH(discrete) != un) { Rf_error("[C]: Length of 'discrete' must be equal to length of 'ui'."); }
         np = (ewise) ? 1 : LENGTH(prob);
         PROTECT(res = allocVector(REALSXP, un * np));
-    // Else it is type = "pmax", so length of res is equal to 'un'.
+    // Else it is type = "mode", so length of res is equal to 'un'.
     } else {
         np = 1;
         PROTECT(res = allocVector(REALSXP, un));
@@ -440,7 +455,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
     double *resptr = REAL(res);
 
     // If mode is not pdf, cdf, or quantile, elementwise must be true.
-    // Else we throw an error here. That is for pmax where elementwise
+    // Else we throw an error here. That is for mode where elementwise
     // makes no sense.
     if (!do_pdf & !do_cdf & !do_q & !ewise) {
         Rf_error("Using \"%s\" with elementwise = false not allowed.\n", CHAR(STRING_ELT(type, 0)));
@@ -505,9 +520,9 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
         // Calculate mean
         } else if (do_mean) {
             resptr[i] = treg_calc_mean(which.index, which.length, tpptr, bkptr);
-        // Else it must be pmax
+        // Else it must be mode
         } else {
-            resptr[i] = treg_calc_pmax(which.index, which.length, tpptr);
+            resptr[i] = treg_calc_mode(which.index, which.length, tpptr, bkptr);
         }
         free(which.index); // Free allocated memory
     }
@@ -528,7 +543,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
  * @param uidx integer vector with unique indices in data.
  * @param idx integer with indices, length of idx is sample size times breaks.
  * @param p probabilities, same length as idx vector.
- * @param type character, either 'pdf', 'cdf', or 'pmax'.
+ * @param type character, either 'pdf', 'cdf', or 'mode'.
  * @param ncores integer, number of cores to be used (ignored if OMP not available).
  *
  * @details Does something similar to treg_predict but calculates both PDF and

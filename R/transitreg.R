@@ -66,10 +66,11 @@
 #'
 #' @examples
 #' ## Example 1: Count data.
+#' library("transitreg")
 #' set.seed(123)
 #' n <- 1000
 #' x <- runif(n, -3, 3)
-#' y <- rpois(n, exp(2 + sin(x)))
+#' y <- rpois(n, exp(2 + sin(x))) + 12
 #'
 #' ## Fit transition count response model.
 #' b <- transitreg(y ~ s(theta) + s(x))
@@ -83,22 +84,32 @@
 #' ## Effect plots.
 #' plot(b)
 #'
-#' ## Quantile residuals.
-#' plot(b, which = 2:4)
+#' ## Plotting hanging rootogram, quantile residuals, and
+#' ## a probability integral transform (PIT) histogram.
+#' plot(b, which = c("rootogram", "qqrplot", "pithist"))
 #'
 #' ## Predictions and plotting.
 #' nd <- data.frame(x = seq(-3, 3, length = 100))
 #' fit <- cbind(
-#'   predict(b, nd, type = "pmax"),
-#'   predict(b, nd, type = "quantile", p = 0.05/2),
-#'   predict(b, nd, type = "quantile", p = 0.5),
-#'   predict(b, nd, type = "quantile", p = 1 - 0.05/2)
+#'   "97.5%"  = predict(b, nd, type = "quantile", p = 1 - 0.05/2),
+#'   "median" = predict(b, nd, type = "quantile", p = 0.5),
+#'   "2.5%"   = predict(b, nd, type = "quantile", p = 0.05/2),
+#'   "mode"   = predict(b, nd, type = "mode")
 #' )
 #'
 #' ## Plot data and fitted counts.
 #' plot(y ~ x, pch = 16, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
-#' matplot(nd$x, fit, type = "l", lty = 1, lwd = 2,
-#'   col = c(2, 4, 4, 4), add = TRUE)
+#' matplot(nd$x, fit, type = "l", add = TRUE, lwd = 2,
+#'        col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
+#' legend("topleft", legend = colnames(fit),
+#'        col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
+#'
+#' ## Visualizing three predicted distributions via Transitreg distributions
+#' idx <- c(25, 50, 75)
+#' d3 <- Transition(predict(b, nd[idx, , drop = FALSE], type = "tp"), breaks = seq.int(0, b$bins) - 0.5)
+#' plot(d3, type = "pdf")
+#' abline(v = predict(b, nd[idx, , drop = FALSE], type = "mode"), col = 1:3, lty = 3)
+#'
 #'
 #' ## Example 2: Continuous response.
 #' set.seed(123)
@@ -112,16 +123,25 @@
 #' ## Predictions and plotting
 #' nd <- data.frame(x = seq(-3, 3, length = 100))
 #' fit <- cbind(
-#'   predict(b, nd, type = "pmax"),
-#'   predict(b, nd, type = "quantile", p = 0.05/2),
-#'   predict(b, nd, type = "quantile", p = 0.5),
-#'   predict(b, nd, type = "quantile", p = 1 - 0.05/2)
+#'   "97.5%"  = predict(b, nd, type = "quantile", p = 1 - 0.05/2),
+#'   "median" = predict(b, nd, type = "quantile", p = 0.5),
+#'   "2.5%"   = predict(b, nd, type = "quantile", p = 0.05/2),
+#'   "mode"   = predict(b, nd, type = "mode")
 #' )
 #'
 #' ## Plot data and fitted curves.
 #' plot(y ~ x, pch = 16, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
-#' matplot(nd$x, fit, type = "l", lty = 1, lwd = 2,
-#'   col = c(2, 4, 4, 4), add = TRUE)
+#' matplot(nd$x, fit, type = "l", add = TRUE, lwd = 2,
+#'        col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
+#' legend("topleft", legend = colnames(fit),
+#'        col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
+#'
+#' ## Visualizing 5 randomly selected fitted distributions
+#' idx <- sample(seq_len(nrow(model.frame(b))), 5L)
+#' plot(b[idx], type = "pdf")
+#' plot(b[idx], type = "cdf")
+#' plot(b[idx], type = "tp")
+#'
 #'
 #' ## Example 3: Count response with neural network.
 #' set.seed(123)
@@ -136,16 +156,18 @@
 #' ## Predictions and plotting.
 #' nd <- data.frame(x = seq(-3, 3, length = 100))
 #' fit <- cbind(
-#'   predict(b, nd, type = "pmax"),
-#'   predict(b, nd, type = "quantile", p = 0.05/2),
-#'   predict(b, nd, type = "quantile", p = 0.5),
-#'   predict(b, nd, type = "quantile", p = 1 - 0.05/2)
+#'   "97.5%"  = predict(b, nd, type = "quantile", p = 1 - 0.05/2),
+#'   "median" = predict(b, nd, type = "quantile", p = 0.5),
+#'   "2.5%"   = predict(b, nd, type = "quantile", p = 0.05/2),
+#'   "mode"   = predict(b, nd, type = "mode")
 #' )
 #'
 #' ## Plot data and fitted counts.
 #' plot(y ~ x, pch = 16, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
-#' matplot(nd$x, fit, type = "l", lty = 1, lwd = 2,
-#'   col = c(2, 4, 4, 4), add = TRUE)
+#' matplot(nd$x, fit, type = "l", add = TRUE, lwd = 2,
+#'        col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
+#' legend("topleft", legend = colnames(fit),
+#'        col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
 #'
 #' @keywords models regression
 #'
@@ -359,7 +381,7 @@ transitreg <- function(formula, data, subset, na.action,
 
 # Helper function for predictions on a transitreg model object.
 transitreg_predict <- function(object, newdata = NULL,
-        type = c("pdf", "cdf", "quantile", "pmax", "tp"), y = NULL, prob = NULL,
+        type = c("pdf", "cdf", "quantile", "mode", "tp"), y = NULL, prob = NULL,
         elementwise = NULL, maxcounts = 1e+03,
         verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
         factor = FALSE, ncores = NULL) {
@@ -375,9 +397,7 @@ transitreg_predict <- function(object, newdata = NULL,
   type <- tolower(type)
   type <- match.arg(type)
 
-  if (type == "pmax")
-      stop("TODO(R): Partially implemented, but not yet tested.")
-
+  ## Setting number of cores for OMP
   if (is.null(ncores))
     ncores <- transitreg_get_number_of_cores(ncores, verbose = verbose)
 
@@ -430,8 +450,8 @@ transitreg_predict <- function(object, newdata = NULL,
               prob <- rep(prob, length.out = nrow(mf))
       } else if (type %in% c("cdf", "pdf")) {
           elementwise <- is.null(y) || length(y) == 1L || length(y) == nrow(mf)
-      } else if (type == "pmax") {
-          elementwise <- TRUE # for 'pmax' elementwise is always TRUE
+      } else if (type == "mode") {
+          elementwise <- TRUE # for 'mode' elementwise is always TRUE
       } else if (type == "tp") {
           NULL
       } else {
@@ -440,7 +460,7 @@ transitreg_predict <- function(object, newdata = NULL,
   }
 
   ## Setting up 'newresponse'.
-  ## Quantile, pmax, tp:
+  ## Quantile, mode, tp:
   ##  - Setting response to "max bin mid" to ensure we calculate the
   ##    transition probabilities for _all_ bins.
   ## CDF/PDF:
@@ -448,7 +468,7 @@ transitreg_predict <- function(object, newdata = NULL,
   ##    up to 'y[i]'.
   ##  - If elementwise = FALSE: We must evaluate each distribution up to
   ##    max(y).
-  if (type %in% c("quantile", "pmax", "tp")) {
+  if (type %in% c("quantile", "mode", "tp")) {
     mf[[object$response]] <- max(get_mids(object))
   } else {
     ## Else highest bin specified on 'y' (if set) or highest
@@ -573,10 +593,11 @@ transitreg_predict <- function(object, newdata = NULL,
     prefix <- if (type == "pdf") "d" else "p"
     ## Setting up empty matrix and populate with results where the
     ## observations did not contain missing data.
-    arr.ind <- cbind(row = rep(which(!obs_na), each = object$bins),
+    arr.ind <- cbind(row = rep(which(!obs_na), each = length(y)),
                      col = rep(seq_along(y), times = sum(!obs_na)))
     x <- matrix(NA, nrow = nrow(mf), ncol = length(y),
                 dimnames = list(NULL, get_elementwise_colnames(y, prefix)))
+    print(mf)
     x[arr.ind] <- res
   ## Elementwise - building vector return
   } else {
@@ -835,7 +856,7 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 #'
 #' * `"pdf"`: The predicted probability density function (PDF).
 #' * `"cdf"`: The cumulative distribution function (CDF).
-#' * `"pmax"`: The expected value of the response (maximum probability).
+#' * `"mode"`: The expected value of the response (maximum probability).
 #' * `"quantile"`: The quantile of the response specified by `prob`.
 #'
 #' For `"pdf"` and `"cdf"`, the response values (`y`) must be provided unless the
@@ -846,7 +867,7 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 #' Returns predictions of the specified type:
 #'
 #' * For `"pdf"` and `"cdf"`, a vector or matrix of probabilities evaluated at `y`.
-#' * For `"pmax"`, the expected value of the response.
+#' * For `"mode"`, the expected value of the response.
 #' * For `"quantile"`, the quantile of the response distribution at the specified `prob`.
 #'
 #' @seealso [transitreg()], [transitreg_tmf()], [transitreg_dist()].
@@ -864,8 +885,8 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 #' p$pdf <- predict(b, type = "pdf", y = 3)
 #' p$cdf <- predict(b, type = "cdf", y = 3)
 #'
-#' ## Predict maximum probability (expected value).
-#' p$pmax <- predict(b, type = "pmax")
+#' ## Predict mode (expected value at highest probability)
+#' p$mode <- predict(b, type = "mode")
 #'
 #' ## Predict quantiles.
 #' p$qu95 <- predict(b, prob = 0.95)
@@ -894,7 +915,7 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 #' @exportS3Method predict transitreg
 #' @author Niki
 predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
-        type = c("pdf", "cdf", "quantile", "pmax", "tp"), ncores = NULL,
+        type = c("pdf", "cdf", "quantile", "mode", "tp"), ncores = NULL,
         elementwise = NULL, verbose = FALSE, ...) {
 
   type <- tolower(type)
