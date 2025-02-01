@@ -1,8 +1,11 @@
 
-## Version 0.1-9005
+## Version 0.1-9010
 
 * Migrated back to main branch, repository renamed to final
   package name `transitreg`.
+* Major internal changes, refined several functions and methods,
+  updated examples and documentation (tbc).
+* Renamed `pmax` to `mode`.
 
 ## Version 0.1-9004
 
