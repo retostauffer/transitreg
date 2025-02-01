@@ -331,7 +331,9 @@ transitreg <- function(formula, data, subset, na.action,
   ## both simultanously in C to improve speed.
   censored <- if (is.null(rval$censored)) "not-censored" else rval$censored
   args <- list(uidx = ui, idx = tmf$index,
-               tp = tp, y = y, breaks = breaks, ncores = ncores, censored = censored)
+               tp = tp, y = y, breaks = breaks,
+               discrete = rep(is.null(rval$breaks), length(ui)),
+               ncores = ncores, censored = censored)
 
   ## Calling C
   args <- check_args_for_treg_predict_pdfcdf(args)
@@ -397,7 +399,19 @@ transitreg_predict <- function(object, newdata = NULL,
 
   ## If 'newdata' is not set we take the existing model.frame; here the response
   ## is already stored as 'bin indices', so we do not have to call numb2bin.
-  mf <- if (is.null(newdata)) model.frame(object) else newdata
+  ## Else we check if we have the variables needed, and extract them from
+  ## the newdata object provided by the user.
+  if (is.null(newdata)) {
+    mf <- model.frame(object)
+  } else {
+    tmp <- names(model.frame(object))
+    tmp <- tmp[!tmp == object$response]
+    if (!all(tmp[!tmp == object$response] %in% names(newdata)))
+        stop("'newdata' does not provide all required variables, ",
+             "missing: ", paste(tmp[!tmp %in% names(newdata)], collapse = ", "))
+    mf <- newdata
+    rm(tmp)
+  }
 
   ## Guessing 'elementwise' if is NULL
   ##
@@ -448,9 +462,16 @@ transitreg_predict <- function(object, newdata = NULL,
     }
   }
 
+  ## Get rows (row index) where we have missing data
+  obs_na <- unname(apply(mf, MARGIN = 1, function(x) sum(is.na(x))) > 0)
+  if (all(obs_na)) {
+    stop("all observations (rows) contain missing data, prediction not possible")
+    # TODO(R): Create tests for this
+  }
+
   ## Creating 'transition model frame' for the prediction of the
   ## transition probabilities using the object$model (binary response model).
-  tmf <- transitreg_tmf(mf,
+  tmf <- transitreg_tmf(mf[!obs_na, , drop = FALSE],
                         response   = object$response,
                         breaks     = breaks,
                         theta_vars = object$theta_vars,
@@ -462,13 +483,19 @@ transitreg_predict <- function(object, newdata = NULL,
     "gam"  = "response",
     "nnet" = "raw"
   )
+
   tp <- as.numeric(predict(object$model, newdata = tmf, type = what))
 
   ## If 'type = "tp"' (transition probabilities) we already have our
   ## result. Convert to matrix and return.
   if (type == "tp") {
       tmp <- list(NULL, paste0("tp_", seq_len(object$bins) - 1))
-      return(matrix(tp, byrow = TRUE, ncol = object$bins, dimnames = tmp))
+      arr.ind <- cbind(row = rep(which(!obs_na), each = object$bins),
+                       col = rep(seq_len(object$bins), times = sum(!obs_na)))
+      # Initialize empty matrix, fill with tps
+      x <- matrix(NA, ncol = object$bins, nrow = nrow(mf), dimnames = tmp)
+      x[arr.ind] <- tp
+      return(x)
   }
 
   ## Extract unique indices
@@ -477,12 +504,12 @@ transitreg_predict <- function(object, newdata = NULL,
   ## Setting dummy values (required by C later on)
   if (type == "quantile") {
       ## Sorting 'prob'. This is important for the .C routine!
-      probC <- if (!elementwise) sort(unique(prob)) else prob
+      probC <- if (!elementwise) sort(unique(prob)) else prob[!obs_na]
       yC   <- NA_integer_ ## Dummy value required for .C call
   } else if (type %in% c("cdf", "pdf")) {
       ## Sorting 'y'. This is important for the .C routine!
       if (elementwise) {
-          yC <- num2bin(mf[[object$response]], breaks = breaks)
+          yC <- num2bin(mf[!obs_na, object$response], breaks = breaks)
       } else {
           yC <- num2bin(sort(unique(y)), breaks = breaks)
       }
@@ -497,14 +524,14 @@ transitreg_predict <- function(object, newdata = NULL,
   censored <- if (is.null(object$censored)) "not-censored" else object$censored
 
   ## Setting up arguments for the .C call
-  args <- list(uidx   = ui,                # int; Unique distribution index (int)
-               idx    = tmf$index,         # int; Index vector (int)
-               tp     = tp,                # num; Transition probabilities
-               breaks = breaks,            # num; Point intersections of bins
-               y      = yC,                # int; Response y, used for 'cdf/pdf'
-               prob   = probC,             # num; Probabilities (used for 'quantile')
-               type   = type,              # str; to predict/calculate
-               ncores = ncores,            # int; Number of cores to be used (OpenMP)
+  args <- list(uidx        = ui,           # int; Unique distribution index (int)
+               idx         = tmf$index,    # int; Index vector (int)
+               tp          = tp,           # num; Transition probabilities
+               breaks      = breaks,       # num; Point intersections of bins
+               y           = yC,           # int; Response y, used for 'cdf/pdf'
+               prob        = probC,        # num; Probabilities (used for 'quantile')
+               type        = type,         # str; to predict/calculate
+               ncores      = ncores,       # int; Number of cores to be used (OpenMP)
                elementwise = elementwise,  # Elementwise (one prob or y per ui)
                discrete    = discrete,     # Discrete distribution?
                censored    = censored)
@@ -516,17 +543,28 @@ transitreg_predict <- function(object, newdata = NULL,
   # If 'ementwise = FALSE' we get length(y)/length(prob) results per
   # observation and have to glue them back together into a matrix.
   if (!elementwise && type == "quantile") {
-    res <- matrix(res, byrow = TRUE, ncol = length(prob),
+    arr.ind <- cbind(row = rep(which(!obs_na), each = length(probC)),
+                     col = rep(seq_along(probC), times = sum(!obs_na)))
+    x <- matrix(NA, nrow = nrow(mf), ncol = length(prob),
                   dimnames = list(NULL, get_elementwise_colnames(prob, NULL)))
+    x[arr.ind] <- res
   } else if (!elementwise) {
     ## Convert from predicted 'bin' back to the numeric value.
     prefix <- if (type == "pdf") "d" else "p"
-    ym  <- bin2num(y, object$breaks)
-    res <- matrix(res, byrow = TRUE, ncol = length(y),
-                  dimnames = list(NULL, get_elementwise_colnames(ym, prefix)))
+    ## Setting up empty matrix and populate with results where the
+    ## observations did not contain missing data.
+    arr.ind <- cbind(row = rep(which(!obs_na), each = object$bins),
+                     col = rep(seq_along(y), times = sum(!obs_na)))
+    x <- matrix(NA, nrow = nrow(mf), ncol = length(y),
+                dimnames = list(NULL, get_elementwise_colnames(y, prefix)))
+    x[arr.ind] <- res
+  ## Elementwise - building vector return
+  } else {
+    x <- rep(NA_real_, nrow(mf))
+    x[!obs_na] <- res
   }
 
-  return(res)
+  return(x)
 }
 
 

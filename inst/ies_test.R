@@ -5,6 +5,7 @@ library("gamlss.cens")
 library("bamlss")
 
 library("transitreg")
+devtools::load_all("../")
 
 rm(list = objects())
 
@@ -25,10 +26,11 @@ dtest <- subset(df, i > 1)
 breaks <- c(0, seq(0.2, floor(max(df$sqrt_pre)) + 1, by = 0.3))
 
 m <- transitreg(sqrt_pre ~ theta0 + s(theta, k = 20), data = df, breaks = breaks, censored = "left")
-#m <- transitreg(sqrt_pre ~ theta0 + s(theta, k = 20), data = df, breaks = breaks)
 
 nd <- data.frame("sqrt_pre" = seq(0, max(df$sqrt_pre), length.out = 101))
 py <- nd$sqrt_pre
+
+library("devtools"); load_all("../")
 pm <- predict(m, newdata = nd, y = nd$sqrt_pre, type = "pdf")
 
 mids <- (head(breaks, -1) + tail(breaks, -1)) / 2
@@ -53,10 +55,6 @@ g2 <- mqgam(sqrt_pre ~ s(day, k = 20, bs = "cc"), data = dtrain, qu = qu)
 
 nd <- data.frame("day" = 0:365)
 pm2 <- predict(m2, newdata = dtest, prob = qu, elementwise = FALSE)
-#pm2 <- do.call("cbind",
-#  lapply(qu, function(j) {
-#    predict(m2, newdata = dtest, prob = j)
-#}))
 
 par <- predict(b2, newdata = dtest, type = "parameter")
 pb2 <- do.call("cbind",

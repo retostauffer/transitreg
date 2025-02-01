@@ -75,7 +75,8 @@ double treg_calc_mean(int* positions, int count, double* tpptr, double* bkptr) {
 
 /* Helper function for type = "pdf" */
 doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
-                        double* bkptr, int nbins, int* y, int ny, bool cens_left, bool cens_right) {
+                        double* bkptr, int nbins, int* y, int ny,
+                        bool disc, bool cens_left, bool cens_right) {
 
     // Temporary double vector to calculate PDF along i = 0, ..., count - 1
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
@@ -107,11 +108,13 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
         if ((y[i] < 0) & cens_left) {
             res.values[i] = tmp[0]; // Point mass on left (lower) end
         } else if ((y[i] >= nbins) & cens_right) {
-            res.values[i] = tmp[nbins]; // Point mass on right (upper) end
         } else if ((y[i] < 0) | (y[i] >= nbins)) {
             res.values[i] = 0.0; // Below or above support
         } else {
+            // discrete? Take pdf of the bin. Else interpolate
+            // TODO(R): We could try to interpolate here
             res.values[i] = tmp[y[i]];
+            //double interpolate_linear(double x1, double y1, double x2, double y2, double p) {
         }
     }
 
@@ -455,11 +458,11 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
                 // Single PDF
                 if (ewise) {
                     tmp = treg_calc_pdf(which.index, which.length, tpptr, bkptr, nbins, &yptr[i], 1,
-                            cens_left, cens_right);
+                            discptr[i] == 1, cens_left, cens_right);
                 // Multiple PDFs
                 } else {
                     tmp = treg_calc_pdf(which.index, which.length, tpptr, bkptr, nbins, yptr, LENGTH(y),
-                            cens_left, cens_right);
+                            discptr[i] == 1, cens_left, cens_right);
                 }
             // --- Calculating cumulative distribution
             } else if (do_cdf) {
@@ -532,15 +535,17 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
  * @return Returns named list with two numeric vectors, each of which
  * has length(uidx) (vector with cdf and pdf).
  */
-SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks, SEXP ncores, SEXP censored) {
+SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
+        SEXP discrete, SEXP ncores, SEXP censored) {
 
     double* tpptr    = REAL(tp);
-    int*    uidxptr  = INTEGER(uidx);      // Unique indices in the dtaa
-    int*    idxptr   = INTEGER(idx);       // Index vector
-    int*    yptr     = INTEGER(y);         // Bin at which to evaluate the distribution
-    double* bkptr    = REAL(breaks);       // Point intersection of bins
-    int     nbins    = LENGTH(breaks) - 1; // Number of bins. 3 breaks -> 2 bins, bin "0" and bin "1"
-    int     nthreads = asInteger(ncores);  // Number of threads for OMP
+    int*    uidxptr  = INTEGER(uidx);       // Unique indices in the dtaa
+    int*    idxptr   = INTEGER(idx);        // Index vector
+    int*    yptr     = INTEGER(y);          // Bin at which to evaluate the distribution
+    double* bkptr    = REAL(breaks);        // Point intersection of bins
+    int*    discptr  = LOGICAL(discrete);   // Discrete distribution?
+    int     nbins    = LENGTH(breaks) - 1;  // Number of bins. 3 breaks -> 2 bins, bin "0" and bin "1"
+    int     nthreads = asInteger(ncores);   // Number of threads for OMP
     int     n        = LENGTH(idx);
     int     un       = LENGTH(uidx);
     int     i;
@@ -589,7 +594,8 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks, SEXP
         //
         // Input arguments are (in this order)
         //     positions, count, tpptr, bkptr, y, ny
-        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, bkptr, nbins, &yptr[i], 1, cens_left, cens_right);
+        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, bkptr, nbins, &yptr[i], 1,
+                discptr[i] == 1, cens_left, cens_right);
         tmpcdf = treg_calc_cdf(which.index, which.length, tpptr, bkptr, nbins, &yptr[i], 1);
 
         // Store last value, that is the last bin provided for this distribution.

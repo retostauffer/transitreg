@@ -283,6 +283,7 @@ args_OK <- list(uidx        = 1:3,
                 tp          = runif(15),
                 y           = c(5L, 10L, 3L),
                 breaks      = c(0, 0.5, 1.0, 1.5),
+                discrete    = rep(TRUE, 3),
                 ncores      = 10L,
                 censored    = "left")
 

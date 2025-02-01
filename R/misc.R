@@ -535,11 +535,12 @@ check_args_for_treg_predict <- function(x, silent = FALSE) {
 #' @importFrom utils str
 check_args_for_treg_predict_pdfcdf <- function(x, silent = FALSE) {
     ## Required elements in the order as expected by C
-    enames <- c("uidx", "idx", "tp", "y", "breaks", "ncores", "censored")
+    enames <- c("uidx", "idx", "tp", "y", "breaks", "discrete", "ncores", "censored")
 
     ## Checking types first
-    tmp <- list("integer" = c("uidx", "idx", "y", "ncores"),
-                "double"  = c("tp", "breaks"),
+    tmp <- list("integer"   = c("uidx", "idx", "y", "ncores"),
+                "double"    = c("tp", "breaks"),
+                "logical"   = "discrete", # TODO(R) Cover this in tests
                 "character" = "censored")
 
     debug_stop <- function(e) { if (!silent) { cat("\nDebugging output (str(args)):\n"); str(x) }; stop(e) }
@@ -559,6 +560,8 @@ check_args_for_treg_predict_pdfcdf <- function(x, silent = FALSE) {
                 length(x$idx) == length(x$tp),
             "length of 'args$y' and 'args$uidx' must be identical" =
                 length(x$y) == length(x$uidx),
+            "'args$discrete' must be logical with same length as args$uidx" = 
+                length(x$discrete) == length(x$uidx),
             "'args$censored' must be character of length 1" =
                 length(x$censored) == 1L
         )},

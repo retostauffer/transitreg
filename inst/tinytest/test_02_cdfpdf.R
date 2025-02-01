@@ -104,7 +104,8 @@ fn <- function(i, tp, binwidth = 1) {
     y    <- transitreg:::num2bin(ynum, bins)
     res <- .Call("treg_predict_pdfcdf",
                  uidx = 42L, idx = rep(42L, length(tp)), tp = tp,
-                 y = y, bins = bins, ncores = 1L, censored = "not-censored",
+                 y = y, breaks = bins, discrete = FALSE,
+                 ncores = 1L, censored = "not-censored",
                  PACKAGE = "transitreg")
     return(data.frame(res))
 }
