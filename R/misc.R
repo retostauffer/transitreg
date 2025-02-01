@@ -613,7 +613,7 @@ transitreg_detect_cores <- function(verbose = TRUE) {
 #' else set tot he 'total number of cores available'.
 #'
 #' @author Reto
-transitreg_get_number_of_cores <- function(ncores = NULL, verbose = verbose) {
+transitreg_get_number_of_cores <- function(ncores = NULL, verbose = FALSE) {
   ## Number of cores to be used for OpenMP. If
   ## - NULL: Guess cores (max cores - 2L)
   ## - Smaller or equal to 0: Set to 1L (single-core processing)
