@@ -80,7 +80,7 @@ utility of this approach with an application to precipitation climatology estima
 Austria, highlighting its potential for broader applications in probabilistic modeling.
 \noindent 
 \hspace{1cm}\\
-\emph{Keywords}: transition models, distributional regression, quantile regression
+\emph{Keywords}: transition models, distributional regression, quantile regression, modal regression
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
