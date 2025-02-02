@@ -228,6 +228,25 @@ reconstructed CDF and density. Predictions for the continuous response variable 
 by mapping the predicted counts $\tilde{y}_i$ back to the continuous scale,
 typically using the midpoints of the corresponding intervals as approximations.
 
+While transition models primarily estimate the cumulative distribution function (CDF) for 
+distributional and quantile regression, they can also be used for modal regression, which 
+identifies the most likely outcome (i.e., the mode) of a response variable. Modal regression is 
+particularly useful for skewed, multimodal, or non-Gaussian data.
+In this framework, the mode of the estimated probability density function (PDF) corresponds to 
+the most probable value in the stepwise approximation. Given the estimated discrete 
+probabilities,
+$$
+P(\tilde{y}_i = r \mid \mathbf{x}_i) = P(\zeta_r < y_i \leq \zeta_{r+1} \mid \mathbf{x}_i),
+$$
+the mode is obtained as
+$$
+\hat{y}_i^* = \arg\max_r P(\tilde{y}_i = r \mid \mathbf{x}_i).
+$$
+Alternatively, a smoothed mode estimate can be obtained by interpolating between bin midpoints 
+and refining the bin discretization for greater accuracy.
+
+
+
 %\subsection{Convergence of the Stepwise Approximation} \label{sec:convergence}
 
 %To prove that the stepwise approximation $\hat{F}(y)$ converges uniformly to the true
@@ -331,10 +350,10 @@ if(!file.exists("ts_hist.png")) {
     #m <- transitreg(sqrt_pre ~ theta0 + s(theta, k = 20), data = df, breaks = breaks)
 
     nd <- data.frame("sqrt_pre" = seq(0, max(df$sqrt_pre), length.out = 101))
+    mids <- nd$sqrt_pre
+
     py <- nd$sqrt_pre
     pm <- predict(m, newdata = nd, y = nd$sqrt_pre, type = "pdf")
-
-    mids <- (head(breaks, -1) + tail(breaks, -1)) / 2
 
     b <- bamlss(sqrt_pre ~ 1, data = df, family = cnorm_bamlss)
     par <- predict(b, newdata = data.frame("sqrt_pre" = mids), type = "parameter")
@@ -427,7 +446,6 @@ if(!file.exists("ts_hist.png")) {
 \end{figure}
 \begin{figure}[!h]
 \centering
-\captionsetup{skip=-6.2cm}
 <<echo=FALSE, results=hide>>=
 if(!file.exists("premodel.png") & FALSE) {
   d <- readRDS("../ehydTirol_Tageschniederschlagssummen.rds")
@@ -577,7 +595,7 @@ if(!file.exists("premodel.png") & FALSE) {
 
   rc <- rain_colors(100)
 
-  png("predictions.png", units = "in", res = 200, width = 10, height = 16)
+  png("predictions.png", units = "in", res = 200, width = 13, height = 10)
 
   xr <- range(pred_long$x)
   xb <- round(seq(xr[1] + 0.1*abs(diff(xr)), xr[2] - 0.1*abs(diff(xr)), length = 5), 2)
