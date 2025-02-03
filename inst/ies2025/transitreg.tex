@@ -45,22 +45,9 @@
 	$^\mathrm{1}$\small{\emph{Universtit\"at Innsbruck}}\\
 }
 
-% for \usepackage{Sweave}
-\SweaveOpts{engine = R, eps = FALSE, keep.source = TRUE}
-
-<<preliminaries, echo=FALSE, results=hide>>=
-options(width = 70, prompt = "R> ", continue = "+  ",
-  SweaveHooks = list(fig = function() par(mar = c(4.1, 4.1, 1, 1))))
-library("transitreg")
-library("qgam")
-library("gamlss2")
-library("gamlss.cens")
-library("bamlss")
-@
-
 \begin{document}
-	\maketitle
 
+\maketitle
 
 \begin{abstract}
 Transition models are widely recognized for their flexibility in count data regression, where they
