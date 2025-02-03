@@ -827,8 +827,6 @@ plot.Transition <- function(x, type = c("tp", "cdf", "pdf"), all = FALSE, n = 8L
         m  <- pdf(x, binmid, elementwise = FALSE, drop = FALSE)
     }
 
-    print(breaks)
-    print(binmid)
     matplot(x = binmid, y = t(m), type = "l",
             lty = 1, main = titles[type], ...)
 
