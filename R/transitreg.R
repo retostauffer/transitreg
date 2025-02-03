@@ -507,7 +507,8 @@ transitreg_predict <- function(object, newdata = NULL,
   tmf_maxrows <- 1e7
   blockindex  <- tmf_rc %/% tmf_maxrows + 1L
 
-  tp <- list()
+  tp    <- list()
+  index <- list()
   for (block in seq_len(max(blockindex))) {
     idx <- which(blockindex == block)
     if (all(obs_na[idx])) next
@@ -521,8 +522,13 @@ transitreg_predict <- function(object, newdata = NULL,
                           scaler     = object$scaler, verbose = verbose)
 
     tp[[block]] <- as.numeric(predict(object$model, newdata = tmf, type = what))
+    ## Index: unique for each observation, thus we need to add the highest index
+    ## of the previous block in case we have multiple 'blocks' (chunk-wise prediction
+    ## of the transition probabilities).
+    index[[block]] <- if (block == 1) tmf$index else (tmf$index + max(index[[block - 1]]))
   }
-  tp <- do.call(c, tp)
+  tp    <- do.call(c, tp) ## Combine transition probs
+  index <- do.call(c, index) ## Combine index (observation index)
 
 
   ## ------------------------------------------------
@@ -539,7 +545,7 @@ transitreg_predict <- function(object, newdata = NULL,
   }
 
   ## Extract unique indices
-  ui   <- unique(tmf$index)
+  ui   <- unique(index)
 
   ## Setting dummy values (required by C later on)
   if (type == "quantile") {
@@ -565,7 +571,7 @@ transitreg_predict <- function(object, newdata = NULL,
 
   ## Setting up arguments for the .C call
   args <- list(uidx        = ui,           # int; Unique distribution index (int)
-               idx         = tmf$index,    # int; Index vector (int)
+               idx         = index,        # int; Index vector (int)
                tp          = tp,           # num; Transition probabilities
                breaks      = breaks,       # num; Point intersections of bins
                y           = yC,           # int; Response y, used for 'cdf/pdf'
