@@ -71,16 +71,16 @@ using standard binary regression methods with an augmented dataset, allowing the
 software designed for binary response models. In this paper, we extend the application of
 transition models to continuous data by employing a slicing technique that transforms continuous
 observations into count-like data. This approach enables the estimation of full probabilistic
-models, including distributional and quantile regression, using simple binary regression
-methods. The stepwise approximation of the cumulative distribution function (CDF)
-converges uniformly to the true CDF.
+models, including distributional, quantile and modal regression, using simple binary regression
+methods.
+%The stepwise approximation of the cumulative distribution function (CDF) converges uniformly to the true CDF.
 The proposed method is highly adaptable, seamlessly handling complex data structures,
 including excess zeros and non-standard distributions. We demonstrate the robustness and
 utility of this approach with an application to precipitation climatology estimation in Tyrol, 
-Austria, highlighting its potential for broader applications in probabilistic modeling
+Austria, highlighting its potential for broader applications in probabilistic modeling.
 \noindent 
 \hspace{1cm}\\
-\emph{Keywords}: transition models, distributional regression, quantile regression
+\emph{Keywords}: transition models, distributional regression, quantile regression, modal regression
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -185,12 +185,14 @@ to $r = 0$, the second interval $(\zeta_2, \zeta_3]$ to $r = 1$, and so on. Each
 $y_i$ is assigned a count $r$ based on the interval it falls into, resulting in a transformed
 count response $\tilde{y}_i$.
 
-The transformed response $\tilde{y}_i$ is then used to estimate the transition model as
-described in Section~\ref{sec:counts}. This allows us to leverage the methodology developed for
-count data while accommodating continuous responses.
+The transformed response $\tilde{y}_i$ is then used to estimate the transition model as described in 
+Section~\ref{sec:counts}. This allows us to leverage the methodology developed for count data
+while accommodating continuous responses.
 
-The described discretization approach effectively provides a stepwise approximation of
-the underlying smooth continuous distribution. For a continuous response variable $y_i$ with
+\subsubsection{Approximation of the CDF and Density}
+
+The described discretization approach effectively provides a stepwise approximation of the
+underlying smooth continuous distribution. For a continuous response variable $y_i$ with
 cumulative distribution function (CDF) $F(y)$, the discretization process approximates the
 probabilities of $y_i$ falling into each interval as
 $$
@@ -213,84 +215,137 @@ For any value $y_i \in (\zeta_l, \zeta_{l+1}]$, the CDF can be approximated by
 $$
 \hat{F}(y_i) = \sum_{r=0}^{l-1} P(\tilde{y}_i = r) + \frac{y_i - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y}_i = l),
 $$
-where the first term sums probabilities for bins below $y_i$, and the second term performs linear
-interpolation within the current bin. As the number of bins $m$ increases and bin widths shrink,
-this stepwise approximation converges uniformly to the true CDF $F(y)$.
+where the first term sums probabilities for bins below $y_i$, and the second term performs
+linear interpolation within the current bin. As the number of bins $m$ increases and bin
+widths shrink, this stepwise approximation converges uniformly to the true CDF $F(y)$.
 
 Similarly, the density function can be approximated as
 $$
 \hat{f}(y_i) = \frac{P(\tilde{y}_i = l)}{\zeta_{l+1} - \zeta_l}, \quad y_i \in (\zeta_l, \zeta_{l+1}].
 $$
 
-After estimating the transition model, quantities such as the mean, cumulative distribution
-function (CDF), quantile function, and density function can be approximated using the
-reconstructed CDF and density. Predictions for the continuous response variable are obtained
-by mapping the predicted counts $\tilde{y}_i$ back to the continuous scale,
-typically using the midpoints of the corresponding intervals as approximations.
+\subsubsection{Computation of Mode and Moments}
 
-%\subsection{Convergence of the Stepwise Approximation} \label{sec:convergence}
+\paragraph{Mode}
+The mode of the estimated probability density function (PDF) corresponds to the most
+probable value in the stepwise approximation. Given the estimated discrete probabilities,
+$$
+P(\tilde{y}_i = r \mid \mathbf{x}_i) = P(\zeta_r < y_i \leq \zeta_{r+1} \mid \mathbf{x}_i),
+$$
+the mode is obtained as
+$$
+\hat{y}_i^* = \arg\max_r P(\tilde{y}_i = r \mid \mathbf{x}_i).
+$$
+Alternatively, a smoothed mode estimate can be obtained by refining the bin
+discretization for greater accuracy.
 
-%To prove that the stepwise approximation $\hat{F}(y)$ converges uniformly to the true
-%cumulative distribution function (CDF) $F(y)$, we proceed as follows. The true CDF $F(y)$ is
-%defined as
-%$$
-%F(y) = P(Y \leq y), \quad y \in \mathbb{R}.
-%$$
-%The stepwise approximation $\hat{F}(y)$ is given by
-%$$
-%\hat{F}(y) = \sum_{r=0}^{l-1} P(\tilde{y} = r) + \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l),
-%$$
-%where $y \in (\zeta_l, \zeta_{l+1}]$, $P(\tilde{y} = r)$ corresponds to the probability
-%mass assigned to the discrete count $r$, and $\zeta_l, \zeta_{l+1}$ are the bin boundaries.
-%To show uniform convergence, we need to show
-%$$
-%\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \to 0 \quad \text{as } m \to \infty,
-%$$
-%where $m$ is the number of bins used in the stepwise approximation. As $m \to \infty$, the
-%bin boundaries $\{\zeta_l\}_{l=1}^m$ partition $\mathbb{R}$ into intervals of shrinking width
-%$$
-%\max_{l} (\zeta_{l+1} - \zeta_l) \to 0 \quad \text{as } m \to \infty.
-%$$
+\paragraph{Mean (Expected Value)}
+The expected value of the response variable can be approximated using
+$$
+E[Y] = \sum_{r} \zeta_r P(\tilde{y} = r),
+$$
+where $\zeta_r$ are the midpoints of the bins.
 
-%The error between $\hat{F}(y)$ and $F(y)$ can be decomposed as
-%$$
-%\left| \hat{F}(y) - F(y) \right| = \underbrace{\left| \sum_{r=0}^{l-1} P(\tilde{y} = r) - F(\zeta_l) \right|}_{\text{Discrete Bin Approximation Error}} + \underbrace{\left| \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) - \left(F(y) - F(\zeta_l)\right) \right|}_{\text{Linear Interpolation Error}}.
-%$$
+\paragraph{Variance}
+The variance of $Y$ is given by
+$$
+\text{Var}(Y) = E[Y^2] - (E[Y])^2,
+$$
+where
+$$
+E[Y^2] = \sum_{r} \zeta_r^2 P(\tilde{y} = r).
+$$
 
-%The discrete bin approximation error is zero because the probability masses $P(\tilde{y} = r)$
-%are defined to match the probabilities of the intervals $(\zeta_r, \zeta_{r+1}]$, such that
-%$$
-%P(\tilde{y} = r) = F(\zeta_{r+1}) - F(\zeta_r), \quad \sum_{r=0}^{l-1} P(\tilde{y} = r) = F(\zeta_l).
-%$$
+\paragraph{Skewness}
+The skewness, measuring the asymmetry of the distribution, is computed as
+$$
+\text{Skewness} = \frac{E[(Y - E[Y])^3]}{\text{Var}(Y)^{3/2}},
+$$
+where
+$$
+E[(Y - E[Y])^3] = \sum_{r} (\zeta_r - E[Y])^3 P(\tilde{y} = r).
+$$
 
-%For the linear interpolation error, within each bin $(\zeta_l, \zeta_{l+1}]$, the true CDF
-%$F(y)$ can be expanded as
-%$$
-%F(y) = F(\zeta_l) + \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} \big(F(\zeta_{l+1}) - F(\zeta_l)\big) + \mathcal{O}((\zeta_{l+1} - \zeta_l)^2).
-%$$
-%By construction,
-%$$
-%\frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) = \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} \big(F(\zeta_{l+1}) - F(\zeta_l)\big).
-%$$
-%The linear interpolation error is thus bounded by the higher-order term
-%$\mathcal{O}((\zeta_{l+1} - \zeta_l)^2)$
-%$$
-%\left| \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) - \big(F(y) - F(\zeta_l)\big) \right| \leq C (\zeta_{l+1} - \zeta_l)^2,
-%$$
-%where $C$ is a constant depending on the second derivative of $F(y)$. Combining these results,
-%the total error is bounded as
-%$$
-%\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \leq C \max_{l} (\zeta_{l+1} - \zeta_l)^2.
-%$$
+\paragraph{Kurtosis}
+Kurtosis, which measures the tail heaviness of the distribution, is computed as
+$$
+\text{Kurtosis} = \frac{E[(Y - E[Y])^4]}{\text{Var}(Y)^2},
+$$
+where
+$$
+E[(Y - E[Y])^4] = \sum_{r} (\zeta_r - E[Y])^4 P(\tilde{y} = r).
+$$
 
-%As $m \to \infty$, $\max_{l} (\zeta_{l+1} - \zeta_l) \to 0$, and hence
-%$$
-%\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \to 0.
-%$$
+\subsubsection{Summary}
 
-%Thus, the stepwise approximation $\hat{F}(y)$ converges uniformly to the true CDF $F(y)$ as
-%$m \to \infty$, provided that the bin widths shrink to zero, ensuring that the
-%discretization approach is a consistent method for approximating the smooth CDF $F(y)$.
+Transition models not only allow for the estimation of the full cumulative distribution
+function but also facilitate the computation of key distributional characteristics, including
+the mean, variance, skewness, kurtosis, and mode. These properties make transition models
+highly versatile in probabilistic regression and distributional modeling.
+
+\subsection{Convergence of the Stepwise Approximation} \label{sec:convergence}
+
+To prove that the stepwise approximation $\hat{F}(y)$ converges uniformly to the true
+cumulative distribution function (CDF) $F(y)$, we proceed as follows. The true CDF $F(y)$ is
+defined as
+$$
+F(y) = P(Y \leq y), \quad y \in \mathbb{R}.
+$$
+The stepwise approximation $\hat{F}(y)$ is given by
+$$
+\hat{F}(y) = \sum_{r=0}^{l-1} P(\tilde{y} = r) + \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l),
+$$
+where $y \in (\zeta_l, \zeta_{l+1}]$, $P(\tilde{y} = r)$ corresponds to the probability
+mass assigned to the discrete count $r$, and $\zeta_l, \zeta_{l+1}$ are the bin boundaries.
+To show uniform convergence, we need to show
+$$
+\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \to 0 \quad \text{as } m \to \infty,
+$$
+where $m$ is the number of bins used in the stepwise approximation. As $m \to \infty$, the
+bin boundaries $\{\zeta_l\}_{l=1}^m$ partition $\mathbb{R}$ into intervals of shrinking width
+$$
+\max_{l} (\zeta_{l+1} - \zeta_l) \to 0 \quad \text{as } m \to \infty.
+$$
+
+The error between $\hat{F}(y)$ and $F(y)$ can be decomposed as
+$$
+\left| \hat{F}(y) - F(y) \right| = \underbrace{\left| \sum_{r=0}^{l-1} P(\tilde{y} = r) - F(\zeta_l) \right|}_{\text{Discrete Bin Approximation Error}} + \underbrace{\left| \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) - \left(F(y) - F(\zeta_l)\right) \right|}_{\text{Linear Interpolation Error}}.
+$$
+
+The discrete bin approximation error is zero because the probability masses $P(\tilde{y} = r)$
+are defined to match the probabilities of the intervals $(\zeta_r, \zeta_{r+1}]$, such that
+$$
+P(\tilde{y} = r) = F(\zeta_{r+1}) - F(\zeta_r), \quad \sum_{r=0}^{l-1} P(\tilde{y} = r) = F(\zeta_l).
+$$
+
+For the linear interpolation error, within each bin $(\zeta_l, \zeta_{l+1}]$, the true CDF
+$F(y)$ can be expanded as
+$$
+F(y) = F(\zeta_l) + \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} \big(F(\zeta_{l+1}) - F(\zeta_l)\big) + \mathcal{O}((\zeta_{l+1} - \zeta_l)^2).
+$$
+By construction,
+$$
+\frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) = \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} \big(F(\zeta_{l+1}) - F(\zeta_l)\big).
+$$
+The linear interpolation error is thus bounded by the higher-order term
+$\mathcal{O}((\zeta_{l+1} - \zeta_l)^2)$
+$$
+\left| \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) - \big(F(y) - F(\zeta_l)\big) \right| \leq C (\zeta_{l+1} - \zeta_l)^2,
+$$
+where $C$ is a constant depending on the second derivative of $F(y)$. Combining these results,
+the total error is bounded as
+$$
+\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \leq C \max_{l} (\zeta_{l+1} - \zeta_l)^2.
+$$
+
+As $m \to \infty$, $\max_{l} (\zeta_{l+1} - \zeta_l) \to 0$, and hence
+$$
+\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \to 0.
+$$
+
+Thus, the stepwise approximation $\hat{F}(y)$ converges uniformly to the true CDF $F(y)$ as
+$m \to \infty$, provided that the bin widths shrink to zero, ensuring that the
+discretization approach is a consistent method for approximating the smooth CDF $F(y)$.
 
 \section{Software} \label{sec:software}
 
@@ -308,112 +363,6 @@ The primary function for estimating transition models is \texttt{transireg()}.
 
 \begin{figure}[!ht]
 \centering
-%% \setkeys{Gin}{width=1\textwidth}
-<<echo=FALSE, results=hide>>=
-if(!file.exists("ts_hist.png")) {
-    d <- readRDS("../ehydTirol_Tageschniederschlagssummen.rds")
-    d <- subset(d, date >= (max(date) - 365*30))
-    d$sqrt_pre <- sqrt(d$value)
-    d$day <- as.POSIXlt(d$date)$yday
-
-    stations <- unique(d$name)
-
-    df <- subset(d, name == "Kirchberg in Tirol")
-
-    set.seed(123)
-    i <- sample(1:2, size = nrow(df), prob = c(0.8, 0.4), replace = TRUE)
-    dtrain <- subset(df, i < 2)
-    dtest <- subset(df, i > 1)
-
-    breaks <- c(0, seq(0.2, floor(max(df$sqrt_pre)) + 1, by = 0.3))
-
-    m <- transitreg(sqrt_pre ~ theta0 + s(theta, k = 20), data = df, breaks = breaks, censored = "left")
-    #m <- transitreg(sqrt_pre ~ theta0 + s(theta, k = 20), data = df, breaks = breaks)
-
-    nd <- data.frame("sqrt_pre" = seq(0, max(df$sqrt_pre), length.out = 101))
-    py <- nd$sqrt_pre
-    pm <- predict(m, newdata = nd, y = nd$sqrt_pre, type = "pdf")
-
-    mids <- (head(breaks, -1) + tail(breaks, -1)) / 2
-
-    b <- bamlss(sqrt_pre ~ 1, data = df, family = cnorm_bamlss)
-    par <- predict(b, newdata = data.frame("sqrt_pre" = mids), type = "parameter")
-    db <- family(b)$d(mids, par)
-
-    f <- sqrt_pre ~ theta0 + s(theta, k = 20) + s(day, bs = "cc", k = 20) + te(theta, day, bs = c("cr", "cc"), k = 10)
-
-    # ----------------------------------------------
-    breaks2 <- c(0, seq(0.2, floor(max(df$sqrt_pre)) + 1, by = 0.05))
-    m2 <- transitreg(f, data = dtrain, breaks = breaks2, censored = "left")
-    #m2 <- transitreg(f, data = dtrain, breaks = breaks2)
-
-    f <- sqrt_pre ~ s(day, k = 20, bs = "cc") | s(day, k = 20, bs = "cc")
-    b2 <- bamlss(f, data = dtrain, family = cnorm_bamlss, binning = TRUE)
-
-    qu <- c(0.01, 0.1, 0.5, 0.9, 0.99)
-
-    g2 <- mqgam(sqrt_pre ~ s(day, k = 20, bs = "cc"), data = dtrain, qu = qu)
-
-    nd <- data.frame("day" = 0:365)
-    pm2 <- predict(m2, newdata = dtest, prob = qu, elementwise = FALSE)
-
-    par <- predict(b2, newdata = dtest, type = "parameter")
-    pb2 <- do.call("cbind",
-      lapply(qu, function(j) {
-        b2$family$q(j, par)
-    }))
-
-    pg2 <- do.call("cbind",
-      lapply(qu, function(j) {
-        qdo(g2, j, predict, newdata = dtest)
-    }))
-    pg2[pg2 < 0] <- 0 # <- lower limit
-
-    err_b <- err_m <- err_g <- NULL
-    for(j in 1:5) {
-      err_b <- c(err_b, qgam::pinLoss(dtest$sqrt_pre, pb2[, j], qu[j]))
-      err_m <- c(err_m, qgam::pinLoss(dtest$sqrt_pre, pm2[, j], qu[j]))
-      err_g <- c(err_g, qgam::pinLoss(dtest$sqrt_pre, pg2[, j], qu[j]))
-    }
-    err_b <- sum(err_b)
-    err_m <- sum(err_m)
-    err_g <- sum(err_g)
-    c(bamlss_b2 = err_b, transitreg_m2 = err_m, mqgam_g2 = err_g)
-
-    ## Create figure
-    png("ts_hist.png", units = "in", res = 200, width = 8, height = 4)
-    par(mfrow = c(1, 2), mar = c(4, 4, 1, 1))
-
-    hist(df$sqrt_pre, breaks = breaks, freq = FALSE,
-      xlab = "sqrt(Precipitation)", main = NA)
-
-    lines(pm ~ py, col = 4, lwd = 2)
-    lines(db ~ mids, col = 2, lwd = 2)
-    rug(df$sqrt_pre, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
-
-    legend("center", c("TM", "CN"),
-      lwd = 2, col = c(4, 2), bty = "n")
-
-    plot(sqrt_pre ~ day, data = dtest, type = "h", col = rgb(0.1, 0.1, 0.1, alpha = 0.4),
-      xlab = "Day of the year", ylab = "sqrt(Precipitation)", ylim = c(0, 11))
-
-    j <- order(dtest$day)
-    matplot(dtest$day[j], pb2[j, ], type = "l", lty = 1, col = 2, add = TRUE)
-    matplot(dtest$day[j], pg2[j, ], type = "l", lty = 1, col = 3, add = TRUE)
-    matplot(dtest$day[j], pm2[j, ], type = "l", lty = 1, col = 4, add = TRUE)
-
-    err <- c("CN" = err_b, "QR" = err_g, "TM" = err_m)
-    col <- c(2, 3, 4)
-    i <- order(err)
-    err <- err[i]
-    col <- col[i]
-
-    legend("topleft", paste(paste(names(err), "PBL ="), round(err)),
-      lwd = 2, col = col, bty = "n")
-
-    dev.off()
-}
-@
 \includegraphics[width=0.9\textwidth]{ts_hist.png}
 \caption{\label{fig:Kirchberg} Precipitation data for Kirchberg in Tirol, Austria.
   The left panel shows a histogram of the square root-transformed daily precipitation values,
@@ -427,180 +376,6 @@ if(!file.exists("ts_hist.png")) {
 \end{figure}
 \begin{figure}[!h]
 \centering
-\captionsetup{skip=-6.2cm}
-<<echo=FALSE, results=hide>>=
-if(!file.exists("premodel.png") & FALSE) {
-  d <- readRDS("../ehydTirol_Tageschniederschlagssummen.rds")
-  d <- subset(d, date >= (max(date) - 365*30))
-  d$sqrt_pre <- sqrt(d$value)
-  d$day <- as.POSIXlt(d$date)$yday
-
-  stations <- unique(d$name)
-
-  set.seed(123)
-  i <- sample(stations, size = floor(length(stations) * 0.8))
-
-  dtrain <- subset(d, name %in% i)
-  dtest <- subset(d, !(name %in% i))
-
-  breaks <- c(-0.05, seq(0.05, floor(max(d$sqrt_pre)) + 1, by = 0.1))
-
-  f1 <- sqrt_pre ~ theta0 +
-    ti(theta) +
-    ti(alt) +
-    ti(day,bs="cc",k=20) +
-    ti(lon,lat,bs="tp",d=2,k=30) +
-    ti(day,lon,lat,d=c(1,2),k=c(5,5,30),bs=c("cc","tp")) +
-    ti(theta,day,lon,lat,d=c(1,1,2),k=c(5,5,30),bs=c("cr","cc","tp")) +
-    ti(theta,day,bs=c("cr","cc")) +
-    ti(theta,alt) +
-    ti(theta,lon,lat,d=c(1,2),bs=c("cr","tp"),k=c(5,30))
-
-  m1 <- transitreg(f1, data = dtrain, breaks = breaks)
-
-  f2 <- sqrt_pre ~ s(day,bs="cc",k=20) + s(alt,k=5) + s(lon,lat) +
-    te(day,lon,lat,d=c(1,2),bs=c("cr","tp"),k=c(5,30)) |
-      s(day,bs="cc",k=8) + s(alt,k=5) + s(lon,lat) +
-      te(day,lon,lat,d=c(1,2),bs=c("cr","tp"),k=c(5,30))
-
-  m2 <- bamlss(f2, data = dtrain, family = cnorm_bamlss,
-    binning = TRUE, light = TRUE)
-
-  qu <- c(0.01, 0.1, 0.5, 0.9, 0.99)
-  err1 <- err2 <- NULL
-  par <- predict(m2, newdata = dtest, type = "parameter")
-  for(j in qu) {
-    pj1 <- predict(m1, newdata = dtest, prob = j)
-    pj2 <- family(m2)$q(j, par)
-    err1 <- c(err1, sum(qgam::pinLoss(dtest$sqrt_pre, pj1, j)))
-    err2 <- c(err2, sum(qgam::pinLoss(dtest$sqrt_pre, pj2, j)))
-  }
-
-#R> err1
-#[1]   2314.927  23149.270 112589.150  71447.505  11941.508
-#R> err2
-#[1]   2314.927  23149.270 112545.307  71472.810  12087.671
-#R> round((err1 - err2) / err2 * 100, 2)
-#[1]  0.00  0.00  0.04 -0.04 -1.21
-
-  download.file("http://bamlss.org/misc/precipitation_clim.tar.gz", "clim.tar.gz")
-  untar("clim.tar.gz", exdir = ".")
-
-  download.file("https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_AUT_1.json.zip", "AT-gadm.zip")
-  unzip("AT-gadm.zip")
-
-  library("raster")
-  library("stars")
-  library("sf")
-
-  dem <- st_as_stars(readRDS("dem.rds"))
-  dem <- st_transform(dem, crs = 4326)
-
-  Tyrol <- "gadm41_AUT_1.json" |>
-    read_sf() |>
-    subset(NAME_1 == "Tirol") |>
-    st_geometry()
-
-  dem <- mask(readRDS("dem.rds"), as(Tyrol, "Spatial"))
-  dem <- crop(dem, as(Tyrol, "Spatial"))
-
-  writeRaster(dem, "dem.tif", format = "GTiff", overwrite = TRUE)
-
-  nd <- as.data.frame(coordinates(dem))
-  names(nd) <- c("lon", "lat")
-  nd$alt <- values(dem)
-
-  days <- c(15, 46, 74, 105, 135, 166, 196, 227, 258, 288, 319, 349)
-  names(days) <- month.name
-
-  for(j in names(days)) {
-    print(j)
-
-    nd$day <- days[j]
-    nd[[paste0("m1_", j)]] <- predict(m1, newdata = nd, prob = 0.99)
-
-    par <- predict(m2, newdata = nd, type = "parameter")
-    par <- as.data.frame(par)
-    p2 <- family(m2)$q(0.99, par)
-    nd[[paste0("m2_", j)]][!is.na(nd$alt)] <- p2
-  }
-
-  r_list <- lapply(names(days), function(j) {
-    a <- nd[, c("lon", "lat", paste0("m1_", j))]
-    a[[paste0("m1_", j)]] <- a[[paste0("m1_", j)]]^2
-    rasterFromXYZ(a)
-  })
-  pred <- stack(r_list)
-  names(pred) <- gsub("m1_", "", names(pred))
-  crs(pred) <- crs(dem)
-
-  library("ggplot2")
-  library("dplyr")
-  library("tidyr")
-
-  pred_df <- as.data.frame(pred, xy = TRUE)
-  pred_df <- pred_df[, c("x", "y", names(pred))]
-  
-  pred_long <- pivot_longer(
-    pred_df, 
-    cols = names(pred), 
-    names_to = "Season", 
-    values_to = "value"
-  )
-
-  pred_long$Season <- factor(pred_long$Season, levels = names(pred))
-
-  rain_colors <- function (n, h = c(-160, -38), c. = c(10, 80), l = c(86, 39), 
-    power = c(2.75806451612903, 1), fixup = FALSE, gamma = NULL, 
-    alpha = 1, ...) 
-  {
-    if (!is.null(gamma)) 
-        warning("'gamma' is deprecated and has no effect")
-    if (n < 1L) 
-        return(character(0L))
-    h <- rep(h, length.out = 2L)
-    c <- rep(c., length.out = 2L)
-    l <- rep(l, length.out = 2L)
-    power <- rep(power, length.out = 2L)
-    rval <- seq(1, 0, length = n)
-    rval <- hex(polarLUV(L = l[2L] - diff(l) * rval^power[2L], 
-        C = c[2L] - diff(c) * rval^power[1L], H = h[2L] - diff(h) * 
-            rval), fixup = fixup, ...)
-    if (!missing(alpha)) {
-        alpha <- pmax(pmin(alpha, 1), 0)
-        alpha <- format(as.hexmode(round(alpha * 255 + 1e-04)), 
-            width = 2L, upper.case = TRUE)
-        rval <- paste(rval, alpha, sep = "")
-    }
-    return(rval)
-  }
-
-  rc <- rain_colors(100)
-
-  png("predictions.png", units = "in", res = 200, width = 10, height = 16)
-
-  xr <- range(pred_long$x)
-  xb <- round(seq(xr[1] + 0.1*abs(diff(xr)), xr[2] - 0.1*abs(diff(xr)), length = 5), 2)
-  yr <- range(pred_long$y)
-  yb <- round(seq(yr[1] + 0.1*abs(diff(yr)), yr[2] - 0.1*abs(diff(yr)), length = 5), 2)
-
-  ggplot() +
-    geom_tile(data = pred_long, aes(x = x, y = y, fill = value)) +
-    geom_sf(data = Tyrol, fill = NA, color = "black", size = 0.5) + # Overlay Tyrol border
-    facet_wrap(~ Season, nrow = 4, ncol = 3) + # Correct ordering
-    scale_fill_gradientn(colors = rc, na.value = "transparent") + # Custom color scale
-    scale_x_continuous(breaks = xb) + # Adjust x-axis ticks
-    scale_y_continuous(breaks = yb) + # Adjust y-axis ticks
-    coord_sf(crs = st_crs(Tyrol)) + # Respect CRS and aspect ratio
-    theme_minimal() +
-    labs(title = NULL,
-         x = "Longitude",
-         y = "Latitude",
-         fill = "Precipitation\n[mm]")
-
-   dev.off()
-}
-@
 \includegraphics[width=1\textwidth]{predictions.png}
 \caption{\label{fig:clim} Estimated climatology for the 99\% quantile precipitation using
   the TM model for selected days representing the 12 months of the year. The figure
@@ -661,7 +436,7 @@ for analyzing complex data.
 %\bibliographystyle{plainnat}
 %\bibliographystyle{apalike}
 \bibliographystyle{unsrt}
-\bibliography{ies2025.bib}
+\bibliography{transitreg.bib}
 
 %\listofchanges
 

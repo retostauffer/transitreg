@@ -1,0 +1,87 @@
+\documentclass[twoside]{report}
+\usepackage{iwsm}
+\usepackage{graphicx}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+
+\usepackage{Sweave}
+\SweaveOpts{engine = R, eps = FALSE, keep.source = TRUE}
+
+<<preliminaries, echo=FALSE, results=hide>>=
+options(width = 70, prompt = "R> ", continue = "+  ",
+  SweaveHooks = list(fig = function() par(mar = c(4.1, 4.1, 1, 1))))
+library("gamlss2")
+@
+
+\begin{document}
+
+\title{Distribution-Free Probabilistic Modeling with Transition Models}
+\titlerunning{Distribution-Free Probabilistic Modeling with Transition Models}
+
+\author{Reto Stauffer\inst{1}, Nikolaus Umlauf\inst{1}}
+\authorrunning{Stauffer and Umlauf}
+
+\institute{University of Innsbruck, Austria}
+
+\email{Reto.Stauffer@uibk.ac.at}
+
+\abstract{
+Transition models are widely recognized for their flexibility in count data regression and are
+commonly applied in ordinal regression, where they are also known as continuation ratio models.
+The core concept involves modeling transition probabilities, specifically the conditional
+probability of observing counts greater than a threshold. These probabilities can be estimated
+using standard binary regression methods with an augmented dataset, allowing the use of any
+software designed for binary response models. In this paper, we extend the application of
+transition models to continuous data by employing a slicing technique that transforms continuous
+observations into count-like data. This approach enables the estimation of full probabilistic
+models, including distributional, quantile and modal regression, using simple binary regression
+methods.
+The proposed method is highly adaptable, seamlessly handling complex data structures,
+including excess zeros and non-standard distributions. We demonstrate the robustness and
+utility of this approach with an application to precipitation climatology estimation in ???, highlighting its potential for broader applications in probabilistic modeling.
+}
+
+\keywords{Transition Models; Distributional Regression; Quantile Regression; Modal Regression.}
+
+\maketitle
+
+\section{Introduction}\label{sec:intro}
+
+\references
+
+\begin{description}
+\item[Rigby, R.A. and Stasinopoulos, D.M.] (2005)
+     Generalized Additive Models for Location, Scale and Shape.
+     {\it Appl.~Stat.}, {\bf 54}(3),
+     507\,--\,554.
+\item[Stasinopoulos, D.M. and Rigby, R.A.] (2007)
+     Generalized Additive Models for Location Scale and
+     Shape (GAMLSS) in \textsf{R}. {\it J.~Stat.~Soft.}, {\bf 23}(7), 1--46.
+%\item[Stasinopoulos, M. and Rigby, R.] (2024)
+%     \textbf{gamlss}: Generalized Additive Models for Location Scale and Shape.
+%     \textsf{R} package version 5.4-22, URL: \texttt{https://CRAN.R-project.org/package=gamlss}.
+%\item[Stasinopoulos, M. and Rigby, R.] (2025)
+%     \textbf{gamlss.dist}: Distributions for Generalized Additive Models
+%     for Location, Scale and Shape.
+%     \textsf{R} package version 6.1-2, URL: \texttt{https://CRAN.R-project.org/package=gamlss.dist}.
+%\item[Umlauf, N., Klein, N., and Zeileis, A.] (2018)
+%     BAMLSS: Bayesian Additive Models for Location, Scale and Shape (and Beyond).
+%     {\it J.~Comput.~Graph.~Stat.}, {\bf 27}(3), 612\,--\,627.
+\item[Umlauf, N., Klein, N., Simon, T., and Zeileis, A.] (2021)
+     \textbf{bamlss}: A Lego Toolbox for Flexible Bayesian Regression (and Beyond).
+     {\it J.~Stat.~Soft.}, {\bf 100}(4), 1\,--\,53.
+\item[Wood, S.N., Pya, N., and Saefken, B.] (2016)
+     Smoothing Parameter and Model Selection for General Smooth Models.
+     {\it J.~American Statistical Association}, {\bf 111}, 1548--1575.
+\item[Yee, T.W.] (2010)
+     The \textbf{VGAM} Package for Categorical Data Analysis.
+     {\it J.~Stat.~Soft.}, {\bf 32}(10), 1--34.
+\item[Zeileis, A., Lang, M.N., and Stauffer, R.] (2024)
+     \textbf{topmodels}: Infrastructure for Forecasting and Assessment of Probabilistic Models.
+     {\it R package version 0.3-0}.
+     Available at\newline
+     \texttt{https://topmodels.R-forge.R-project.org/topmodels/}.
+\end{description}
+
+\end{document}
+
