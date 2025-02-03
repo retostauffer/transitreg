@@ -283,69 +283,69 @@ function but also facilitate the computation of key distributional characteristi
 the mean, variance, skewness, kurtosis, and mode. These properties make transition models
 highly versatile in probabilistic regression and distributional modeling.
 
-%\subsection{Convergence of the Stepwise Approximation} \label{sec:convergence}
+\subsection{Convergence of the Stepwise Approximation} \label{sec:convergence}
 
-%To prove that the stepwise approximation $\hat{F}(y)$ converges uniformly to the true
-%cumulative distribution function (CDF) $F(y)$, we proceed as follows. The true CDF $F(y)$ is
-%defined as
-%$$
-%F(y) = P(Y \leq y), \quad y \in \mathbb{R}.
-%$$
-%The stepwise approximation $\hat{F}(y)$ is given by
-%$$
-%\hat{F}(y) = \sum_{r=0}^{l-1} P(\tilde{y} = r) + \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l),
-%$$
-%where $y \in (\zeta_l, \zeta_{l+1}]$, $P(\tilde{y} = r)$ corresponds to the probability
-%mass assigned to the discrete count $r$, and $\zeta_l, \zeta_{l+1}$ are the bin boundaries.
-%To show uniform convergence, we need to show
-%$$
-%\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \to 0 \quad \text{as } m \to \infty,
-%$$
-%where $m$ is the number of bins used in the stepwise approximation. As $m \to \infty$, the
-%bin boundaries $\{\zeta_l\}_{l=1}^m$ partition $\mathbb{R}$ into intervals of shrinking width
-%$$
-%\max_{l} (\zeta_{l+1} - \zeta_l) \to 0 \quad \text{as } m \to \infty.
-%$$
+To prove that the stepwise approximation $\hat{F}(y)$ converges uniformly to the true
+cumulative distribution function (CDF) $F(y)$, we proceed as follows. The true CDF $F(y)$ is
+defined as
+$$
+F(y) = P(Y \leq y), \quad y \in \mathbb{R}.
+$$
+The stepwise approximation $\hat{F}(y)$ is given by
+$$
+\hat{F}(y) = \sum_{r=0}^{l-1} P(\tilde{y} = r) + \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l),
+$$
+where $y \in (\zeta_l, \zeta_{l+1}]$, $P(\tilde{y} = r)$ corresponds to the probability
+mass assigned to the discrete count $r$, and $\zeta_l, \zeta_{l+1}$ are the bin boundaries.
+To show uniform convergence, we need to show
+$$
+\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \to 0 \quad \text{as } m \to \infty,
+$$
+where $m$ is the number of bins used in the stepwise approximation. As $m \to \infty$, the
+bin boundaries $\{\zeta_l\}_{l=1}^m$ partition $\mathbb{R}$ into intervals of shrinking width
+$$
+\max_{l} (\zeta_{l+1} - \zeta_l) \to 0 \quad \text{as } m \to \infty.
+$$
 
-%The error between $\hat{F}(y)$ and $F(y)$ can be decomposed as
-%$$
-%\left| \hat{F}(y) - F(y) \right| = \underbrace{\left| \sum_{r=0}^{l-1} P(\tilde{y} = r) - F(\zeta_l) \right|}_{\text{Discrete Bin Approximation Error}} + \underbrace{\left| \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) - \left(F(y) - F(\zeta_l)\right) \right|}_{\text{Linear Interpolation Error}}.
-%$$
+The error between $\hat{F}(y)$ and $F(y)$ can be decomposed as
+$$
+\left| \hat{F}(y) - F(y) \right| = \underbrace{\left| \sum_{r=0}^{l-1} P(\tilde{y} = r) - F(\zeta_l) \right|}_{\text{Discrete Bin Approximation Error}} + \underbrace{\left| \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) - \left(F(y) - F(\zeta_l)\right) \right|}_{\text{Linear Interpolation Error}}.
+$$
 
-%The discrete bin approximation error is zero because the probability masses $P(\tilde{y} = r)$
-%are defined to match the probabilities of the intervals $(\zeta_r, \zeta_{r+1}]$, such that
-%$$
-%P(\tilde{y} = r) = F(\zeta_{r+1}) - F(\zeta_r), \quad \sum_{r=0}^{l-1} P(\tilde{y} = r) = F(\zeta_l).
-%$$
+The discrete bin approximation error is zero because the probability masses $P(\tilde{y} = r)$
+are defined to match the probabilities of the intervals $(\zeta_r, \zeta_{r+1}]$, such that
+$$
+P(\tilde{y} = r) = F(\zeta_{r+1}) - F(\zeta_r), \quad \sum_{r=0}^{l-1} P(\tilde{y} = r) = F(\zeta_l).
+$$
 
-%For the linear interpolation error, within each bin $(\zeta_l, \zeta_{l+1}]$, the true CDF
-%$F(y)$ can be expanded as
-%$$
-%F(y) = F(\zeta_l) + \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} \big(F(\zeta_{l+1}) - F(\zeta_l)\big) + \mathcal{O}((\zeta_{l+1} - \zeta_l)^2).
-%$$
-%By construction,
-%$$
-%\frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) = \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} \big(F(\zeta_{l+1}) - F(\zeta_l)\big).
-%$$
-%The linear interpolation error is thus bounded by the higher-order term
-%$\mathcal{O}((\zeta_{l+1} - \zeta_l)^2)$
-%$$
-%\left| \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) - \big(F(y) - F(\zeta_l)\big) \right| \leq C (\zeta_{l+1} - \zeta_l)^2,
-%$$
-%where $C$ is a constant depending on the second derivative of $F(y)$. Combining these results,
-%the total error is bounded as
-%$$
-%\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \leq C \max_{l} (\zeta_{l+1} - \zeta_l)^2.
-%$$
+For the linear interpolation error, within each bin $(\zeta_l, \zeta_{l+1}]$, the true CDF
+$F(y)$ can be expanded as
+$$
+F(y) = F(\zeta_l) + \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} \big(F(\zeta_{l+1}) - F(\zeta_l)\big) + \mathcal{O}((\zeta_{l+1} - \zeta_l)^2).
+$$
+By construction,
+$$
+\frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) = \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} \big(F(\zeta_{l+1}) - F(\zeta_l)\big).
+$$
+The linear interpolation error is thus bounded by the higher-order term
+$\mathcal{O}((\zeta_{l+1} - \zeta_l)^2)$
+$$
+\left| \frac{y - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y} = l) - \big(F(y) - F(\zeta_l)\big) \right| \leq C (\zeta_{l+1} - \zeta_l)^2,
+$$
+where $C$ is a constant depending on the second derivative of $F(y)$. Combining these results,
+the total error is bounded as
+$$
+\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \leq C \max_{l} (\zeta_{l+1} - \zeta_l)^2.
+$$
 
-%As $m \to \infty$, $\max_{l} (\zeta_{l+1} - \zeta_l) \to 0$, and hence
-%$$
-%\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \to 0.
-%$$
+As $m \to \infty$, $\max_{l} (\zeta_{l+1} - \zeta_l) \to 0$, and hence
+$$
+\sup_{y \in \mathbb{R}} \left| \hat{F}(y) - F(y) \right| \to 0.
+$$
 
-%Thus, the stepwise approximation $\hat{F}(y)$ converges uniformly to the true CDF $F(y)$ as
-%$m \to \infty$, provided that the bin widths shrink to zero, ensuring that the
-%discretization approach is a consistent method for approximating the smooth CDF $F(y)$.
+Thus, the stepwise approximation $\hat{F}(y)$ converges uniformly to the true CDF $F(y)$ as
+$m \to \infty$, provided that the bin widths shrink to zero, ensuring that the
+discretization approach is a consistent method for approximating the smooth CDF $F(y)$.
 
 \section{Software} \label{sec:software}
 
@@ -436,7 +436,7 @@ for analyzing complex data.
 %\bibliographystyle{plainnat}
 %\bibliographystyle{apalike}
 \bibliographystyle{unsrt}
-\bibliography{ies2025.bib}
+\bibliography{transitreg.bib}
 
 %\listofchanges
 
