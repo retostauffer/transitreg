@@ -114,7 +114,6 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
             // discrete? Take pdf of the bin. Else interpolate
             // TODO(R): We could try to interpolate here
             res.values[i] = tmp[y[i]];
-            //double interpolate_linear(double x1, double y1, double x2, double y2, double p) {
         }
     }
 
@@ -143,7 +142,7 @@ doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
             }
             pprod *= tpptr[positions[i - 1]]; // Multiply with previous element
 
-            tmp[i] = tmp[i - 1] + (1.0 - tpptr[positions[i]]) * pprod; // Calculate pdf
+            tmp[i] = tmp[i - 1] + (1.0 - tpptr[positions[i]]) * pprod; // Calculate cdf
         }
     }
 
@@ -168,6 +167,15 @@ doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
     return res;
 }
 
+/* Draw random value between a and b */
+double ab_random(double a, double b) {
+    printf("ab_random");
+    if (a < b) {
+        return a + (b - a) * rand();
+    } else {
+        return b + (a - b) * rand();
+    }
+}
 
 /* Linear interpolation for finer quantiles */
 double interpolate_linear(double x1, double y1, double x2, double y2, double p) {
@@ -274,6 +282,8 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
                     res[i] = (bkptr[j + 1] + bkptr[j]) * 0.5;
                 // Perform linear interpolation between the two neighboring bin mids.
                 } else {
+                    // TESTING //res[i] = ab_random(bkptr[j], bkptr[j + 1]);
+                    printf(" -xxx reto xxx-");
                     res[i] = interpolate_linear(bkptr[j], tmp[j - 1], bkptr[j + 1], tmp[j], prob[i]);
                 }
                 break; // Found what we were looking for, break inner loop

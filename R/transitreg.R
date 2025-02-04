@@ -603,7 +603,6 @@ transitreg_predict <- function(object, newdata = NULL,
                      col = rep(seq_along(y), times = sum(!obs_na)))
     x <- matrix(NA, nrow = nrow(mf), ncol = length(y),
                 dimnames = list(NULL, get_elementwise_colnames(y, prefix)))
-    print(mf)
     x[arr.ind] <- res
   ## Elementwise - building vector return
   } else {
