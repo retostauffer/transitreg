@@ -537,6 +537,7 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     breaks   <- attr(d, "breaks")
 
     # Convert numeric values to corresponding 'bin indices' (int)
+    xorig <- x
     x <- num2bin(x, breaks)
 
     if (!elementwise) x <- sort(x) # Important
@@ -640,7 +641,7 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL,
                  type        = "quantile",
                  ncores      = ncores,
                  elementwise = elementwise,
-                 discrete    = !approx, # TODO(R): Testing
+                 discrete    = rep(!approx, length(x)), # TODO(R): Testing
                  censored    = censored)
 
     # Calling C

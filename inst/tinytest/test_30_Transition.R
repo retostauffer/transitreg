@@ -16,7 +16,7 @@ m <- rbind(A = convert_tp(ppois(0:15, lambda = 3.0), "cdf", "tp"),
            C = convert_tp(ppois(0:15, lambda = 0.3), "cdf", "tp"))
 
 # Fake breaks; width equal to 1
-breaks <- seq(-0.5, by = 1, length.out = ncol(m) + 1)
+breaks <- as.numeric(seq.int(0, by = 1, length.out = ncol(m) + 1))
 
 
 
@@ -49,12 +49,6 @@ expect_true("breaks" %in% names(attributes(d1)),             info = "Checking if
 expect_identical(attr(d1, "breaks"), breaks,                 info = "Testing attribute 'breaks'")
 
 
-expect_true("discrete" %in% names(attributes(d1)),           info = "Checking if attribute 'discrete' is available")
-expect_identical(attr(d1, "discrete"), TRUE,                 info = "Testing attribute 'discrete'")
-expect_identical(is_discrete(d1),   rep(TRUE, 1),            info = "Testing return of is_discrete")
-expect_identical(is_continuous(d1), rep(FALSE, 1),           info = "Testing return of is_continuous")
-
-
 # Convert to matrix
 expect_silent(m1 <- as.matrix(d1),                          info = "Converting to matrix")
 expect_identical(class(m1), c("Transitionmatrix", "matrix", "array"), info = "Testing matrix class")
@@ -63,7 +57,6 @@ expect_identical(dim(m1), c(1L, ncol(m)),                   info = "Testing matr
 expect_true(all(grep("^tp_[0-9]+$", colnames(m1))),         info = "Matrix column names")
 expect_true(is.null(rownames(m1)),                          info = "Matrix row names (unnamed)")
 expect_identical(attr(m1, "breaks"), breaks,                info = "Testing 'breaks' attribute on matrix")
-expect_identical(attr(m1, "discrete"), TRUE,                info = "Testing 'discrete' attribute on matrix")
 rm(m1)
 
 # Convert to extended (long) matrix
@@ -74,7 +67,6 @@ expect_identical(dim(m1e), c(ncol(m), 3L),                  info = "Testing exte
 expect_identical(colnames(m1e), c("index", "theta", "tp"),  info = "Matrix extended column names")
 expect_true(is.null(rownames(m1e)),                         info = "Extended matrix row names (unnamed)")
 expect_identical(attr(m1e, "breaks"), breaks,               info = "Testing 'breaks' attribute on matrix")
-expect_identical(attr(m1e, "discrete"), TRUE,               info = "Testing 'discrete' attribute on matrix")
 
 # Testing content ...
 expect_true(all(m1e[, "index"] == 1L),                      info = "Checking matrix content (index)")
@@ -86,31 +78,11 @@ expect_equal(m1e[, "tp"], as.vector(m[1, ]),                info = "Checking mat
 #          the format function as I need to support to access
 #          specific elements using y[i] if dim(y) = c(1, N).
 expect_true(is.null(attr(m1e[1, ], "breaks")))
-expect_true(is.null(attr(m1e[1, ], "discrete")))
-#expect_identical(attr(m1e[1, ], "breaks"), breaks,          info = "Testing 'breaks' attribute on matrix subset")
-#expect_identical(attr(m1e[1, ], "discrete"), TRUE,          info = "Testing 'discrete' attribute on matrix subset")
 
 rm(m1e)
 rm(d1)
 
 
-# ------------- distribution m, length 3 -----------------------------
-# --------- testing non-discrete mode (breaks) -----------------------
-# ---------------- continuous distribution ---------------------------
-
-cbreaks <- seq(11.5, 34.1, length.out = length(breaks))
-expect_silent(d1c  <- Transition(m, breaks = cbreaks),
-              info = "Create continuous distribution, discrete = NULL")
-expect_silent(d1c2 <- Transition(m, breaks = cbreaks, discrete = FALSE),
-              info = "Create continuous distribution, discrete = FALSE")
-expect_identical(d1c, d1c2, info = "Test that both objects are identical")
-expect_true("breaks" %in% names(attributes(d1c)),         info = "Testing that attribute 'breaks' is available")
-expect_identical(attr(d1c, "breaks"), cbreaks,            info = "Testing values of attribute 'breaks'")
-expect_true("discrete" %in% names(attributes(d1c)),       info = "Testing that attribute 'discrete' is available")
-expect_identical(attr(d1c, "discrete"), FALSE,            info = "Testing attribute 'discrete'")
-expect_identical(is_continuous(d1c), rep(TRUE, nrow(m)),  info = "Testing return of is_continuous")
-expect_identical(is_discrete(d1c),   rep(FALSE, nrow(m)), info = "Testing return of is_discrete")
-rm(d1c, d1c2)
 
 # ------------- distribution m, length 3 -----------------------------
 

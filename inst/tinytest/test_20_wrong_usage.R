@@ -18,8 +18,6 @@ expect_error(transitreg(), info = "Missing 'formula' and 'data'")
 expect_error(transitreg(formula = y ~ theta), info = "Missing 'data'")
 expect_error(transitreg(data = data), info = "Missing 'formula'")
 
-expect_error(transitreg(y ~ s(theta, k = 3), data = data, censored = 3),
-              info = "'censored' set but does not match allowed arguments")
 expect_error(transitreg(y ~ s(theta, k = 3), data = data, ncores = "foo"),
               info = "'ncores' not numeric")
 expect_error(transitreg(y ~ s(theta, k = 3), data = data, verbose = c(TRUE, FALSE)),

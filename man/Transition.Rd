@@ -21,7 +21,7 @@
 \alias{plot.Transition}
 \title{Creates a Transition Distribution}
 \usage{
-Transition(x, breaks, discrete = NULL, censored = NULL)
+Transition(x, breaks)
 
 dtransit(x, d, log = FALSE, ncores = NULL)
 
@@ -41,7 +41,15 @@ rtransit(n, d, ncores = NULL)
 
 \method{cdf}{Transition}(d, x, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
 
-\method{quantile}{Transition}(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...)
+\method{quantile}{Transition}(
+  x,
+  probs,
+  drop = TRUE,
+  elementwise = NULL,
+  ncores = NULL,
+  approx = FALSE,
+  ...
+)
 
 \method{median}{Transition}(x, na.rm = NULL, ncores = NULL, ...)
 
@@ -64,10 +72,6 @@ rtransit(n, d, ncores = NULL)
 The length the vector must be of \code{length(x) + 1} (if \code{x} is
 a vector) or \code{ncol(x) + 1} if \code{x} is a matrix. Must be
 monotonically increasing.}
-
-\item{discrete}{\code{NULL} or logical. If \code{NULL} and the breaks look like
-count data breaks (\code{c(-0.5, 0.5, 1.5, ...)}) discrete will be set
-\code{TRUE}, else \code{FALSE}.}
 
 \item{d}{An object of class \code{Transition}.}
 
@@ -99,6 +103,12 @@ means that \code{elementwise = TRUE} is used if the lengths match and otherwise
 \item{probs}{numeric vector of probabilities with values in \verb{[0,1]}.
 (Values up to ‘2e-14’ outside that range are accepted and
 moved to the nearby endpoint.) TODO(R): SURE?}
+
+\item{approx}{logical, if \code{FALSE} (default) quantiles of the
+discrete distribution is returned. If \code{TRUE} the quantile
+is approximated, using linear interpolation.
+TODO(R): For development purposes only, decide if we want
+to keep this (and if so, check if correct).}
 
 \item{na.rm}{Unused.}
 

@@ -104,7 +104,7 @@
 #'
 #' ## Visualizing three predicted distributions via Transitreg distributions
 #' idx <- c(25, 50, 75)
-#' d3 <- Transition(predict(b, nd[idx, , drop = FALSE], type = "tp"), breaks = seq.int(0, b$bins) - 0.5)
+#' d3 <- Transition(predict(b, nd[idx, , drop = FALSE], type = "tp"), breaks = seq.int(0, b$bins))
 #' plot(d3, type = "pdf")
 #' abline(v = predict(b, nd[idx, , drop = FALSE], type = "mode"), col = 1:3, lty = 3)
 #'
@@ -258,7 +258,7 @@ transitreg <- function(formula, data, subset, na.action,
       tmp  <- ceiling(ymax * if (ymax <= 10) { 3 } else if (ymax <= 100) { 1.5 } else { 1.25 })
       rval$bins <- as.integer(tmp)
       # Will not be stored on 'rval' but used to convert data
-      breaks <- seq.int(0L, rval$bins) - 0.5
+      breaks <- as.numeric(seq.int(0L, rval$bins))
       rm(tmp, ymax)
   }
 
@@ -607,7 +607,8 @@ transitreg_predict <- function(object, newdata = NULL,
 # on the object, but here calculcated on the fly.
 get_breaks <- function(x) {
     stopifnot("'x' must be a transitreg model" = inherits(x, "transitreg"))
-    return(if (!is.null(x[["breaks"]])) x$breaks else seq.int(0, x$bins))
+    # Enforcing numeric as this is used in .C where it must be double (numeric)
+    return(if (!is.null(x[["breaks"]])) x$breaks else as.numeric(seq.int(0, x$bins)))
 }
 
 # Helper function to get bin mids of a transitreg model
@@ -624,7 +625,7 @@ get_mids <- function(x) {
 `[.transitreg` <- function(x, i, ..., drop = TRUE) {
     tp <- transitreg_predict(x, newdata = model.frame(x)[i, , drop = FALSE],
                             type = "tp")
-    breaks <- if (is.null(x$breaks)) seq_len(x$bins + 1) - 1.5 else x$breaks
+    breaks <- if (is.null(x$breaks)) get_breaks(x)
     return(Transition(tp, breaks))
 }
 

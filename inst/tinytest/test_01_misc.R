@@ -5,17 +5,6 @@
 suppressPackageStartupMessages(library("tinytest"))
 suppressPackageStartupMessages(library("transitreg"))
 
-# # -------------------------------------------------------------------
-# # Estimating simple model (from ?transitreg examples)
-# # -------------------------------------------------------------------
-# set.seed(123)
-# n <- 1000
-# x <- runif(n, -3, 3)
-# y <- rpois(n, exp(2 + sin(x)))
-# 
-# # Fit transition count response model.
-# b <- transitreg(y ~ s(theta) + s(x))
-
 
 # -------------------------------------------------------------------
 # 'grep2': Convenience function which allows to grep()
@@ -227,8 +216,7 @@ args_OK <- list(uidx        = 1L,
                 type        = "pdf",
                 ncores      = 10L,
                 elementwise = TRUE,
-                discrete    = FALSE,
-                censored    = "left")
+                discrete    = FALSE)
 
 expect_silent(transitreg:::check_args_for_treg_predict(args_OK), info = "This should work like a charm")
 
@@ -253,8 +241,6 @@ args <- args_OK; args$elementwise <- 5
 expect_error(transitreg:::check_args_for_treg_predict(args, silent = TRUE), info = "args$elementwise not logical")
 args <- args_OK; args$discrete <- "foo"
 expect_error(transitreg:::check_args_for_treg_predict(args, silent = TRUE), info = "args$discrete not logical")
-args <- args_OK; args$discrete <- 1.234
-expect_error(transitreg:::check_args_for_treg_predict(args, silent = TRUE), info = "args$censored no character")
 
 # Testing content errors (mismatching lengths, ...)
 args <- args_OK; args$elementwise <- logical()
@@ -271,8 +257,6 @@ args <- args_OK; args$discrete <- rep(TRUE, 10)
 expect_error(transitreg:::check_args_for_treg_predict(args, silent = TRUE), info = "args$uidx and args$discrete length mismatch")
 args <- args_OK; args$uidx <- NULL
 expect_error(transitreg:::check_args_for_treg_predict(args, silent = TRUE), info = "Not all required elements in list")
-args <- args_OK; args$censored <- c("left", "right")
-expect_error(transitreg:::check_args_for_treg_predict(args, silent = TRUE), info = "args$censored must be of length 1")
 
 rm(args, args_OK)
 
@@ -284,8 +268,7 @@ args_OK <- list(uidx        = 1:3,
                 y           = c(5L, 10L, 3L),
                 breaks      = c(0, 0.5, 1.0, 1.5),
                 discrete    = rep(TRUE, 3),
-                ncores      = 10L,
-                censored    = "left")
+                ncores      = 10L)
 
 expect_silent(transitreg:::check_args_for_treg_predict_pdfcdf(args_OK), info = "This should work like a charm")
 
@@ -302,8 +285,6 @@ args <- args_OK; args$y    <- 5.0
 expect_error(transitreg:::check_args_for_treg_predict_pdfcdf(args, silent = TRUE), info = "args$y not integer")
 args <- args_OK; args$ncores <- 3.3
 expect_error(transitreg:::check_args_for_treg_predict_pdfcdf(args, silent = TRUE), info = "args$cores not integer")
-args <- args_OK; args$censored <- TRUE
-expect_error(transitreg:::check_args_for_treg_predict_pdfcdf(args, silent = TRUE), info = "args$censored not character")
 
 # Testing content errors (mismatching lengths, ...)
 args <- args_OK; args$tp <- logical()
@@ -312,8 +293,6 @@ args <- args_OK; args$idx <- rep(1L, 10L)
 expect_error(transitreg:::check_args_for_treg_predict_pdfcdf(args, silent = TRUE), info = "args$idx and args$tp length mismatch")
 args <- args_OK; args$tp <- rnorm(3)
 expect_error(transitreg:::check_args_for_treg_predict_pdfcdf(args, silent = TRUE), info = "args$idx and args$tp length mismatch")
-args <- args_OK; args$censored <- c("left", "right")
-expect_error(transitreg:::check_args_for_treg_predict_pdfcdf(args, silent = TRUE), info = "args$censored must be of length 1")
 
 rm(args, args_OK)
 

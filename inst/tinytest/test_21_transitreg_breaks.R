@@ -28,12 +28,12 @@ expect_identical(m1$bins, as.integer(max(ndp$y) * 3),
 expect_identical(m1$breaks, NULL,
                info = "No user-defined breaks, thus 'breaks' must be NULL")
 # The function get_braks will return 'pseudo breaks' centered arou nd 0, ..., m1$bins - 1L
-tmp <- seq.int(0L, m1$bins) - 0.5
+tmp <- seq.int(0L, m1$bins)
 expect_equal(transitreg:::get_breaks(m1), tmp,
                info = "Checking pseudo-breaks for count data response")
 # Mid points used get_breaks() and calculates mid points. In this model this
 # should be equal to 0, 1, 2, ..., m2$bins - 1L
-expect_equal(transitreg:::get_mids(m1), seq(0, m1$bins - 1L),
+expect_equal(transitreg:::get_mids(m1), seq(0, m1$bins - 1L) + 0.5,
                info = "Checking return of get_mids() helper function")
 rm(m1)
 

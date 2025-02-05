@@ -14,7 +14,6 @@ transitreg(
   na.action,
   engine = "bam",
   breaks = NULL,
-  censored = NULL,
   model = TRUE,
   ncores = NULL,
   verbose = FALSE,
@@ -45,9 +44,6 @@ Default is \code{"bam"}.}
 count response. If a single number is provided, equidistant intervals are used. If a
 numeric vector is provided, it is used directly as the breakpoints. This argument is
 critical for continuous responses.}
-
-\item{censored}{\code{NULL} or one of \code{"left"}, \code{"right"}, or \code{"both"}. Specifies
-if the distribution is censored on one or both ends.}
 
 \item{model}{Logical value indicating whether the model frame should be included in
 the return object.}
@@ -149,7 +145,7 @@ legend("topleft", legend = colnames(fit),
 
 ## Visualizing three predicted distributions via Transitreg distributions
 idx <- c(25, 50, 75)
-d3 <- Transition(predict(b, nd[idx, , drop = FALSE], type = "tp"), breaks = seq.int(0, b$bins) - 0.5)
+d3 <- Transition(predict(b, nd[idx, , drop = FALSE], type = "tp"), breaks = seq.int(0, b$bins))
 plot(d3, type = "pdf")
 abline(v = predict(b, nd[idx, , drop = FALSE], type = "mode"), col = 1:3, lty = 3)
 

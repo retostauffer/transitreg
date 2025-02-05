@@ -493,13 +493,13 @@ make_breaks <- function(y, breaks = 30) {
 check_args_for_treg_predict <- function(x, silent = FALSE) {
     ## Expected elements (in the order expected by C)
     enames <- c("uidx", "idx", "tp", "breaks", "y", "prob",
-                "type", "ncores", "elementwise", "discrete", "censored")
+                "type", "ncores", "elementwise", "discrete")
 
     ## Checking types first
     tmp <- list("integer"   = c("uidx", "idx", "y", "ncores"),
                 "double"    = c("tp", "breaks", "prob"),
                 "logical"   = c("elementwise", "discrete"),
-                "character" = c("type", "censored"))
+                "character" = "type")
 
     debug_stop <- function(e) { if (!silent) { cat("\nDebugging output (str(args)):\n"); str(x) }; stop(e) }
     for (n in names(tmp)) {
@@ -521,9 +521,7 @@ check_args_for_treg_predict <- function(x, silent = FALSE) {
             "length of 'args$discrete' and 'args$uidx' must be identical" =
                 length(x$uidx) == length(x$discrete),
             "not all required elements found in 'args'" =
-                all(enames %in% names(x)),
-            "'args$censored' must be character of length 1" =
-                length(x$censored) == 1L
+                all(enames %in% names(x))
         )},
         error = function(e) debug_stop(e)
     )
@@ -535,13 +533,12 @@ check_args_for_treg_predict <- function(x, silent = FALSE) {
 #' @importFrom utils str
 check_args_for_treg_predict_pdfcdf <- function(x, silent = FALSE) {
     ## Required elements in the order as expected by C
-    enames <- c("uidx", "idx", "tp", "y", "breaks", "discrete", "ncores", "censored")
+    enames <- c("uidx", "idx", "tp", "y", "breaks", "discrete", "ncores")
 
     ## Checking types first
     tmp <- list("integer"   = c("uidx", "idx", "y", "ncores"),
                 "double"    = c("tp", "breaks"),
-                "logical"   = "discrete", # TODO(R) Cover this in tests
-                "character" = "censored")
+                "logical"   = "discrete") # TODO(R) Cover this in tests
 
     debug_stop <- function(e) { if (!silent) { cat("\nDebugging output (str(args)):\n"); str(x) }; stop(e) }
     for (n in names(tmp)) {
@@ -561,9 +558,7 @@ check_args_for_treg_predict_pdfcdf <- function(x, silent = FALSE) {
             "length of 'args$y' and 'args$uidx' must be identical" =
                 length(x$y) == length(x$uidx),
             "'args$discrete' must be logical with same length as args$uidx" = 
-                length(x$discrete) == length(x$uidx),
-            "'args$censored' must be character of length 1" =
-                length(x$censored) == 1L
+                length(x$discrete) == length(x$uidx)
         )},
         error = function(e) debug_stop(e)
     )
