@@ -20,8 +20,6 @@
 #'        count response. If a single number is provided, equidistant intervals are used. If a
 #'        numeric vector is provided, it is used directly as the breakpoints. This argument is
 #'        critical for continuous responses.
-#' @param censored `NULL` or one of `"left"`, `"right"`, or `"both"`. Specifies
-#'        if the distribution is censored on one or both ends.
 #' @param model Logical value indicating whether the model frame should be included in
 #'        the return object.
 #' @param ncores `NULL` (default) or single numeric. See 'OpenMP' for more information.
@@ -178,15 +176,9 @@
 #' @export
 transitreg <- function(formula, data, subset, na.action,
                        engine = "bam", breaks = NULL,
-                       censored = NULL,
                        model = TRUE, ncores = NULL, verbose = FALSE, ...) {
 
   if (!is.null(breaks)) breaks <- as.numeric(breaks)
-  if (!is.null(censored)) {
-      censored <- tolower(censored)
-      censored <- match.arg(censored, c("left", "right", "both"))
-  }
-
 
   ## Staying sane
   stopifnot(
@@ -237,7 +229,6 @@ transitreg <- function(formula, data, subset, na.action,
 
   ## Setting up empty list for return value
   rval <- list()
-  rval$censored <- censored
   rval$response <- response_name(formula)
   rval$ymax     <- max(mf[[rval$response]])
 
@@ -351,11 +342,10 @@ transitreg <- function(formula, data, subset, na.action,
 
   ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.
-  censored <- if (is.null(rval$censored)) "not-censored" else rval$censored
   args <- list(uidx = ui, idx = tmf$index,
                tp = tp, y = y, breaks = breaks,
                discrete = rep(is.null(rval$breaks), length(ui)),
-               ncores = ncores, censored = censored)
+               ncores = ncores)
 
   ## Calling C
   args <- check_args_for_treg_predict_pdfcdf(args)
@@ -567,7 +557,6 @@ transitreg_predict <- function(object, newdata = NULL,
 
   ## If object$breaks is NULL, we have discrete bins (e.g., count data).
   discrete <- rep(is.null(object$breaks), length(ui))
-  censored <- if (is.null(object$censored)) "not-censored" else object$censored
 
   ## Setting up arguments for the .C call
   args <- list(uidx        = ui,           # int; Unique distribution index (int)
@@ -579,8 +568,7 @@ transitreg_predict <- function(object, newdata = NULL,
                type        = type,         # str; to predict/calculate
                ncores      = ncores,       # int; Number of cores to be used (OpenMP)
                elementwise = elementwise,  # Elementwise (one prob or y per ui)
-               discrete    = discrete,     # Discrete distribution?
-               censored    = censored)
+               discrete    = discrete)     # Discrete distribution?
 
   # Calling C
   args <- check_args_for_treg_predict(args)
@@ -637,7 +625,7 @@ get_mids <- function(x) {
     tp <- transitreg_predict(x, newdata = model.frame(x)[i, , drop = FALSE],
                             type = "tp")
     breaks <- if (is.null(x$breaks)) seq_len(x$bins + 1) - 1.5 else x$breaks
-    return(Transition(tp, breaks, censored = x$censored))
+    return(Transition(tp, breaks))
 }
 
 

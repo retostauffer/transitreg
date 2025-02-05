@@ -590,15 +590,22 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
 #' @param probs numeric vector of probabilities with values in `[0,1]`.
 #'        (Values up to ‘2e-14’ outside that range are accepted and
 #'        moved to the nearby endpoint.) TODO(R): SURE?
+#' @param approx logical, if `FALSE` (default) quantiles of the
+#'        discrete distribution is returned. If `TRUE` the quantile
+#'        is approximated, using linear interpolation.
+#'        TODO(R): For development purposes only, decide if we want
+#'        to keep this (and if so, check if correct).
 #'
 #' @importFrom stats quantile setNames
 #'
 #' @author Reto
 #' @rdname Transition
 #' @exportS3Method quantile Transition
-quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncores = NULL, ...) {
+quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL,
+                                ncores = NULL, approx = FALSE, ...) {
     ## Get number of cores for OpenMP parallelization
     ncores <- transitreg_get_number_of_cores(ncores, FALSE)
+    stopifnot("'approx' must be TRUE or FALSE" = isTRUE(approx) || isFALSE(approx))
 
     # Guessing elementwise if set NULL
     if (is.null(elementwise)) {
@@ -633,7 +640,7 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
                  type        = "quantile",
                  ncores      = ncores,
                  elementwise = elementwise,
-                 discrete    = FALSE,#is_discrete(x),
+                 discrete    = !approx, # TODO(R): Testing
                  censored    = censored)
 
     # Calling C
