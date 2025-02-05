@@ -9,9 +9,6 @@
 #'        The length the vector must be of \code{length(x) + 1} (if \code{x} is
 #'        a vector) or \code{ncol(x) + 1} if \code{x} is a matrix. Must be
 #'        monotonically increasing.
-#' @param discrete `NULL` or logical. If `NULL` and the breaks look like
-#'        count data breaks (`c(-0.5, 0.5, 1.5, ...)`) discrete will be set
-#'        `TRUE`, else `FALSE`.
 #'
 #' @return Returns an object of class \code{c("Transition", "distribution")}.
 #' TODO(R): Missing.
@@ -30,7 +27,7 @@
 #' @author Reto
 #' @rdname Transition
 #' @export
-Transition <- function(x, breaks, discrete = NULL, censored = NULL) {
+Transition <- function(x, breaks) {
 
     # Sanity checks
     stopifnot(
@@ -39,8 +36,7 @@ Transition <- function(x, breaks, discrete = NULL, censored = NULL) {
         "length of 'x' must be > 0" = length(x) > 0L,
         "'breaks' must be a numeric vector" = is.atomic(breaks) && is.numeric(breaks),
         "missing values in 'breaks' not allowed" = all(!is.na(breaks)),
-        "'breaks' must be monotonically increasing" = all(diff(breaks) > 0),
-        "'discrete' must be NULL or logical TRUE/FALSE" = is.null(discrete) || (isTRUE(discrete) || isFALSE(discrete))
+        "'breaks' must be monotonically increasing" = all(diff(breaks) > 0)
     )
 
     # If 'x' is a vector, convert to matrix
@@ -54,27 +50,10 @@ Transition <- function(x, breaks, discrete = NULL, censored = NULL) {
     x[,] <- as.numeric(x)
     breaks <- as.numeric(breaks)
 
-    if (!is.null(censored)) {
-        censored <- tolower(censored)
-        censored <- match.arg(censored, c("left", "right", "both"))
-    }
-
-    # Guessing 'discrete' option if needed.
-    if (is.null(discrete)) {
-        mids <- (head(breaks, -1) + tail(breaks, -1)) / 2
-        if (all(abs(mids %% 1 < sqrt(.Machine$double.eps)) &
-                isTRUE(all.equal(mids, seq_along(mids) - 1)))) {
-            discrete <- TRUE
-        } else {
-            discrete <- FALSE
-        }
-    }
-
     res <- setNames(as.data.frame(x),
                     paste("tp", seq_len(ncol(x)) - 1, sep = "_"))
 
-    structure(res, class = c("Transition", "distribution"), breaks = breaks,
-              censored = censored, discrete = discrete)
+    structure(res, class = c("Transition", "distribution"), breaks = breaks)
 }
 
 
@@ -168,7 +147,7 @@ dpq_get_results <- function(z, d, ncores, type) {
     elementwise <- length(z) == length(d)
 
     ## Setting up character for C call
-    censored <- if (is.null(attr(d, "censored"))) "not-censored" else attr(d, "censored")
+    censored <- 'REMOVE ME TODO'
 
     # Setting up arguments to call .C predict function
     args <- list(uidx        = ui,               # Unique distribution index (int)
@@ -253,7 +232,7 @@ rtransit <- function(n, d, ncores = NULL) {
     binwidth <- diff(breaks)
 
     ## Setting up character for C call
-    censored <- if (is.null(attr(d, "censored"))) "not-censored" else attr(d, "censored")
+    censored <- "REMOVE ME TODO"
 
     # Calculating densities for all distributions
     ui  <- seq_along(d)
@@ -310,7 +289,7 @@ mean_transit <- function(x, ncores = NULL, ...) {
     idx  <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
     ## Setting up character for C call
-    censored <- if (is.null(attr(x, "censored"))) "not-censored" else attr(x, "censored")
+    censored <- "REMOVE ME TODO"
 
     ## Calling C to calculate the required values.
     args <- list(uidx        = ui,               # Unique distribution index (int)
@@ -381,7 +360,6 @@ as.matrix.Transition <- function(x, expand = FALSE, ...) {
 
     xnames <- names(x) # Keep for later
     breaks   <- attr(x, "breaks")
-    discrete <- attr(x, "discrete")
 
     # convert to data.frame -> matrix
     x <- as.matrix(structure(x, class = "data.frame"))
@@ -396,14 +374,13 @@ as.matrix.Transition <- function(x, expand = FALSE, ...) {
         x <- cbind(index = index, theta = theta, tp = as.vector(t(x)))
     }
 
-    structure(x, class = c("Transitionmatrix", class(x)), breaks = breaks, discrete = discrete)
+    structure(x, class = c("Transitionmatrix", class(x)), breaks = breaks)
 }
 
 ## TODO(R): Problem when subsetting a matrix issue
 ### #' @exportS3Method "[" Transitionmatrix
 ### `[.Transitionmatrix` <- function(x, i, j, drop = TRUE, ...) {
 ###     breaks   <- attr(x, "breaks")
-###     discrete <- attr(x, "discrete")
 ###     xclass   <- class(x)
 ### 
 ###     # Convert to default matrix
@@ -412,7 +389,7 @@ as.matrix.Transition <- function(x, expand = FALSE, ...) {
 ### 
 ###     if (!missing(j)) return(x)
 ###     # Re-create Transitionmatrix object
-###     structure(x, class = xclass, breaks = breaks, discrete = discrete)
+###     structure(x, class = xclass, breaks = breaks)
 ### }
 
 #### @exportS3Method format Transitionmatrix
@@ -420,14 +397,13 @@ as.matrix.Transition <- function(x, expand = FALSE, ...) {
 ###    class(x) <- class(x)[!class(x) == "Transitionmatrix"]
 ###
 ###    # Extracting (and deleting) attributes
-###    an <- c("breaks", "discrete")
+###    an <- c("breaks")
 ###    att <- setNames(lapply(an, function(n) attr(x, n)), an)
 ###    for (n in an) attr(x, n) <- NULL
 ###
 ###    # Print
 ###    print(x)
 ###    cat("breaks: ", paste(att$breaks, sep = ", "), "\n")
-###    cat("discrete: ", att$discrete, "\n")
 ###
 ###}
 
@@ -438,34 +414,16 @@ format.Transition <- function(x, digits = pmax(3L, getOption("digits") - 3L), ..
     if (length(x) < 1L) return(character(0))
     xnames <- names(x) # Keep for later
 
-    # Create string for censoring (if needed)
-    censored <- attr(x, "censored")
-    if (is.null(censored)) {
-        censored <- "" # <- not censored
-    } else {
-        sp <- support(x)
-        if (censored == "left") {
-            censored <- paste0(", left = ", format(min(sp)))
-        } else if (censored == "left") {
-            censored <- paste0(", right = ", format(max(sp)))
-        } else {
-            censored <- paste0(", left = ", format(min(sp)),
-                               ", right = ", format(max(sp)))
-        }
-    }
-
-    # Extracting probabilites and breaks; 'censored' is scoped (same for all)
+    # Extracting probabilites and breaks
     fmtfun <- function(i) {
         y <- as.matrix(x[i], expand = FALSE)
         if (ncol(y) > 2L) {
-            sprintf("Transition_%d(%s, ..., %s%s)", ncol(y),
-                    format(y[1], digits = digits), format(y[ncol(y)], digits = digits),
-                    censored)
+            sprintf("Transition_%d(%s, ..., %s)", ncol(y),
+                    format(y[1], digits = digits), format(y[ncol(y)], digits = digits))
         } else {
             # Typically unused, that is two bins only!
-            sprintf("Transition_%d(%s, %s%s)", ncol(y),
-                    format(y[1], digits = digits), format(y[2], digits = digits),
-                    censored)
+            sprintf("Transition_%d(%s, %s)", ncol(y),
+                    format(y[1], digits = digits), format(y[2], digits = digits))
         }
     }
     f <- sapply(seq_along(x), fmtfun)
@@ -515,7 +473,7 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
     ## Setting up character for C call
-    censored <- if (is.null(attr(d, "censored"))) "not-censored" else attr(d, "censored")
+    censored <- "REMOVE ME TODO"
 
     # Setting up arguments to call .C predict function
     args <- list(uidx  = ui,                       # Unique distribution index (int)
@@ -586,7 +544,7 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
     ## Setting up character for C call
-    censored <- if (is.null(attr(d, "censored"))) "not-censored" else attr(d, "censored")
+    censored <- "REMOVE ME TODO"
 
     ## Calling C to calculate the required values.
     args <- list(uidx        = ui,               # Unique distribution index (int)
@@ -663,7 +621,7 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
     ## Setting up character for C call
-    censored <- if (is.null(attr(x, "censored"))) "not-censored" else attr(x, "censored")
+    censored <- "REMOVE ME TODO"
 
     ## Calling C to calculate the required values.
     args <- list(uidx        = ui,               # Unique distribution index (int)
@@ -675,7 +633,7 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL, ncore
                  type        = "quantile",
                  ncores      = ncores,
                  elementwise = elementwise,
-                 discrete    = is_discrete(x),
+                 discrete    = FALSE,#is_discrete(x),
                  censored    = censored)
 
     # Calling C
@@ -762,20 +720,14 @@ random.Transition <- function(x, n = 1L, drop = TRUE, ...) {
 #' @author Reto
 #' @rdname Transition
 #' @exportS3Method is_discrete Transition
-is_discrete.Transition <- function(d, ...) {
-    x <- if (is.null(attr(d, "censored")) & attr(d, "discrete")) TRUE else FALSE
-    rep(x, length(d))
-}
+is_discrete.Transition <- function(d, ...) rep(TRUE, length(d))
 
 #' @importFrom distributions3 is_continuous
 #'
 #' @author Reto
 #' @rdname Transition
 #' @exportS3Method is_continuous Transition
-is_continuous.Transition <- function(d, ...) {
-    x <- is.null(attr(d, "censored")) & !attr(d, "discrete")
-    rep(x, length(d))
-}
+is_continuous.Transition <- function(d, ...) rep(FALSE, length(d))
 
 #' @importFrom distributions3 support
 #' @importFrom stats setNames

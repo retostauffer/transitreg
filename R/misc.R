@@ -432,7 +432,7 @@ num2bin <- function(x, breaks = NULL) {
         stop("Response contains missing values (not allowed).")
 
     # 'Cut' data, limit to -1 to length(brekas) - 1.
-    res <- cut(x, breaks = breaks, labels = FALSE, include.lowest = TRUE) - 1L
+    res <- cut(x, breaks = breaks, labels = FALSE, right = FALSE, include.lowest = TRUE) - 1L
     res[x < min(breaks)] <- -1L                  # Outside range (below bin 0)
     res[x > max(breaks)] <- length(breaks) - 1L  # Outside range (above highest bin)
 

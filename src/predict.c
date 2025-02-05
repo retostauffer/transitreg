@@ -72,11 +72,25 @@ double treg_calc_mean(int* positions, int count, double* tpptr, double* bkptr) {
     return res;
 }
 
+/* Calculate 'mid of bins' based on the breaks provided. */
+doubleVec get_binmid(SEXP breaks) {
+    int nb = LENGTH(breaks) - 1L;
+    double* bkptr = REAL(breaks);
+
+    // Initialize/allocate return object
+    doubleVec res;
+    res.values = (double*)malloc(nb * sizeof(double));  // Allocate vector result
+    res.length = nb;
+
+    // Calculating mid of bins
+    for (int i = 0; i < nb; i++) { res.values[i] = (bkptr[i] + bkptr[i + 1]) / 2.0; }
+
+    return res;
+}
 
 /* Helper function for type = "pdf" */
 doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
-                        double* bkptr, int nbins, int* y, int ny,
-                        bool disc, bool cens_left, bool cens_right) {
+                        double* bkptr, int nbins, int* y, int ny, bool disc) {
 
     // Temporary double vector to calculate PDF along i = 0, ..., count - 1
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
@@ -105,10 +119,7 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
 
     // Store CDF from tmp[y] to res.values
     for (int i = 0; i < ny; i++) {
-        if ((y[i] < 0) & cens_left) {
-            res.values[i] = tmp[0]; // Point mass on left (lower) end
-        } else if ((y[i] >= nbins) & cens_right) {
-        } else if ((y[i] < 0) || (y[i] >= nbins)) {
+        if ((y[i] < 0) || (y[i] >= nbins)) {
             res.values[i] = 0.0; // Below or above support
         } else {
             // discrete? Take pdf of the bin. Else interpolate
@@ -271,7 +282,11 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
                 break;
             } else if (prob[i] < (tmp[0] + eps)) {
                 // If prob[i] < tmp[0]: Store lowest value and break the loop
-                res[i] = disc ? (bkptr[1] + bkptr[0]) * 0.5 : bkptr[0];
+                if (disc) {
+                    res[i] = disc ? (bkptr[1] + bkptr[0]) * 0.5 : bkptr[0];
+                } else {
+                    res[i] = interpolate_linear(bkptr[0], 0, bkptr[1], tmp[0], prob[i]);
+                }
                 break;
             }
 
@@ -283,7 +298,6 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
                 // Perform linear interpolation between the two neighboring bin mids.
                 } else {
                     // TESTING //res[i] = ab_random(bkptr[j], bkptr[j + 1]);
-                    printf(" -xxx reto xxx-");
                     res[i] = interpolate_linear(bkptr[j], tmp[j - 1], bkptr[j + 1], tmp[j], prob[i]);
                 }
                 break; // Found what we were looking for, break inner loop
@@ -298,8 +312,8 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
         // This means we reached the end of the loop above but could not find a
         // bin we fall into. Outside support, return NA.
         if (j == count) {
-            // Fill the results vector with "highest bin".
-            res[i] = disc ? (bkptr[count] + bkptr[count + 1]) * 0.5 : R_NaReal; //bkptr[count];
+            // Fill the results vector with "highest bin mid".
+            res[i] = disc ? (bkptr[count - 1] + bkptr[count]) * 0.5 : R_NaReal; //bkptr[count];
         }
     }
     // void function, no return, we have updated/modified 'res'
@@ -402,7 +416,7 @@ double treg_calc_mode(int* positions, int count, double* tpptr, double* bkptr) {
  * @return TODO(R): Depends on mode.
  */
 SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
-                  SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete, SEXP censored) {
+                  SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete) {
 
     int    *uidxptr   = INTEGER(uidx);     // Unique indices in the dtaa
     int    *idxptr    = INTEGER(idx);      // Distribution index
@@ -434,11 +448,8 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
     // ... if none of them is true, it must be "do mode"
     // bool do_mode = strcmp(thetype, "modex") == 0;
 
-    // Evaluate 'censored'. Can be 'left', 'right', or 'both'. If
-    // we get anything else, we handle is at 'neither left nor right censored'.
-    const char* thecens = CHAR(STRING_ELT(censored, 0));
-    bool cens_left  = (strcmp(thecens, "left") == 0) || (strcmp(thecens, "both") == 0);
-    bool cens_right = (strcmp(thecens, "both") == 0) || (strcmp(thecens, "right") == 0);
+    // Calculate mid of bins
+    //TODO(R): Added for testing, needed? // doubleVec binmid = get_binmid(breaks);
 
     // Allocating return vector.
     //
@@ -486,12 +497,12 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
             if (do_pdf) {
                 // Single PDF
                 if (ewise) {
-                    tmp = treg_calc_pdf(which.index, which.length, tpptr, bkptr, nbins, &yptr[i], 1,
-                            discptr[i] == 1, cens_left, cens_right);
+                    tmp = treg_calc_pdf(which.index, which.length, tpptr, bkptr, nbins,
+                                        &yptr[i], 1, discptr[i] == 1);
                 // Multiple PDFs
                 } else {
-                    tmp = treg_calc_pdf(which.index, which.length, tpptr, bkptr, nbins, yptr, LENGTH(y),
-                            discptr[i] == 1, cens_left, cens_right);
+                    tmp = treg_calc_pdf(which.index, which.length, tpptr, bkptr, nbins,
+                                        yptr, LENGTH(y), discptr[i] == 1);
                 }
             // --- Calculating cumulative distribution
             } else if (do_cdf) {
@@ -565,7 +576,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
  * has length(uidx) (vector with cdf and pdf).
  */
 SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
-        SEXP discrete, SEXP ncores, SEXP censored) {
+        SEXP discrete, SEXP ncores) {
 
     double* tpptr    = REAL(tp);
     int*    uidxptr  = INTEGER(uidx);       // Unique indices in the dtaa
@@ -587,12 +598,6 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
     integerVec which;
     doubleVec tmppdf;
     doubleVec tmpcdf;
-
-    // Evaluate 'censored'. Can be 'left', 'right', or 'both'. If
-    // we get anything else, we handle is at 'neither left nor right censored'.
-    const char* thecens = CHAR(STRING_ELT(censored, 0));
-    bool cens_left  = (strcmp(thecens, "left") == 0) || (strcmp(thecens, "both") == 0);
-    bool cens_right = (strcmp(thecens, "both") == 0) || (strcmp(thecens, "right") == 0);
 
     // Initialize results vector
     int nProtected = 0;
@@ -627,8 +632,7 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
         //
         // Input arguments are (in this order)
         //     positions, count, tpptr, bkptr, y, ny
-        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, bkptr, nbins, &yptr[i], 1,
-                discptr[i] == 1, cens_left, cens_right);
+        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, bkptr, nbins, &yptr[i], 1, discptr[i] == 1);
         tmpcdf = treg_calc_cdf(which.index, which.length, tpptr, bkptr, nbins, &yptr[i], 1);
 
         // Store last value, that is the last bin provided for this distribution.

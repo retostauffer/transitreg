@@ -619,12 +619,7 @@ transitreg_predict <- function(object, newdata = NULL,
 # on the object, but here calculcated on the fly.
 get_breaks <- function(x) {
     stopifnot("'x' must be a transitreg model" = inherits(x, "transitreg"))
-    if (!is.null(x[["breaks"]])) {
-        res <- x$breaks
-    } else {
-        res <- seq.int(0, x$bins) - 0.5
-    }
-    return(res)
+    return(if (!is.null(x[["breaks"]])) x$breaks else seq.int(0, x$bins))
 }
 
 # Helper function to get bin mids of a transitreg model
