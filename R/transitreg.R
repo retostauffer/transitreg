@@ -236,7 +236,8 @@ transitreg <- function(formula, data, subset, na.action,
   if (is.numeric(breaks) && length(breaks) == 1L) {
       # Create, and store breaks and bins
       breaks <- rval$breaks <- make_breaks(mf[[rval$response]], breaks = breaks)
-      rval$bins <- length(breaks) - 1L ## 10 breaks = 9 bins
+      rval$bins   <- length(breaks) - 1L ## 10 breaks = 9 bins
+      rval$breaks <- breaks
   ## User-specified breaks, check if they span the required range
   } else if (is.numeric(breaks)) {
       tmp_bk <- range(breaks)
@@ -625,7 +626,7 @@ get_mids <- function(x) {
 `[.transitreg` <- function(x, i, ..., drop = TRUE) {
     tp <- transitreg_predict(x, newdata = model.frame(x)[i, , drop = FALSE],
                             type = "tp")
-    breaks <- if (is.null(x$breaks)) get_breaks(x)
+    breaks <- if (is.null(x$breaks)) get_breaks(x) else x$breaks
     return(Transition(tp, breaks))
 }
 
