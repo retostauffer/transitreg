@@ -145,9 +145,13 @@ legend("topleft", legend = colnames(fit),
 ## Visualizing three predicted distributions via Transitreg distributions
 idx <- c(25, 50, 75)
 d3 <- Transition(predict(b, nd[idx, , drop = FALSE], type = "tp"), breaks = seq.int(0, b$bins))
+
+par(ask = TRUE)
+plot(d3)
 abline(v = predict(b, nd[idx, , drop = FALSE], type = "mode"), col = 1:3, lty = 3)
 plot(d3, tp = TRUE) # add transition probabilities
 abline(v = predict(b, nd[idx, , drop = FALSE], type = "mode"), col = 1:3, lty = 3)
+
 plot(d3, cdf = TRUE)
 plot(d3, cdf = TRUE, tp = TRUE) # add transition probabilities
 
@@ -182,6 +186,8 @@ legend("topleft", legend = colnames(fit),
 
 ## Visualizing 5 randomly selected fitted distributions
 set.seed(6020)
+
+par(ask = TRUE)
 idx <- sample(seq_len(nrow(model.frame(b))), 5L)
 plot(b[idx])
 plot(b[idx], cdf = TRUE)
@@ -217,6 +223,8 @@ legend("topleft", legend = colnames(fit),
 ## Visualizing 5 randomly selected fitted distributions
 set.seed(2025)
 idx <- sample(seq_len(nrow(model.frame(b))), 5L)
+
+par(ask = TRUE)
 plot(b[idx])
 plot(b[idx], cdf = TRUE)
 plot(b[idx], cdf = TRUE, tp = TRUE)
