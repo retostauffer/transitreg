@@ -45,7 +45,7 @@ expect_error(transitreg(y ~ 1, engin = "bam", data = data),
 # y is numeric data (not 'count data'), so breaks must be provided!
 data_num <- data.frame(y = runif(100, 0, 30))
 expect_error(transitreg(y ~ s(theta, k = 3), data = data_num),
-             pattern = "Response not count data\\. Breaks must be specified for binning\\.",
+             pattern = "Response not count data\\. 'breaks' must be specified for binning\\.",
              info = "Response numeric, but no breaks specified.")
 
 

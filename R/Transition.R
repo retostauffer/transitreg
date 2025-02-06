@@ -802,6 +802,3 @@ plot.Transition <- function(x, type = c("tp", "cdf", "pdf"), all = FALSE, n = 8L
 
 
 
-
-
-

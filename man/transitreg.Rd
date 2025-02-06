@@ -109,7 +109,7 @@ library("transitreg")
 set.seed(123)
 n <- 1000
 x <- runif(n, -3, 3)
-y <- rpois(n, exp(2 + sin(x))) + 12
+y <- rpois(n, exp(2 + sin(x)))
 
 ## Fit transition count response model.
 b <- transitreg(y ~ s(theta) + s(x))
@@ -125,7 +125,7 @@ plot(b)
 
 ## Plotting hanging rootogram, quantile residuals, and
 ## a probability integral transform (PIT) histogram.
-plot(b, which = c("rootogram", "qqrplot", "pithist"))
+plot(b, which = c("rootogram", "qqrplot", "pithist", "wormplot"))
 
 ## Predictions and plotting.
 nd <- data.frame(x = seq(-3, 3, length = 100))
@@ -158,6 +158,9 @@ y <- sin(x) + rnorm(n, sd = exp(-1 + cos(x)))
 
 ## Fit model with continuous response.
 b <- transitreg(y ~ s(theta) + s(x) + te(x, theta), breaks = 200)
+
+## Diagnostic plots
+plot(b, which = c("rootogram", "qqrplot", "pithist", "wormplot"))
 
 ## Predictions and plotting
 nd <- data.frame(x = seq(-3, 3, length = 100))

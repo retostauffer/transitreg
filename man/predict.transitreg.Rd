@@ -116,7 +116,7 @@ matplot(nd$x, do.call("cbind", p),
 
 }
 \seealso{
-\code{\link[=transitreg]{transitreg()}}, \code{\link[=transitreg_tmf]{transitreg_tmf()}}, \code{\link[=transitreg_dist]{transitreg_dist()}}.
+\code{\link[=transitreg]{transitreg()}}, \code{\link[=transitreg_tmf]{transitreg_tmf()}}.
 }
 \author{
 Niki

@@ -10,6 +10,7 @@
 #' @param response Character string specifying the name of the response variable
 #'        to be used for transition modeling. This variable must represent
 #'        counts or categorical states.
+#' @param breaks numeric vector with the bin intersection points (break points).
 #' @param theta_vars `NULL`  or character vector with the bin-specific theta variables
 #'        to be set up (e.g., `c("theta0", "theta99")`). Can be an empty character
 #'        vector (or `NULL`) if there are no `theta_vars`.
@@ -18,6 +19,8 @@
 #' @param scaler Can be `FALSE`/`NULL`, `TRUE`, or a list. See section 'Scaler' for details.
 #' @param verbose Logical value indicating whether information about the transformation
 #'        process should be printed to the console. Default is `FALSE`.
+#' @param \dots currently unused (TODO(R): Check lower/upper dev option controlled
+#'        via the dots argument; remove or document).
 #'
 #' @details
 #' Transition models focus on modeling the conditional probabilities of transitions
@@ -58,19 +61,44 @@
 #' For instance, a response variable with a value of 3 will generate rows with
 #' transitions up to its value (0, 1, 2, and 3).
 #'
-#' @seealso [transitreg()], [transitreg_dist()]
+#' @seealso [transitreg()].
 #'
 #' @examples
 #' ## Raw data frame.
-#' d <- data.frame(
-#'   "id" = 1:5,
-#'   "counts" = c(1, 0, 2, 3, 1),
-#'   "x" = 1:5 * 10
-#' )
+#' d <- data.frame(myresponse = c(5.3, 0, 2.1),
+#'                 x = c(-1.2, 3.2, -0.5),
+#'                 y = c(765, 731, 353),
+#'                 z = as.factor(c("foo", "bar", "foo")))
 #'
-#' ## Transformed data frame.
-#' dtm <- transitreg_data(d, response = "counts", verbose = TRUE)
-#' print(dtm)
+#' ## Building model.frame for testing
+#' mf <- model.frame(myresponse ~ x + y + z, d)
+#'
+#' ## Breaks
+#' bk <- seq(0, 8, by = 1)
+#'
+#' ## Simple case
+#' tmf <- transitreg:::transitreg_tmf(mf, "myresponse", bk)
+#' head(tmf)
+#'
+#' ## Providing response via 'newresponse' argument (bin index)
+#' idx  <- transitreg:::num2bin(mf$myresponse, bk)
+#' tmf2 <- transitreg:::transitreg_tmf(subset(mf, select = -myresponse),
+#'                                     "myresponse", bk, newresponse = idx)
+#' head(tmf2)
+#'
+#' ## Demonstrating 'thetaX' behavior
+#' theta_vars <- c("theta0", "theta1", "theta2")
+#' tmf3 <- transitreg:::transitreg_tmf(mf, "myresponse", bk, theta_vars = theta_vars)
+#' head(tmf3)
+#'
+#' ## Demonstrating 'scaler' behavior
+#' tmf4 <- transitreg:::transitreg_tmf(mf, "myresponse", bk, scaler = TRUE)
+#' head(tmf4)
+#' (scaler <- attr(tmf4, "scaler"))
+#'
+#' ## Re-using the scaler from above
+#' tmf5 <- transitreg:::transitreg_tmf(mf, "myresponse", bk, scaler = scaler)
+#' identical(tmf4, tmf5)
 #'
 #' @keywords data transformation
 #' @concept transition

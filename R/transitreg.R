@@ -68,7 +68,7 @@
 #' set.seed(123)
 #' n <- 1000
 #' x <- runif(n, -3, 3)
-#' y <- rpois(n, exp(2 + sin(x))) + 12
+#' y <- rpois(n, exp(2 + sin(x)))
 #'
 #' ## Fit transition count response model.
 #' b <- transitreg(y ~ s(theta) + s(x))
@@ -84,7 +84,7 @@
 #'
 #' ## Plotting hanging rootogram, quantile residuals, and
 #' ## a probability integral transform (PIT) histogram.
-#' plot(b, which = c("rootogram", "qqrplot", "pithist"))
+#' plot(b, which = c("rootogram", "qqrplot", "pithist", "wormplot"))
 #'
 #' ## Predictions and plotting.
 #' nd <- data.frame(x = seq(-3, 3, length = 100))
@@ -117,6 +117,9 @@
 #'
 #' ## Fit model with continuous response.
 #' b <- transitreg(y ~ s(theta) + s(x) + te(x, theta), breaks = 200)
+#'
+#' ## Diagnostic plots
+#' plot(b, which = c("rootogram", "qqrplot", "pithist", "wormplot"))
 #'
 #' ## Predictions and plotting
 #' nd <- data.frame(x = seq(-3, 3, length = 100))
@@ -243,7 +246,7 @@ transitreg <- function(formula, data, subset, na.action,
       tmp_bk <- range(breaks)
       tmp_y  <- range(mf[[rval$response]])
       if (tmp_bk[[1L]] > tmp_y[[1L]] || tmp_bk[[2L]] < tmp_y[[2L]])
-          stop("Breaks do not cover the full range of the response \"", rval$response, "\".")
+          stop("'breaks' do not cover the full range of the response \"", rval$response, "\".")
       # Store breaks and bins
       rval$bins   <- length(breaks) - 1L
       rval$breaks <- breaks
@@ -252,7 +255,7 @@ transitreg <- function(formula, data, subset, na.action,
       # Check that the response is positive integers only.
       if (any(mf[[rval$response]] < 0) ||
           any(abs(mf[[rval$response]] %% 1) > sqrt(.Machine$double.eps))) {
-          stop("Response not count data. Breaks must be specified for binning.")
+          stop("Response not count data. 'breaks' must be specified for binning.")
       }
       # There are no breaks, but bins
       ymax <- as.integer(max(mf[[rval$response]], na.rm = TRUE))
@@ -788,6 +791,30 @@ prodist.transitreg <- function(object, newdata = NULL, ...) {
 }
 
 
+# For the assessment plots we need to convince topmodels that
+# we are dealing with actual count data (pseudo-counts as this
+# is a transitreg model based on an originally continuous response)
+# by setting all observations to the lower point of the corresponding
+# bin it falls into. This is what this function does, before forwarding
+# everything to the default method.
+
+#' @importFrom topmodels newresponse proresiduals
+#' @exportS3Method proresiduals transitreg
+proresiduals.transitreg <- function(object, ...) {
+    args <- c(list(object = object), list(...))
+    if (!is.null(object$breaks)) {
+        # Find minimum distance to lower end of bin/interval
+        if (is.null(args$newdata))
+            args$newdata <- model.frame(object)
+
+        ## Setting response to 'lower end of bin' for wormplot
+        args$newdata[[object$response]] <-
+            object$breaks[1L + num2bin(args$newdata[[object$response]], object$breaks)]
+    }
+    do.call(topmodels:::proresiduals.default, args)
+}
+
+
 #' @importFrom topmodels newresponse
 #'
 #' @author Reto
@@ -860,7 +887,7 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 #' * For `"mode"`, the expected value of the response.
 #' * For `"quantile"`, the quantile of the response distribution at the specified `prob`.
 #'
-#' @seealso [transitreg()], [transitreg_tmf()], [transitreg_dist()].
+#' @seealso [transitreg()], [transitreg_tmf()].
 #'
 #' @examples
 #' ## Example: Predicting PDF and CDF.
