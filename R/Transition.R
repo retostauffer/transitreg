@@ -8,7 +8,8 @@
 #' @param breaks numeric vector of points of intersection of the breaks.
 #'        The length the vector must be of \code{length(x) + 1} (if \code{x} is
 #'        a vector) or \code{ncol(x) + 1} if \code{x} is a matrix. Must be
-#'        monotonically increasing.
+#'        monotonically increasing. If `breaks` is integer, all must be `>=0`
+#'        (used to identify count data Transition distributions).
 #'
 #' @return Returns an object of class \code{c("Transition", "distribution")}.
 #' TODO(R): Missing.
@@ -28,7 +29,6 @@
 #' @rdname Transition
 #' @export
 Transition <- function(x, breaks) {
-
     # Sanity checks
     stopifnot(
         "'x' must be numeric (vector or matrix)" = is.numeric(x) && is.atomic(x),
@@ -46,9 +46,13 @@ Transition <- function(x, breaks) {
     if (length(breaks) != (ncol(x) + 1))
         stop("'breaks' must be of length ", ncol(x) + 1)
 
+    # If breaks are integer: interpret as counts (discrete distribution),
+    # thus all breaks must be >= 0
+    if (is.integer(breaks) && !all(breaks >= 0L))
+        stop("If 'breaks' are integer (counts) all must be >= 0L")
+
     # Ensure to convert to double in case input is integer
     x[,] <- as.numeric(x)
-    breaks <- as.numeric(breaks)
 
     res <- setNames(as.data.frame(x),
                     paste("tp", seq_len(ncol(x)) - 1, sep = "_"))
@@ -146,19 +150,15 @@ dpq_get_results <- function(z, d, ncores, type) {
     # If length(y) == length(d): elementwise = TRUE
     elementwise <- length(z) == length(d)
 
-    ## Setting up character for C call
-    censored <- 'REMOVE ME TODO'
-
     # Setting up arguments to call .C predict function
-    args <- list(uidx        = ui,               # Unique distribution index (int)
-                 idx         = idx,              # Index vector (int)
-                 tp          = t(as.matrix(d)),  # Transition probabilities
-                 breaks      = breaks,           # Point intersection of breaks
+    args <- list(uidx        = ui,                # Unique distribution index (int)
+                 idx         = idx,               # Index vector (int)
+                 tp          = t(as.matrix(d)),   # Transition probabilities
+                 breaks      = as.double(breaks), # Point intersection of breaks
                  type        = type,
                  ncores      = ncores,
                  elementwise = elementwise,
-                 discrete    = is_discrete(d),
-                 censored    = censored)
+                 discrete    = is_discrete(d))
 
     if (type == "quantile") {
         args$y    <- NA_integer_
@@ -231,24 +231,20 @@ rtransit <- function(n, d, ncores = NULL) {
     binmid <- (head(breaks, -1) + tail(breaks, -1)) / 2.
     binwidth <- diff(breaks)
 
-    ## Setting up character for C call
-    censored <- "REMOVE ME TODO"
-
     # Calculating densities for all distributions
     ui  <- seq_along(d)
     idx <- rep(seq_along(binmid), length(d))
     y   <- seq_along(binmid) - 1L
-    args <- list(uidx        = ui,               # Unique distribution index (int)
-                 idx         = idx,              # Index vector (int)
-                 tp          = t(as.matrix(d)),  # Transition probabilities
-                 breaks      = breaks,           # Point intersection of breaks
-                 y           = y,                # Where to evaluate the pdf
-                 prob        = NA_real_,         # <- Dummy value
+    args <- list(uidx        = ui,                # Unique distribution index (int)
+                 idx         = idx,               # Index vector (int)
+                 tp          = t(as.matrix(d)),   # Transition probabilities
+                 breaks      = as.double(breaks), # Point intersection of breaks
+                 y           = y,                 # Where to evaluate the pdf
+                 prob        = NA_real_,          # <- Dummy value
                  type        = "pdf",
                  ncores      = ncores,
                  elementwise = FALSE,
-                 discrete    = is_discrete(d),
-                 censored    = censored)
+                 discrete    = is_discrete(d))
 
     args <- check_args_for_treg_predict(args)
     p <- matrix(do.call(function(...) .Call("treg_predict", ...), args),
@@ -261,8 +257,10 @@ rtransit <- function(n, d, ncores = NULL) {
         p <- as.vector(p[i, ])
         r <- sample(binmid, size = n, prob = p, replace = TRUE)
         # Adding random uniform error
-        if (!discrete[i])
-            r <- r + runif(n, min = -binwidth[r] / 2, max = +binwidth[r] / 2)
+        # TODO(R): Revamped discrete/continuous, check
+        #          if this is fine or not and adjust accordingly.
+        #if (!is_discrete(d[i]))
+        #    r <- r + runif(n, min = -binwidth[r] / 2, max = +binwidth[r] / 2)
         return(r)
     }
     res <- lapply(seq_along(d), fn)
@@ -288,21 +286,17 @@ mean_transit <- function(x, ncores = NULL, ...) {
     ui   <- seq_along(x) # Unique index
     idx  <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
-    ## Setting up character for C call
-    censored <- "REMOVE ME TODO"
-
     ## Calling C to calculate the required values.
-    args <- list(uidx        = ui,               # Unique distribution index (int)
-                 idx         = idx,              # Index vector (int)
-                 tp          = t(as.matrix(x)),  # Transition probabilities
-                 breaks      = breaks,           # Point intersection of breaks
-                 y           = NA_integer_,      # <- Dummy value
-                 prob        = NA_real_,         # <- Dummy value
+    args <- list(uidx        = ui,                # Unique distribution index (int)
+                 idx         = idx,               # Index vector (int)
+                 tp          = t(as.matrix(x)),   # Transition probabilities
+                 breaks      = as.double(breaks), # Point intersection of breaks
+                 y           = NA_integer_,       # <- Dummy value
+                 prob        = NA_real_,          # <- Dummy value
                  type        = "mean",
                  ncores      = ncores,
                  elementwise = TRUE,             # Must always be TRUE for mean
-                 discrete    = is_discrete(x),
-                 censored    = censored)
+                 discrete    = is_discrete(x))
 
     # Calling C
     args <- check_args_for_treg_predict(args)
@@ -472,19 +466,15 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     ui  <- seq_along(d) # Unique index
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
-    ## Setting up character for C call
-    censored <- "REMOVE ME TODO"
-
     # Setting up arguments to call .C predict function
-    args <- list(uidx  = ui,                       # Unique distribution index (int)
-                 idx   = idx,                      # Index vector (int)
-                 tp    = t(as.matrix(d)),          # Transition probabilities
-                 breaks  = breaks,                     # Point intersection of breaks
-                 y     = x,                        # Where to evaluate the pdf
-                 prob  = NA_real_,                 # Dummy, only used for 'quantile'
-                 type  = "pdf", ncores = ncores, elementwise = elementwise,
-                 discrete = is_discrete(d),
-                 censored = censored)
+    args <- list(uidx     = ui,                # Unique distribution index (int)
+                 idx      = idx,               # Index vector (int)
+                 tp       = t(as.matrix(d)),   # Transition probabilities
+                 breaks   = as.double(breaks), # Point intersection of breaks
+                 y        = x,                 # Where to evaluate the pdf
+                 prob     = NA_real_,          # Dummy, only used for 'quantile'
+                 type     = "pdf", ncores = ncores, elementwise = elementwise,
+                 discrete = is_discrete(d))
 
     # Calling C
     args <- check_args_for_treg_predict(args)
@@ -544,21 +534,17 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     ui  <- seq_along(d) # Unique index
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
-    ## Setting up character for C call
-    censored <- "REMOVE ME TODO"
-
     ## Calling C to calculate the required values.
-    args <- list(uidx        = ui,               # Unique distribution index (int)
-                 idx         = idx,              # Index vector (int)
-                 tp          = t(as.matrix(d)),  # Transition probabilities
-                 breaks      = breaks,           # Point intersection of breaks
-                 y           = x,                # Where to evaluate the pdf
-                 prob        = NA_real_,         # Dummy, only used for 'quantile'
+    args <- list(uidx        = ui,                # Unique distribution index (int)
+                 idx         = idx,               # Index vector (int)
+                 tp          = t(as.matrix(d)),   # Transition probabilities
+                 breaks      = as.double(breaks), # Point intersection of breaks
+                 y           = x,                 # Where to evaluate the pdf
+                 prob        = NA_real_,          # Dummy, only used for 'quantile'
                  type        = "cdf",
                  ncores      = ncores,
                  elementwise = elementwise,
-                 discrete    = is_discrete(d),
-                 censored    = censored)
+                 discrete    = is_discrete(d))
 
     # Calling C
     args <- check_args_for_treg_predict(args)
@@ -628,21 +614,17 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL,
     ui  <- seq_along(x) # Unique index
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
-    ## Setting up character for C call
-    censored <- "REMOVE ME TODO"
-
     ## Calling C to calculate the required values.
-    args <- list(uidx        = ui,               # Unique distribution index (int)
-                 idx         = idx,              # Index vector (int)
-                 tp          = t(as.matrix(x)),  # Transition probabilities
-                 breaks      = breaks,           # Point intersection of breaks
-                 y           = NA_integer_,      # Dummy, only used for cdf/pdf
-                 prob        = probs,            # Probabilities where to evaluate the distribution
+    args <- list(uidx        = ui,                # Unique distribution index (int)
+                 idx         = idx,               # Index vector (int)
+                 tp          = t(as.matrix(x)),   # Transition probabilities
+                 breaks      = as.double(breaks), # Point intersection of breaks
+                 y           = NA_integer_,       # Dummy, only used for cdf/pdf
+                 prob        = probs,             # Probabilities where to evaluate the distribution
                  type        = "quantile",
                  ncores      = ncores,
                  elementwise = elementwise,
-                 discrete    = rep(!approx, length(x)), # TODO(R): Testing
-                 censored    = censored)
+                 discrete    = rep(!approx, length(x))) # TODO(R): Testing
 
     # Calling C
     args <- check_args_for_treg_predict(args)
@@ -728,14 +710,16 @@ random.Transition <- function(x, n = 1L, drop = TRUE, ...) {
 #' @author Reto
 #' @rdname Transition
 #' @exportS3Method is_discrete Transition
-is_discrete.Transition <- function(d, ...) rep(TRUE, length(d))
+is_discrete.Transition <- function(d, ...)
+    rep(is.integer(attr(d, "breaks")), length(d))
 
 #' @importFrom distributions3 is_continuous
 #'
 #' @author Reto
 #' @rdname Transition
 #' @exportS3Method is_continuous Transition
-is_continuous.Transition <- function(d, ...) rep(FALSE, length(d))
+is_continuous.Transition <- function(d, ...)
+    rep(is.double(attr(d, "breaks")), length(d))
 
 #' @importFrom distributions3 support
 #' @importFrom stats setNames
@@ -753,46 +737,62 @@ support.Transition <- function(d, drop = NULL, ...) {
 }
 
 
-#' @param type Character, type of plot to be created. Either
-#'        `"tp"` (transition probabilities), `"cdf"` or `"pdf"`.
+#' @param cdf logical. If `cdf = TRUE` then the cumulative
+#'        distribution function (c.d.f.) is plotted. Otherwise, the
+#'        probability density function (p.d.f.), for a continuous
+#'        variable, or the probability mass function (p.m.f.), for a
+#'        discrete variable, is plotted.
+#' @param tp logical.  If `tp = TRUE` then the transition probabilities
+#'        are plotted in addition to the cummulative distribution function
+#'        or the probability mass function (see `cdf`).
 #' @param all Logical. If `TRUE` all distributions in `x` will be drawn.
-#'        Else only the first N ones (default is 8).
-#' @param n Integer. Maximum number of distributions to be plotted, defaults to 8.
+#'        Else only the first n ones (default is 8).
+#' @param n Integer, maximum number of distributions to be plotted, defaults to `8L`.
 #'
 #' @importFrom utils head tail
 #' @importFrom graphics matplot axis
 #' @exportS3Method plot Transition
 #' @rdname Transition
-plot.Transition <- function(x, type = c("tp", "cdf", "pdf"), all = FALSE, n = 8L, ...) {
-    stopifnot("'all' must be TRUE or FALSE" = isTRUE(all) || isFALSE(all))
+plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, ...) {
+    stopifnot(
+        "'cdf' must be TRUE or FALSE" = isTRUE(all) || isFALSE(all),
+        "'tp' must be TRUE or FALSE" = isTRUE(all) || isFALSE(all),
+        "'all' must be TRUE or FALSE" = isTRUE(all) || isFALSE(all)
+    )
     n <- as.integer(n)[1]
     stopifnot("'n' cannot be coerced to integer > 0L" =
               is.integer(n) && length(n) == 1L && n > 0L)
 
-    type <- match.arg(type)
-    titles <- c("tp"  = "Transition Probabilities",
-               "cdf" = "Distribution",
-               "pdf" = "Density")
-    breaks <- attr(x, "breaks")
+    title <- if (cdf) "Distribution" else "Density"
+    if (tp) title <- paste(title, "and Transition Probabilities")
+    breaks   <- attr(x, "breaks")
 
     # Take first 1:n distributions only
     if (length(x) > n & !all) x <- x[seq_len(n)]
 
     binmid <- (head(breaks, -1) + tail(breaks, -1)) / 2 # Mid of bin
-    if (type == "tp") {
-        m  <- as.matrix(x)
-    } else if (type == "cdf") {
-        m  <- cdf(x, binmid, elementwise = FALSE, drop = FALSE)
+    m_tp <- if (tp) as.matrix(x) else NULL
+    if (cdf) {
+        m <- cdf(x, binmid, elementwise = FALSE, drop = FALSE)
     } else {
-        m  <- pdf(x, binmid, elementwise = FALSE, drop = FALSE)
+        m <- pdf(x, binmid, elementwise = FALSE, drop = FALSE)
     }
 
+    # Plotting pdf or cdf
     type <- if (is_discrete(x[1])) "p" else "l"
     matplot(x = binmid, y = t(m), type = type,
             lwd = 2, lty = 1,
             pch = 19, cex = 0.75,
+            xlab = "x",
+            ylab = "P(X = x)",
             xlim = range(breaks),
-            main = titles[type], ...)
+            ylim = if (tp) c(0, pmax(1, max(m))) else NULL,
+            main = title, ...)
+
+    # Adding transition probability if requested
+    if (!is.null(m_tp))
+        matplot(x = binmid, y = t(m_tp), type = "l",
+                lwd = 1, lty = 2, add = TRUE)
 
     for (s in c(1, 3))
         axis(side = s, at = breaks, labels = FALSE, col = 1, tck = 0.025)

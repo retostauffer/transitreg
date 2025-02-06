@@ -10,6 +10,7 @@
 #'        regression model (given `formula`) using [glmnet::cv.glmnet()].
 #' @param nfolds Integer, defaults to `10L`. Number of cross-folds for the
 #'        glmnet model.
+#' @param \dots forwarded to [glmnet::cv.glmnet()].
 #'
 #' @importFrom mgcv interpret.gam smoothCon
 #'
@@ -59,6 +60,12 @@ transitreg_glmnet <- function(formula, data, nfolds = 10, ...) {
     return(mod)
 }
 
+#' @param object an object of class `transitreg_glmnet`.
+#' @param type character, defaults to `"response"`.
+#' @param s value(s) of the penalty parameter, defaults to `"lambda.min"`.
+#'        See [glmnet::predict.glmnet()] for details.
+#' @param \dots currently unused.
+#'
 #' @exportS3Method predict transitreg_glmnet
 #' @rdname transitreg_glmnet
 predict.transitreg_glmnet <- function(object, type = "response", s = "lambda.min", ...) {

@@ -147,9 +147,9 @@ expect_identical(s3, matrix(range(breaks), byrow = TRUE, ncol = 2L, nrow = lengt
 
 # S3 method is_discrete
 expect_silent(is_discrete(d3),                                info = "Calling S3 method is_discrete")
-expect_identical(is_discrete(d3), rep(TRUE, length(d3)),      info = "Testing return of is_discrete")
+expect_identical(is_discrete(d3), rep(FALSE, length(d3)),     info = "Testing return of is_discrete")
 expect_silent(is_continuous(d3),                              info = "Calling S3 method is_continuous")
-expect_identical(is_continuous(d3), rep(FALSE, length(d3)),   info = "Testing return of is_continuous")
+expect_identical(is_continuous(d3), rep(TRUE, length(d3)),   info = "Testing return of is_continuous")
 
 # S3 method cdf
 # Evaluate the distributions at all breaks (binmid)

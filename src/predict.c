@@ -178,16 +178,6 @@ doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
     return res;
 }
 
-/* Draw random value between a and b */
-double ab_random(double a, double b) {
-    printf("ab_random");
-    if (a < b) {
-        return a + (b - a) * rand();
-    } else {
-        return b + (a - b) * rand();
-    }
-}
-
 /* Linear interpolation for finer quantiles */
 double interpolate_linear(double x1, double y1, double x2, double y2, double p) {
     if (ISNAN(x1) || ISNAN(y1) || ISNAN(x2) || ISNAN(y2)) {

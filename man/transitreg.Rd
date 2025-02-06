@@ -105,7 +105,6 @@ automatically, and \code{ncores} is set to \code{N - 2L}.
 
 \examples{
 ## Example 1: Count data.
-library("transitreg")
 set.seed(123)
 n <- 1000
 x <- runif(n, -3, 3)
@@ -146,8 +145,11 @@ legend("topleft", legend = colnames(fit),
 ## Visualizing three predicted distributions via Transitreg distributions
 idx <- c(25, 50, 75)
 d3 <- Transition(predict(b, nd[idx, , drop = FALSE], type = "tp"), breaks = seq.int(0, b$bins))
-plot(d3, type = "pdf")
 abline(v = predict(b, nd[idx, , drop = FALSE], type = "mode"), col = 1:3, lty = 3)
+plot(d3, tp = TRUE) # add transition probabilities
+abline(v = predict(b, nd[idx, , drop = FALSE], type = "mode"), col = 1:3, lty = 3)
+plot(d3, cdf = TRUE)
+plot(d3, cdf = TRUE, tp = TRUE) # add transition probabilities
 
 
 ## Example 2: Continuous response.
@@ -179,10 +181,11 @@ legend("topleft", legend = colnames(fit),
        col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
 
 ## Visualizing 5 randomly selected fitted distributions
+set.seed(6020)
 idx <- sample(seq_len(nrow(model.frame(b))), 5L)
-plot(b[idx], type = "pdf")
-plot(b[idx], type = "cdf")
-plot(b[idx], type = "tp")
+plot(b[idx])
+plot(b[idx], cdf = TRUE)
+plot(b[idx], cdf = TRUE, tp = TRUE)
 
 
 ## Example 3: Count response with neural network.
@@ -210,6 +213,13 @@ matplot(nd$x, fit, type = "l", add = TRUE, lwd = 2,
        col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
 legend("topleft", legend = colnames(fit),
        col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
+
+## Visualizing 5 randomly selected fitted distributions
+set.seed(2025)
+idx <- sample(seq_len(nrow(model.frame(b))), 5L)
+plot(b[idx])
+plot(b[idx], cdf = TRUE)
+plot(b[idx], cdf = TRUE, tp = TRUE)
 
 }
 \seealso{

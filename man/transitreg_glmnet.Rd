@@ -17,6 +17,15 @@ regression model (given \code{formula}) using \code{\link[glmnet:cv.glmnet]{glmn
 
 \item{nfolds}{Integer, defaults to \code{10L}. Number of cross-folds for the
 glmnet model.}
+
+\item{\dots}{currently unused.}
+
+\item{object}{an object of class \code{transitreg_glmnet}.}
+
+\item{type}{character, defaults to \code{"response"}.}
+
+\item{s}{value(s) of the penalty parameter, defaults to \code{"lambda.min"}.
+See \code{\link[glmnet:predict.glmnet]{glmnet::predict.glmnet()}} for details.}
 }
 \description{
 Experimental engine used to estimate the transition probabilities

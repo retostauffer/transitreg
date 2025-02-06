@@ -64,7 +64,6 @@
 #'
 #' @examples
 #' ## Example 1: Count data.
-#' library("transitreg")
 #' set.seed(123)
 #' n <- 1000
 #' x <- runif(n, -3, 3)
@@ -105,8 +104,11 @@
 #' ## Visualizing three predicted distributions via Transitreg distributions
 #' idx <- c(25, 50, 75)
 #' d3 <- Transition(predict(b, nd[idx, , drop = FALSE], type = "tp"), breaks = seq.int(0, b$bins))
-#' plot(d3, type = "pdf")
 #' abline(v = predict(b, nd[idx, , drop = FALSE], type = "mode"), col = 1:3, lty = 3)
+#' plot(d3, tp = TRUE) # add transition probabilities
+#' abline(v = predict(b, nd[idx, , drop = FALSE], type = "mode"), col = 1:3, lty = 3)
+#' plot(d3, cdf = TRUE)
+#' plot(d3, cdf = TRUE, tp = TRUE) # add transition probabilities
 #'
 #'
 #' ## Example 2: Continuous response.
@@ -138,10 +140,11 @@
 #'        col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
 #'
 #' ## Visualizing 5 randomly selected fitted distributions
+#' set.seed(6020)
 #' idx <- sample(seq_len(nrow(model.frame(b))), 5L)
-#' plot(b[idx], type = "pdf")
-#' plot(b[idx], type = "cdf")
-#' plot(b[idx], type = "tp")
+#' plot(b[idx])
+#' plot(b[idx], cdf = TRUE)
+#' plot(b[idx], cdf = TRUE, tp = TRUE)
 #'
 #'
 #' ## Example 3: Count response with neural network.
@@ -169,6 +172,13 @@
 #'        col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
 #' legend("topleft", legend = colnames(fit),
 #'        col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
+#'
+#' ## Visualizing 5 randomly selected fitted distributions
+#' set.seed(2025)
+#' idx <- sample(seq_len(nrow(model.frame(b))), 5L)
+#' plot(b[idx])
+#' plot(b[idx], cdf = TRUE)
+#' plot(b[idx], cdf = TRUE, tp = TRUE)
 #'
 #' @keywords models regression
 #'
@@ -563,16 +573,16 @@ transitreg_predict <- function(object, newdata = NULL,
   discrete <- rep(is.null(object$breaks), length(ui))
 
   ## Setting up arguments for the .C call
-  args <- list(uidx        = ui,           # int; Unique distribution index (int)
-               idx         = index,        # int; Index vector (int)
-               tp          = tp,           # num; Transition probabilities
-               breaks      = breaks,       # num; Point intersections of bins
-               y           = yC,           # int; Response y, used for 'cdf/pdf'
-               prob        = probC,        # num; Probabilities (used for 'quantile')
-               type        = type,         # str; to predict/calculate
-               ncores      = ncores,       # int; Number of cores to be used (OpenMP)
-               elementwise = elementwise,  # Elementwise (one prob or y per ui)
-               discrete    = discrete)     # Discrete distribution?
+  args <- list(uidx        = ui,                # int; Unique distribution index (int)
+               idx         = index,             # int; Index vector (int)
+               tp          = tp,                # num; Transition probabilities
+               breaks      = as.double(breaks), # num; Point intersections of bins
+               y           = yC,                # int; Response y, used for 'cdf/pdf'
+               prob        = probC,             # num; Probabilities (used for 'quantile')
+               type        = type,              # str; to predict/calculate
+               ncores      = ncores,            # int; Number of cores to be used (OpenMP)
+               elementwise = elementwise,       # Elementwise (one prob or y per ui)
+               discrete    = discrete)          # Discrete distribution?
 
   # Calling C
   args <- check_args_for_treg_predict(args)
@@ -608,11 +618,12 @@ transitreg_predict <- function(object, newdata = NULL,
 
 # Helper function, returns breaks of a transitreg model.
 # If the model is a 'count data model' the breaks are not stored
-# on the object, but here calculcated on the fly.
+# on the object, but here calculcated on the fly and will be returned
+# as integer (used to identify count data Transition probabilities).
 get_breaks <- function(x) {
     stopifnot("'x' must be a transitreg model" = inherits(x, "transitreg"))
     # Enforcing numeric as this is used in .C where it must be double (numeric)
-    return(if (!is.null(x[["breaks"]])) x$breaks else as.numeric(seq.int(0, x$bins)))
+    return(if (!is.null(x[["breaks"]])) x$breaks else seq.int(0, x$bins))
 }
 
 # Helper function to get bin mids of a transitreg model

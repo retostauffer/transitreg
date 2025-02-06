@@ -1,4 +1,18 @@
 
+## Version 0.1-9011-90XX
+
+* Further (major) changes as the package is still under development.
+* Removed the 'censored' option both from R and C.
+* Revamped how 'discrete' and 'pseudo-discrete' (continuous) models
+  are handled, as well as how to depict this in `Transition` disbributions.
+  For short, if `breaks` are integers, the model/distribution is assumed to 
+  be a discrete count data distribution. Else a pseudo-discrete continuous
+  distribution.
+* Convinced `topmodels` to properly handle both (discrete and pseudo-discrete)
+  distributions using a custom `proresiduals` S3 method.
+* Refined plotting (to be in line with the `distributions3` plotting functions).
+* Updated man pages where needed (tbc).
+
 ## Version 0.1-9010
 
 * Migrated back to main branch, repository renamed to final

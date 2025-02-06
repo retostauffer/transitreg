@@ -63,7 +63,7 @@ rtransit(n, d, ncores = NULL)
 
 \method{support}{Transition}(d, drop = NULL, ...)
 
-\method{plot}{Transition}(x, type = c("tp", "cdf", "pdf"), all = FALSE, n = 8L, ...)
+\method{plot}{Transition}(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, ...)
 }
 \arguments{
 \item{x}{Numeric, vector of quantiles.}
@@ -71,7 +71,8 @@ rtransit(n, d, ncores = NULL)
 \item{breaks}{numeric vector of points of intersection of the breaks.
 The length the vector must be of \code{length(x) + 1} (if \code{x} is
 a vector) or \code{ncol(x) + 1} if \code{x} is a matrix. Must be
-monotonically increasing.}
+monotonically increasing. If \code{breaks} is integer, all must be \verb{>=0}
+(used to identify count data Transition distributions).}
 
 \item{d}{An object of class \code{Transition}.}
 
@@ -84,7 +85,7 @@ monotonically increasing.}
 
 \item{p}{Numeric, vector of probabilities.}
 
-\item{n}{Integer. Maximum number of distributions to be plotted, defaults to 8.}
+\item{n}{Integer, maximum number of distributions to be plotted, defaults to \code{8L}.}
 
 \item{\dots}{unused.}
 
@@ -112,11 +113,18 @@ to keep this (and if so, check if correct).}
 
 \item{na.rm}{Unused.}
 
-\item{type}{Character, type of plot to be created. Either
-\code{"tp"} (transition probabilities), \code{"cdf"} or \code{"pdf"}.}
+\item{cdf}{logical. If \code{cdf = TRUE} then the cumulative
+distribution function (c.d.f.) is plotted. Otherwise, the
+probability density function (p.d.f.), for a continuous
+variable, or the probability mass function (p.m.f.), for a
+discrete variable, is plotted.}
+
+\item{tp}{logical.  If \code{tp = TRUE} then the transition probabilities
+are plotted in addition to the cummulative distribution function
+or the probability mass function (see \code{cdf}).}
 
 \item{all}{Logical. If \code{TRUE} all distributions in \code{x} will be drawn.
-Else only the first N ones (default is 8).}
+Else only the first n ones (default is 8).}
 }
 \value{
 Returns an object of class \code{c("Transition", "distribution")}.
