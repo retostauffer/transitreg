@@ -16,7 +16,9 @@ m <- rbind(A = convert_tp(ppois(0:15, lambda = 3.0), "cdf", "tp"),
            C = convert_tp(ppois(0:15, lambda = 0.3), "cdf", "tp"))
 
 # Fake breaks; width equal to 1
-breaks <- as.numeric(seq.int(0, by = 1, length.out = ncol(m) + 1))
+breaks_int <- seq.int(0, by = 1L, length.out = ncol(m) + 1L)
+breaks_dbl <- as.double(breaks_int)
+stopifnot(is.integer(breaks_int), is.double(breaks_dbl))
 
 
 
@@ -24,18 +26,76 @@ breaks <- as.numeric(seq.int(0, by = 1, length.out = ncol(m) + 1))
 # Testing constructor function
 # --------------------------------------------------------------------
 
+# ------------- function misuse --------------------------------------
+expect_error(Transition(),            info = "No arguments provided")
+expect_error(Transition(m), pattern = "argument \"breaks\" is missing",
+             info = "No breaks provided.")
+expect_error(Transition(c(TRUE, FALSE), breaks = breaks_int),
+             pattern = "'x' must be numeric \\(vector or matrix\\)",
+             info = "Wrong input on 'x' (not numeric).")
+expect_error(Transition(list(m), breaks = breaks_int),
+             pattern = "'x' must be numeric \\(vector or matrix\\)",
+             info = "Wrong input on 'x' (not atomic).")
+expect_error(Transition(double(), breaks = breaks_int),
+             pattern = "length of 'x' must be > 0",
+             info = "Input of length zero (empty vector).")
+expect_error(Transition(matrix(double()), breaks = breaks_int),
+             pattern = "length of 'x' must be > 0",
+             info = "Input of length zero (empty matrix).")
+expect_error(Transition(m, breaks = list(1, 2, 3)),
+             pattern = "'breaks' must be a numeric vector",
+             info = "Wrong input on 'breaks' (not atomic).")
+expect_error(Transition(m, breaks = c(TRUE, FALSE, TRUE)),
+             pattern = "'breaks' must be a numeric vector",
+             info = "Wrong input on 'breaks' (not numeric).")
+expect_error(Transition(m, breaks = c(0, 1, 2, NA, 4, 5)),
+             pattern = "missing values in 'breaks' not allowed",
+             info = "Missing values not allowed in 'breaks' argument.")
+expect_error(Transition(m, breaks = c(0, 1, 2, 2, 2, 3, 4, 5)),
+             pattern = "'breaks' must be monotonically increasing",
+             info = "Duplicated values in 'breaks'.")
+expect_error(Transition(m, breaks = c(0, 1, 2, 3, 2.99)),
+             pattern = "'breaks' must be monotonically increasing",
+             info = "Decreasing breaks.")
+expect_error(Transition(m, breaks = head(breaks_int, -1)),
+             pattern = "'breaks' must be of length",
+             info = "Number of breaks not matching the data (one too short).")
+expect_error(Transition(m, breaks = seq.int(0, length(breaks_int))),
+             pattern = "'breaks' must be of length",
+             info = "Number of breaks not matching the data (one too long).")
+expect_error(Transition(m, breaks = breaks_int - 5L),
+             pattern = "If 'breaks' are integer \\(counts\\) all must be >= 0",
+             info = "Negative count breaks (integers).")
+
+
 # ------------- distribution m[1, ] w/ fake data ---------------------
 
 # One single distribution based on m[1, ]. Firstly, we test that
 # the constructor function works and that the result is identical
 # if we hand over a vector or a single-row matrix.
-expect_silent(d1 <- Transition(as.vector(m[1, ]), breaks),
+expect_silent(d1 <- Transition(as.vector(m[1, ]), breaks_int),
               info = "Calling constructor function (vector input)")
-expect_silent(d1_m <- Transition(m[1, , drop = FALSE], breaks),
+expect_silent(d1_m <- Transition(m[1, , drop = FALSE], breaks_int),
               info = "Constructor function with matrix input (nrow = 1)")
 expect_identical(d1, setNames(d1_m, NULL),
                info = "Check that Transition is identical with vector/matrix input")
+expect_true(is.integer(attr(d1, "breaks")), info = "Check that breaks are stored as integer.")
+expect_identical(attr(d1, "breaks"), breaks_int, info = "Testing attribute 'breaks'.")
+
 rm(d1_m)
+
+# Doing the very same, but this time using `break_dbl`. Stores breaks
+# as double, indicating that this is a 'discrete' distribution.
+expect_silent(d2 <- Transition(as.vector(m[1, ]), breaks_dbl),
+              info = "Calling constructor function (vector input)")
+expect_silent(d2_m <- Transition(m[1, , drop = FALSE], breaks_dbl),
+              info = "Constructor function with matrix input (nrow = 1)")
+expect_identical(d2, setNames(d2_m, NULL),
+               info = "Check that Transition is identical with vector/matrix input")
+expect_true(is.double(attr(d2, "breaks")), info = "Check that breaks are stored as double.")
+expect_identical(attr(d2, "breaks"), breaks_dbl, info = "Testing attribute 'breaks'.")
+
+rm(d2, d2_m)
 
 # Testing the Transition object of length 1
 expect_identical(class(d1), c("Transition", "distribution"), info = "Testing class")
@@ -46,7 +106,7 @@ expect_true(grepl(pat, format(d1)),                          info = "Testing for
 
 # Checking attributes
 expect_true("breaks" %in% names(attributes(d1)),             info = "Checking if attribute 'breaks' is available")
-expect_identical(attr(d1, "breaks"), breaks,                 info = "Testing attribute 'breaks'")
+expect_identical(attr(d1, "breaks"), breaks_int,             info = "Testing attribute 'breaks'")
 
 
 # Convert to matrix
@@ -56,7 +116,7 @@ expect_true(is.matrix(m1) && is.numeric(m1),                info = "Testing matr
 expect_identical(dim(m1), c(1L, ncol(m)),                   info = "Testing matrix dimension")
 expect_true(all(grep("^tp_[0-9]+$", colnames(m1))),         info = "Matrix column names")
 expect_true(is.null(rownames(m1)),                          info = "Matrix row names (unnamed)")
-expect_identical(attr(m1, "breaks"), breaks,                info = "Testing 'breaks' attribute on matrix")
+expect_identical(attr(m1, "breaks"), breaks_int,            info = "Testing 'breaks' attribute on matrix")
 rm(m1)
 
 # Convert to extended (long) matrix
@@ -66,7 +126,7 @@ expect_true(is.matrix(m1e) && is.numeric(m1e),              info = "Testing exte
 expect_identical(dim(m1e), c(ncol(m), 3L),                  info = "Testing extended matrix dimension")
 expect_identical(colnames(m1e), c("index", "theta", "tp"),  info = "Matrix extended column names")
 expect_true(is.null(rownames(m1e)),                         info = "Extended matrix row names (unnamed)")
-expect_identical(attr(m1e, "breaks"), breaks,               info = "Testing 'breaks' attribute on matrix")
+expect_identical(attr(m1e, "breaks"), breaks_int,           info = "Testing 'breaks' attribute on matrix")
 
 # Testing content ...
 expect_true(all(m1e[, "index"] == 1L),                      info = "Checking matrix content (index)")
@@ -88,11 +148,11 @@ rm(d1)
 
 # In contrast to the test above we name the distribution "A";
 # should result in proper rownames on the matrices.
-expect_silent(d3 <- Transition(m, breaks),                   info = "Calling constructor with three distributions")
+expect_silent(d3 <- Transition(m, breaks_dbl),               info = "Calling constructor with three distributions")
 expect_identical(class(d3), c("Transition", "distribution"), info = "Testing return class")
 expect_identical(length(d3), nrow(m),                        info = "Testing length")
 expect_identical(names(d3), rownames(m),                     info = "Testing names")
-expect_identical(attr(d3, "breaks"), breaks,                 info = "Testing 'breaks' attribute on Transition")
+expect_identical(attr(d3, "breaks"), breaks_dbl,             info = "Testing 'breaks' attribute on Transition")
 expect_true(all(grepl(sprintf("^Transition_%d\\([0-9\\.\\,\\ ]+\\)$", ncol(m)), format(d3))), info = "Format")
 
 # Convert to matrix
@@ -101,7 +161,7 @@ expect_true(is.matrix(m3) && is.numeric(m3),                 info = "Testing mat
 expect_identical(dim(m3), dim(m),                            info = "Testing matrix dimension")
 expect_true(all(grep("^tp_[0-9]+$", colnames(m3))),          info = "Matrix column names")
 expect_identical(rownames(m3), rownames(m),                  info = "Matrix row names")
-expect_identical(attr(m3, "breaks"), breaks,                     info = "Testing 'breaks' attribute on matrix")
+expect_identical(attr(m3, "breaks"), breaks_dbl,             info = "Testing 'breaks' attribute on matrix")
 
 # Convert to extended (long) matrix
 expect_silent(m3e <- as.matrix(d3, expand = TRUE),           info = "Converting to extended matrix")
@@ -110,7 +170,7 @@ expect_true(is.matrix(m3e) && is.numeric(m3e),               info = "Testing ext
 expect_identical(dim(m3e), c(3L * ncol(m), 3L),              info = "Testing extended matrix dimension")
 expect_identical(colnames(m3e), c("index", "theta", "tp"),   info = "Matrix extended column names")
 expect_true(is.null(rownames(m3e)),                          info = "Extended matrix row names (unnamed)")
-expect_identical(attr(m3e, "breaks"), breaks,                    info = "Testing 'breaks' attribute on matrix")
+expect_identical(attr(m3e, "breaks"), breaks_dbl,            info = "Testing 'breaks' attribute on matrix")
 
 # Testing content ...
 expect_equal(m3e[, "index"], rep(seq_along(d3), each = ncol(m)),           info = "Checking matrix content (index)")
@@ -123,7 +183,7 @@ rm(d3)
 
 # ------------- testing S3 methods for Transition --------------------
 
-d3 <- Transition(m, breaks)
+d3 <- Transition(m, breaks_dbl)
 
 # Testing c(); We have already tested 'd3', so if the result
 # of the c(...) call is identical we know the combined object is
@@ -141,7 +201,7 @@ expect_identical(rownames(d3df), names(d3),                   info = "Data.frame
 
 # S3 method support
 expect_silent(s3 <- support(d3),                              info = "Calling S3 method support")
-expect_identical(s3, matrix(range(breaks), byrow = TRUE, ncol = 2L, nrow = length(d3), dimnames = list(names(d3), c("min", "max"))),
+expect_identical(s3, matrix(range(breaks_dbl), byrow = TRUE, ncol = 2L, nrow = length(d3), dimnames = list(names(d3), c("min", "max"))),
                  info = "Testing return of 'support()' method")
 
 
@@ -153,7 +213,7 @@ expect_identical(is_continuous(d3), rep(TRUE, length(d3)),   info = "Testing ret
 
 # S3 method cdf
 # Evaluate the distributions at all breaks (binmid)
-binmid <- (head(breaks, -1) + tail(breaks, -1)) / 2
+binmid <- (head(breaks_dbl, -1) + tail(breaks_dbl, -1)) / 2
 expect_silent(xcdf <- cdf(d3[1], binmid),                     info = "Calling S3 method cdf")
 expect_identical(xcdf, convert_tp(m[1, ], "tp", "cdf"),       info = "Compare result from C/R")
 

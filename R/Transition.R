@@ -32,7 +32,6 @@ Transition <- function(x, breaks) {
     # Sanity checks
     stopifnot(
         "'x' must be numeric (vector or matrix)" = is.numeric(x) && is.atomic(x),
-        "'x' must be a vector or a matrix" = is.vector(x) || is.matrix(x),
         "length of 'x' must be > 0" = length(x) > 0L,
         "'breaks' must be a numeric vector" = is.atomic(breaks) && is.numeric(breaks),
         "missing values in 'breaks' not allowed" = all(!is.na(breaks)),
