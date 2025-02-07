@@ -74,7 +74,7 @@ dtransit <- function(x, d, log = FALSE, ncores = NULL) {
     log <- as.logical(log[1])
     stopifnot("'log' must evaluate to TRUE/FALSE" = isTRUE(log) || isFALSE(log))
 
-    ## Evaluate cdf
+    ## Evaluate pdf
     res <- dpq_get_results(x, d, ncores, type = "pdf")
 
     return(if (log) log(res) else res)
@@ -219,35 +219,18 @@ rtransit <- function(n, d, ncores = NULL) {
     stopifnot(
         "'n' must be of length > 0" = length(n) > 0L,
         "missing values in 'n' not allowed" = all(!is.na(n)),
-        "'n' must be integer > 0" = all(n > 0L)
+        "'n' must be integer > 0" = all(n > 0L),
+        "'d' must be of class 'Transition'" = inherits(d, "Transition")
     )
 
     ## Get number of cores for OpenMP parallelization
     ncores <- transitreg_get_number_of_cores(ncores, FALSE)
 
-    # Calculating 'bin mids'
-    breaks <- attr(d, "breaks")
-    binmid <- (head(breaks, -1) + tail(breaks, -1)) / 2.
-    binwidth <- diff(breaks)
+    ## Evaluate pdf
+    y <- head(attr(d, "breaks"), -1)
+    p <- pdf(d, y, drop = FALSE)
 
-    # Calculating densities for all distributions
-    ui  <- seq_along(d)
-    idx <- rep(seq_along(binmid), length(d))
-    y   <- seq_along(binmid) - 1L
-    args <- list(uidx        = ui,                # Unique distribution index (int)
-                 idx         = idx,               # Index vector (int)
-                 tp          = t(as.matrix(d)),   # Transition probabilities
-                 breaks      = as.double(breaks), # Point intersection of breaks
-                 y           = y,                 # Where to evaluate the pdf
-                 prob        = NA_real_,          # <- Dummy value
-                 type        = "pdf",
-                 ncores      = ncores,
-                 elementwise = FALSE,
-                 discrete    = is_discrete(d))
-
-    args <- check_args_for_treg_predict(args)
-    p <- matrix(do.call(function(...) .Call("treg_predict", ...), args),
-                ncol = length(binmid), byrow = TRUE)
+    binmid <- (head(attr(d, "breaks"), -1) + tail(attr(d, "breaks"), -1)) / 2.0
 
     # Helper function, draw weighted sample of length 'n'.
     # Scoping 'x', 'n', 'binmid', 'binwidth'
@@ -255,11 +238,10 @@ rtransit <- function(n, d, ncores = NULL) {
         y <- as.matrix(d[i], expand = TRUE)
         p <- as.vector(p[i, ])
         r <- sample(binmid, size = n, prob = p, replace = TRUE)
-        # Adding random uniform error
-        # TODO(R): Revamped discrete/continuous, check
-        #          if this is fine or not and adjust accordingly.
-        #if (!is_discrete(d[i]))
-        #    r <- r + runif(n, min = -binwidth[r] / 2, max = +binwidth[r] / 2)
+        # Adding random uniform error if the distribution is
+        # a 'continuous' distribution (pseudo-binned).
+        if (!is_discrete(d[i]))
+            r <- r + runif(n, min = -binwidth[r] / 2, max = +binwidth[r] / 2)
         return(r)
     }
     res <- lapply(seq_along(d), fn)
@@ -744,19 +726,21 @@ support.Transition <- function(d, drop = NULL, ...) {
 #' @param tp logical.  If `tp = TRUE` then the transition probabilities
 #'        are plotted in addition to the cummulative distribution function
 #'        or the probability mass function (see `cdf`).
-#' @param all Logical. If `TRUE` all distributions in `x` will be drawn.
+#' @param all logical. If `TRUE` all distributions in `x` will be drawn.
 #'        Else only the first n ones (default is 8).
+#' @param plot logical. If `FALSE` not plot is produced.
 #' @param n Integer, maximum number of distributions to be plotted, defaults to `8L`.
 #'
 #' @importFrom utils head tail
 #' @importFrom graphics matplot axis
 #' @exportS3Method plot Transition
 #' @rdname Transition
-plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, ...) {
+plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plot = TRUE, ...) {
     stopifnot(
-        "'cdf' must be TRUE or FALSE" = isTRUE(all) || isFALSE(all),
-        "'tp' must be TRUE or FALSE" = isTRUE(all) || isFALSE(all),
-        "'all' must be TRUE or FALSE" = isTRUE(all) || isFALSE(all)
+        "'cdf' must be TRUE or FALSE" = isTRUE(cdf) || isFALSE(cdf),
+        "'tp' must be TRUE or FALSE" = isTRUE(tp) || isFALSE(tp),
+        "'all' must be TRUE or FALSE" = isTRUE(all) || isFALSE(all),
+        "'plot' must be TRUE or FALSE" = isTRUE(plot) || isFALSE(plot)
     )
     n <- as.integer(n)[1]
     stopifnot("'n' cannot be coerced to integer > 0L" =
@@ -769,33 +753,35 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, ...
     # Take first 1:n distributions only
     if (length(x) > n & !all) x <- x[seq_len(n)]
 
-    binmid <- (head(breaks, -1) + tail(breaks, -1)) / 2 # Mid of bin
-    m_tp <- if (tp) as.matrix(x) else NULL
+    rval <- list(x = (head(breaks, -1) + tail(breaks, -1)) / 2) # Mid of bin
+    rval$tp <- if (tp) structure(as.matrix(x), class = NULL, breaks = NULL) else NULL
     if (cdf) {
-        m <- cdf(x, binmid, elementwise = FALSE, drop = FALSE)
+        rval$y <- cdf(x, rval$x, elementwise = FALSE, drop = FALSE)
     } else {
-        m <- pdf(x, binmid, elementwise = FALSE, drop = FALSE)
+        rval$y <- pdf(x, rval$x, elementwise = FALSE, drop = FALSE)
     }
 
     # Plotting pdf or cdf
-    type <- if (is_discrete(x[1])) "p" else "l"
-    matplot(x = binmid, y = t(m), type = type,
-            lwd = 2, lty = 1,
-            pch = 19, cex = 0.75,
-            xlab = "x",
-            ylab = "P(X = x)",
-            xlim = range(breaks),
-            ylim = if (tp) c(0, pmax(1, max(m))) else NULL,
-            main = title, ...)
+    if (plot) {
+        type <- if (is_discrete(x[1])) "p" else "l"
+        matplot(x = rval$x, y = t(rval$y), type = type,
+                lwd = 2, lty = 1,
+                pch = 19, cex = 0.75,
+                xlab = "x",
+                ylab = "P(X = x)",
+                xlim = range(breaks),
+                ylim = if (tp) c(0, pmax(1, max(rval$y))) else NULL,
+                main = title, ...)
 
-    # Adding transition probability if requested
-    if (!is.null(m_tp))
-        matplot(x = binmid, y = t(m_tp), type = "l",
-                lwd = 1, lty = 2, add = TRUE)
+        # Adding transition probability if requested
+        if (!is.null(rval$tp))
+            matplot(x = rval$x, y = t(rval$tp), type = "l",
+                    lwd = 1, lty = 2, add = TRUE)
 
-    for (s in c(1, 3))
-        axis(side = s, at = breaks, labels = FALSE, col = 1, tck = 0.025)
-    invisible(NULL)
+        for (s in c(1, 3))
+            axis(side = s, at = breaks, labels = FALSE, col = 1, tck = 0.025)
+    }
+    invisible(rval)
 }
 
 
