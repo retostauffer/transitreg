@@ -700,7 +700,7 @@ is_discrete.Transition <- function(d, ...)
 #' @rdname Transition
 #' @exportS3Method is_continuous Transition
 is_continuous.Transition <- function(d, ...)
-    rep(is.double(attr(d, "breaks")), length(d))
+    rep(FALSE, length(d))
 
 #' @importFrom distributions3 support
 #' @importFrom stats setNames

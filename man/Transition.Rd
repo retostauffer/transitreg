@@ -63,7 +63,7 @@ rtransit(n, d, ncores = NULL)
 
 \method{support}{Transition}(d, drop = NULL, ...)
 
-\method{plot}{Transition}(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, ...)
+\method{plot}{Transition}(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plot = TRUE, ...)
 }
 \arguments{
 \item{x}{Numeric, vector of quantiles.}
@@ -123,8 +123,10 @@ discrete variable, is plotted.}
 are plotted in addition to the cummulative distribution function
 or the probability mass function (see \code{cdf}).}
 
-\item{all}{Logical. If \code{TRUE} all distributions in \code{x} will be drawn.
+\item{all}{logical. If \code{TRUE} all distributions in \code{x} will be drawn.
 Else only the first n ones (default is 8).}
+
+\item{plot}{logical. If \code{FALSE} not plot is produced.}
 }
 \value{
 Returns an object of class \code{c("Transition", "distribution")}.
