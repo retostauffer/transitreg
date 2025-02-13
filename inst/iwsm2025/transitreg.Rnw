@@ -26,37 +26,139 @@ library("gamlss2")
 \email{Reto.Stauffer@uibk.ac.at}
 
 \abstract{
-Transition models are widely recognized for their flexibility in count data regression and are
-commonly applied in ordinal regression, where they are also known as continuation ratio models.
-The core concept involves modeling transition probabilities, specifically the conditional
-probability of observing counts greater than a threshold. These probabilities can be estimated
-using standard binary regression methods with an augmented dataset, allowing the use of any
-software designed for binary response models. In this paper, we extend the application of
-transition models to continuous data by employing a slicing technique that transforms continuous
-observations into count-like data. This approach enables the estimation of full probabilistic
-models, including distributional, quantile and modal regression, using simple binary regression
-methods.
-The proposed method is highly adaptable, seamlessly handling complex data structures,
-including excess zeros and non-standard distributions. We demonstrate the robustness and
-utility of this approach with an application to precipitation climatology estimation in ???, highlighting its potential for broader applications in probabilistic modeling.
+Transition models are widely recognized for their flexibility in count data
+regression and are commonly applied in ordinal regression, where they are also
+known as continuation ratio models. The core concept involves modeling
+transition probabilities, specifically the conditional probability of observing
+counts greater than a threshold. These probabilities can be estimated using
+standard binary regression methods with an augmented dataset, allowing the use
+of any software designed for binary response models.
+In this paper, we extend the application of transition models
+to continuous data by employing a slicing technique that transforms continuous
+observations into count-like data. This approach enables the estimation of full
+probabilistic models, including distributional, quantile and modal regression,
+using simple binary regression methods.
+The proposed method is highly adaptable, seamlessly handling complex data
+structures, including excess zeros and non-standard distributions. We
+demonstrate the robustness and utility of this approach with an application to
+precipitation climatology estimation in and around Limerick, Ireland,
+highlighting its potential for broader applications in probabilistic modeling.
 }
 
 \keywords{Transition Models; Distributional Regression; Quantile Regression; Modal Regression.}
 
 \maketitle
 
-\section{Introduction}\label{sec:intro}
+\section{Introduction}\label{stauffer:sec:intro}
+
+For count data, a range of regression-based models exist such as e.g., Poisson
+models and Negative Binomial models, or zero-inflated or hurdle models to deal
+with an abundance of zero observations. However, these models assume a fixed
+parametric distribution, where the distribution parameters are typically linked
+to a set of (linear) predictors inclding explanatory variables. This assumtion can be
+rather strong for certain applications or data. Rather then estimating the parameters
+of a certain distribution, transition models model the transition probability
+between intervals, i.e., the probability that value exceeds a certain threshold,
+where the transition probabilities are modelled conditional on explanatory variables.
+This allows for high flexibility as no assumption about the distribution of the data
+is required as demonstrated by Berger and Tutz~(2021) in the context of count data
+modeling.
+
+We are extending transition models to allow modeling any univariate continuous response
+by using a discretization inspired by histogram binning, converting
+$y \in \mathcal{R}~\rightarrow~\tilde{y} \in \mathcal{N}_0$. This allows to directly
+apply transition models, making use of its flexibility as well as its ability
+to account for specific characteristics of the data such as e.g., excessive
+zeros or such alike.
+
+\section{Methodology}\label{stauffer:sec:method}
+
+Following Berger and Tutz~(2021), the transition probability $P$ for count data
+is defined as follows:
+$$
+P(y_i > r | y_i \ge r, \mathbf{x}_i) = F(\eta_{ir}(\alpha)),~~r = 0, 1, \dots
+$$
+where $\mathcal{F}(\dot)$ is a cummulative distribution function (e.g., logistic
+or probit) and the $r$ representing the counts. The additive predictor
+$$
+\eta_{ir}(\alpha) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \beta).
+$$
+The parameters $\alpha = (\theta^\top, \beta^\top)$ include count-specific
+intercepts and (possibly) smooth functions $f_j(\dot)$, which can be estimated
+with standard software for binomial response models (e.g., \verb|mgcv|, \verb|nnet|,
+\verb|glmnet|, \dots).
+
+
+To allow modeling any univariate continuous response $y_i \in \mathcal{R}$ we
+utilize a discretization inspired by histogram binning. The response $y$ is
+divided into $m - 1$ intervals using a set of monitonically increasing
+boundaries $\zeta_j$ with $j = [1, \dots, m]$, where each interval $[\zeta_l,
+\zeta_l+1)$ corresponds to a discrete pseudo-count $r$. All observations $y_i$
+are assigned to their discrete representation $\tilde{y}_i$ based on the
+interval they falls into. The corresponding density function (PDF) can be approximated
+as
+$$
+\hat{f}(y_i) = \frac{\mathcal{P}(\tilde{y}_i = l)}{\zeta_{l+1}-\zeta_l},~~y_i \in [\zeta_{l+1} + \zeta_l).
+$$
+It can be proven that the approximated PDF converges to the true PDF if
+the number of pseudo-bins goes towards infinity ($m \rightarrow \infty$).
+
+
+\section{Demo application}\label{stauffer:sec:application}
+
+For demonstration, climatological estimates for daily precipitation sums
+in and around Limerick are estimated. Precipitation observations show
+excessive zeros (days without precipitation) and a strong positive skewness.
+To account for the nature of this data, previous studies have employed a
+zero-left censored Gaussian distribution on the square-root transformed
+observations (e.g., Stauffer et.~al~2017). Although this works quite well,
+a parametric distribution needs to be assumed. For a comparison, the
+precipitation climatology for a weather station in Ardnacrusha
+(5\,km north of Limerick) is estimated using a generalized additive
+model for location, scale, and shape (GAMLSS, estimated with \verb|bamlss|)
+using the left-censored Gaussian distribution, as well as a transition
+model with $m = XXX$ breaks.
+
+
+
+
+
+
+\begin{figure}
+    \includegraphics[width=\textwidth]{stauffer-figure1.pdf}
+    \caption{ENTER CAPTIPN}
+    \label{stauffer:fig1}
+\end{figure}
+
+
+\begin{figure}
+    \includegraphics[width=\textwidth]{stauffer-figure2.pdf}
+    \caption{ENTER CAPTIPN}
+    \label{stauffer:fig2}
+\end{figure}
+
+\section{Software}\label{stauffer:sec:software}
+
+
+
 
 \references
 
 \begin{description}
-\item[Rigby, R.A. and Stasinopoulos, D.M.] (2005)
-     Generalized Additive Models for Location, Scale and Shape.
-     {\it Appl.~Stat.}, {\bf 54}(3),
-     507\,--\,554.
-\item[Stasinopoulos, D.M. and Rigby, R.A.] (2007)
-     Generalized Additive Models for Location Scale and
-     Shape (GAMLSS) in \textsf{R}. {\it J.~Stat.~Soft.}, {\bf 23}(7), 1--46.
+\item[Berger, M. and Tutz, G.] (2021)
+    Transition Models for Count Data: a Flexible Alternative to Fixed Distribution Models.
+    {\it Stat Methods Appl}, {\bf 30}, 1259--1283.
+\item[Stauffer, R., Mayr, GJ., Messner, JW., Umlauf, N., and Zeileis A.] (2017)
+     Spatio-Temporal Precipitation Climatology Over Complex Terrain Using a
+     Censored Additive Regression Model.
+     {\it Int. J. Climatol.}, {\bf 37}(7), 3264--3275.
+%\item[Rigby, R.A. and Stasinopoulos, D.M.] (2005)
+%     Generalized Additive Models for Location, Scale and Shape.
+%     {\it Appl.~Stat.}, {\bf 54}(3),
+%     507\,--\,554.
+%\item[Stasinopoulos, D.M. and Rigby, R.A.] (2007)
+%     Generalized Additive Models for Location Scale and
+%     Shape (GAMLSS) in \textsf{R}. {\it J.~Stat.~Soft.}, {\bf 23}(7), 1--46.
 %\item[Stasinopoulos, M. and Rigby, R.] (2024)
 %     \textbf{gamlss}: Generalized Additive Models for Location Scale and Shape.
 %     \textsf{R} package version 5.4-22, URL: \texttt{https://CRAN.R-project.org/package=gamlss}.
