@@ -75,7 +75,7 @@ void eval_bins_quantile(double* res, double* tmp, int* positions, int count,
 double interpolate_linear(double x1, double y1, double x2, double y2, double p);
 
 doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
-        double* bkptr, int nbins, int* y, int ny, bool disc);
+        double* bkptr, double* binwidth, int nbins, int* y, int ny, bool disc);
 
 doubleVec treg_calc_cdf(int* positions, int count, double* tpptr,
         double* bkptr, int nbins, int* y, int ny);

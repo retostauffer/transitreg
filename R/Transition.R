@@ -763,7 +763,7 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plo
 
     # Plotting pdf or cdf
     if (plot) {
-        type <- if (is_discrete(x[1])) "p" else "l"
+        type <- if (is_discrete(x[1])) "p" else "o"
         matplot(x = rval$x, y = t(rval$y), type = type,
                 lwd = 2, lty = 1,
                 pch = 19, cex = 0.75,

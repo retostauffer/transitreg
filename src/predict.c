@@ -72,45 +72,46 @@ double treg_calc_mean(int* positions, int count, double* tpptr, double* bkptr) {
     return res;
 }
 
-/* Calculate 'mid of bins' based on the breaks provided. */
-doubleVec get_binmid(SEXP breaks) {
-    int nb = LENGTH(breaks) - 1L;
-    double* bkptr = REAL(breaks);
-
-    // Initialize/allocate return object
-    doubleVec res;
-    res.values = (double*)malloc(nb * sizeof(double));  // Allocate vector result
-    res.length = nb;
-
-    // Calculating mid of bins
-    for (int i = 0; i < nb; i++) { res.values[i] = (bkptr[i] + bkptr[i + 1]) / 2.0; }
-
-    return res;
-}
+///////* Calculate 'mid of bins' based on the breaks provided. */
+//////doubleVec get_binmid(SEXP breaks) {
+//////    int nb = LENGTH(breaks) - 1L;
+//////    double* bkptr = REAL(breaks);
+//////
+//////    // Initialize/allocate return object
+//////    doubleVec res;
+//////    res.values = (double*)malloc(nb * sizeof(double));  // Allocate vector result
+//////    res.length = nb;
+//////
+//////    // Calculating mid of bins
+//////    for (int i = 0; i < nb; i++) { res.values[i] = (bkptr[i] + bkptr[i + 1]) / 2.0; }
+//////
+//////    return res;
+//////}
 
 /* Helper function for type = "pdf" */
 doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
-                        double* bkptr, int nbins, int* y, int ny, bool disc) {
+                        double* bkptr, double* binwidth, int nbins, int* y, int ny, bool disc) {
 
     // Temporary double vector to calculate PDF along i = 0, ..., count - 1
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
+    double tp_tmp;
 
     // Calculate PDF for each bin given by the distribution for i = 0, ..., count - 1.
     // Store in double 'tmp', the required values will be extracted after this loop.
     int i = 0;
     double prod = 1.0; // Initialize product
     for (i = 0; i < count; i++) {
-        if (ISNAN(tpptr[positions[i]])) {
+        // Storing tpptr[positions[i]] once (used multiple times) for efficiency
+        tp_tmp = tpptr[positions[i]];
+        if (ISNAN(tp_tmp)) {
             Rf_error("TODO(R): First element ISNAN, must be adressed in C");
             //return R_NaReal; 
         }
         // Updating temporary PDF vector
-        tmp[i] = prod * (1.0 - tpptr[positions[i]]);
+        tmp[i] = prod * (1.0 - tp_tmp) / binwidth[i];
         // Updating product of transition probabilities
-        prod *= tpptr[positions[i]];
+        prod *= tp_tmp;
     }
-    // Divide PDF by width of the bin
-    for (i = 0; i < count; i++) { tmp[i] = tmp[i] / (bkptr[i + 1] - bkptr[i]); }
 
     // Initialize return value/object.
     doubleVec res;
@@ -438,8 +439,9 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
     // ... if none of them is true, it must be "do mode"
     // bool do_mode = strcmp(thetype, "modex") == 0;
 
-    // Calculate mid of bins
-    //TODO(R): Added for testing, needed? // doubleVec binmid = get_binmid(breaks);
+    // Calculating bin width only once (used to calculate pdf)
+    double* binwidth = malloc(nbins * sizeof(double)); // Single double pointer
+    for (i = 0; i < nbins; i++) { binwidth[i] = bkptr[i + 1] - bkptr[i]; }
 
     // Allocating return vector.
     //
@@ -476,6 +478,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
     integerVec which;
     doubleVec tmp;
 
+
     #if _OPENMP
     #pragma omp parallel for num_threads(nthreads) private(which, tmp, j)
     #endif
@@ -487,11 +490,13 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
             if (do_pdf) {
                 // Single PDF
                 if (ewise) {
-                    tmp = treg_calc_pdf(which.index, which.length, tpptr, bkptr, nbins,
+                    tmp = treg_calc_pdf(which.index, which.length, tpptr, bkptr,
+                                        binwidth, nbins,
                                         &yptr[i], 1, discptr[i] == 1);
                 // Multiple PDFs
                 } else {
-                    tmp = treg_calc_pdf(which.index, which.length, tpptr, bkptr, nbins,
+                    tmp = treg_calc_pdf(which.index, which.length, tpptr, bkptr,
+                                        binwidth, nbins,
                                         yptr, LENGTH(y), discptr[i] == 1);
                 }
             // --- Calculating cumulative distribution
@@ -537,6 +542,9 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
         }
         free(which.index); // Free allocated memory
     }
+
+    /* free allocated memory */
+    free(binwidth);
 
     UNPROTECT(1); // Releasing protected objects
     return res;
@@ -584,6 +592,10 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
     int    nthreads   = asInteger(ncores);
     #endif
 
+    // Calculating bin width only once (used to calculate pdf)
+    double* binwidth = malloc(nbins * sizeof(double)); // Single double pointer
+    for (i = 0; i < nbins; i++) { binwidth[i] = bkptr[i + 1] - bkptr[i]; }
+
     // Custom struct object to mimik "which()"
     integerVec which;
     doubleVec tmppdf;
@@ -622,7 +634,8 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
         //
         // Input arguments are (in this order)
         //     positions, count, tpptr, bkptr, y, ny
-        tmppdf = treg_calc_pdf(which.index, which.length, tpptr, bkptr, nbins, &yptr[i], 1, discptr[i] == 1);
+        tmppdf = treg_calc_pdf(which.index, which.length, tpptr,
+                bkptr, binwidth, nbins, &yptr[i], 1, discptr[i] == 1);
         tmpcdf = treg_calc_cdf(which.index, which.length, tpptr, bkptr, nbins, &yptr[i], 1);
 
         // Store last value, that is the last bin provided for this distribution.
@@ -634,6 +647,9 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
         free(tmppdf.values);
         free(tmpcdf.values);
     }
+
+    /* free allocated memory */
+    free(binwidth);
 
     /* ----------------------------------- */
     /* Generating list */

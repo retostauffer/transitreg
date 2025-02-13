@@ -3,13 +3,10 @@ library("transitreg")
 library("bamlss")
 library("qgam")
 
-#if(!file.exists("ts_hist.png")) {
+PNG <- "stauffer-figure1.png"
+if (!file.exists(PNG)) {
   df <- readRDS("observations_stn4811.rds")
-  #df <- readRDS("observations_stn3485.rds")
-  #df <- readRDS("observations_stn4011.rds")
 
-
-  set.seed(123)
   set.seed(6020)
   idx    <- sample(1:2, size = nrow(df), prob = c(0.8, 0.4), replace = TRUE)
   dtrain <- subset(df, idx == 1L)
@@ -75,8 +72,8 @@ library("qgam")
   print(sort(c(bamlss_b2 = err_b, transitreg_m2 = err_m, mqgam_g2 = err_g)))
 
   ## Create figure
-  png("ts_hist.png", units = "in", res = 200, width = 8, height = 4)
-  par(mfrow = c(1, 2), mar = c(4, 4, 1, 1))
+  png(PNG, units = "in", res = 200, width = 8, height = 4)
+    par(mfrow = c(1, 2), mar = c(4, 4, 1, 1))
 
     # First subplot
     hist(df$sqrt_rain, breaks = breaks, freq = FALSE,
@@ -108,7 +105,7 @@ library("qgam")
       lwd = 2, col = col, bty = "n")
 
   dev.off()
-#}
+}
 
 #if(!file.exists("premodel.png") & FALSE) {
 #  d <- readRDS("../ehydTirol_Tageschniederschlagssummen.rds")
@@ -258,7 +255,7 @@ library("qgam")
 #
 #  rc <- rain_colors(100)
 #
-#  png("predictions.png", units = "in", res = 200, width = 13, height = 10)
+#  png("stauffer-figure1.png", units = "in", res = 200, width = 13, height = 10)
 #
 #  xr <- range(pred_long$x)
 #  xb <- round(seq(xr[1] + 0.1*abs(diff(xr)), xr[2] - 0.1*abs(diff(xr)), length = 5), 2)

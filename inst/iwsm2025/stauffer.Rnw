@@ -125,7 +125,7 @@ model with $m = XXX$ breaks.
 
 
 \begin{figure}
-    \includegraphics[width=\textwidth]{stauffer-figure1.pdf}
+    \includegraphics[width=\textwidth]{stauffer-figure1.png}
     \caption{ENTER CAPTIPN}
     \label{stauffer:fig1}
 \end{figure}
