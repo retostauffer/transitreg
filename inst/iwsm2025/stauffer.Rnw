@@ -96,12 +96,12 @@ To model any univariate continuous response $y_i \in \mathcal{R}$, we
 employ a discretization technique inspired by histogram binning. The response $y$ is
 divided into $m - 1$ intervals using a set of monotonically increasing
 boundaries $\zeta_j$ with $j = [1, \dots, m]$, where each interval $[\zeta_l,
-\zeta_l+1)$ corresponds to a discrete pseudo-count $r$. Each observation $y_i$
+\zeta_{l+1})$ corresponds to a discrete pseudo-count $r$. Each observation $y_i$
 is assigned to its discrete representation $\tilde{y}_i$ based on the
 interval it falls into. The corresponding probability density function (PDF)
 can then be approximated as
 $$
-\hat{f}(y_i) = \frac{P(\tilde{y}_i = l)}{\zeta_{l+1}-\zeta_l},~~y_i \in [\zeta_{l+1} + \zeta_l).
+\hat{f}(y_i) = \frac{P(\tilde{y}_i = l)}{\zeta_{l+1}-\zeta_l},~~y_i \in [\zeta_l + \zeta_{l + 1}).
 $$
 It can be shown that the approximated PDF converges to the true PDF as
 the number of pseudo-bins approaches infinity ($m \rightarrow \infty$).
