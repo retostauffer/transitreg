@@ -15,8 +15,11 @@ library("gamlss2")
 
 \begin{document}
 
-\title{Distribution-Free Probabilistic Modeling with Transition Models}
-\titlerunning{Distribution-Free Probabilistic Modeling with Transition Models}
+\title{Transition Regression for Continuous Data}
+\titlerunning{Transition Regression for Continuous Data}
+%\title{Transition Regression for Distribution-Free Probabilistic Modeling
+%\title{Distribution-Free Probabilistic Modeling with Transition Models}
+%\titlerunning{Distribution-Free Probabilistic Modeling with Transition Models}
 
 \author{Reto Stauffer\inst{1}, Nikolaus Umlauf\inst{1}}
 \authorrunning{Stauffer and Umlauf}
@@ -32,20 +35,19 @@ known as continuation ratio models. The core concept involves modeling
 transition probabilities, specifically the conditional probability of observing
 counts greater than a threshold. These probabilities can be estimated using
 standard binary regression methods with an augmented dataset, allowing the use
-of any software designed for binary response models.
-In this paper, we extend the application of transition models
-to continuous data by employing a slicing technique that transforms continuous
-observations into count-like data. This approach enables the estimation of full
-probabilistic models, including distributional, quantile and modal regression,
-using simple binary regression methods.
+of any software designed for binary response models. In this paper, we extend
+the application of transition models to continuous data by employing a slicing
+technique that transforms continuous observations into count-like data. This
+approach enables the estimation of full probabilistic models, including
+distributional and quantile regression, using simple binary regression methods.
 The proposed method is highly adaptable, seamlessly handling complex data
 structures, including excess zeros and non-standard distributions. We
 demonstrate the robustness and utility of this approach with an application to
-precipitation climatology estimation in and around Limerick, Ireland,
-highlighting its potential for broader applications in probabilistic modeling.
+precipitation climatologies for Ireland, highlighting its potential for broader
+applications in probabilistic modeling.
 }
 
-\keywords{Transition Models; Distributional Regression; Quantile Regression; Modal Regression.}
+\keywords{Transition Models; Distributional Regression; Quantile Regression}
 
 \maketitle
 
@@ -55,11 +57,11 @@ For count data, a range of regression-based models exist such as e.g., Poisson
 models and Negative Binomial models, or zero-inflated or hurdle models to deal
 with an abundance of zero observations. However, these models assume a fixed
 parametric distribution, where the distribution parameters are typically linked
-to a set of (linear) predictors inclding explanatory variables. This assumtion can be
-rather strong for certain applications or data. Rather then estimating the parameters
+to a set of (linear) predictors including explanatory variables. This assumption can be
+pretty strong for certain applications or data. Rather then estimating the parameters
 of a certain distribution, transition models model the transition probability
-between intervals, i.e., the probability that value exceeds a certain threshold,
-where the transition probabilities are modelled conditional on explanatory variables.
+between intervals, i.e., the probability that a value exceeds a certain threshold,
+where these probabilities are modelled conditional on explanatory variables.
 This allows for high flexibility as no assumption about the distribution of the data
 is required as demonstrated by Berger and Tutz~(2021) in the context of count data
 modeling.
@@ -72,14 +74,15 @@ to account for specific characteristics of the data such as e.g., excessive
 zeros or such alike.
 
 \section{Methodology}\label{stauffer:sec:method}
+%Following Berger and Tutz~(2021), the transition probability $P$ for count data
+%is defined as follows:
 
-Following Berger and Tutz~(2021), the transition probability $P$ for count data
-is defined as follows:
+The transition probability $P$ for count data is defined as:
 $$
 P(y_i > r | y_i \ge r, \mathbf{x}_i) = F(\eta_{ir}(\alpha)),~~r = 0, 1, \dots
 $$
-where $\mathcal{F}(\dot)$ is a cummulative distribution function (e.g., logistic
-or probit) and the $r$ representing the counts. The additive predictor
+where $F(\dot)$ is a cumulative distribution function (e.g., logistic
+or probit) and $r$ representing the (pseudo-)counts, with an additive predictor
 $$
 \eta_{ir}(\alpha) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \beta).
 $$
@@ -91,45 +94,82 @@ with standard software for binomial response models (e.g., \verb|mgcv|, \verb|nn
 
 To allow modeling any univariate continuous response $y_i \in \mathcal{R}$ we
 utilize a discretization inspired by histogram binning. The response $y$ is
-divided into $m - 1$ intervals using a set of monitonically increasing
+divided into $m - 1$ intervals using a set of monotonically increasing
 boundaries $\zeta_j$ with $j = [1, \dots, m]$, where each interval $[\zeta_l,
 \zeta_l+1)$ corresponds to a discrete pseudo-count $r$. All observations $y_i$
 are assigned to their discrete representation $\tilde{y}_i$ based on the
-interval they falls into. The corresponding density function (PDF) can be approximated
+interval they fall into. The corresponding density function (PDF) can be approximated
 as
 $$
-\hat{f}(y_i) = \frac{\mathcal{P}(\tilde{y}_i = l)}{\zeta_{l+1}-\zeta_l},~~y_i \in [\zeta_{l+1} + \zeta_l).
+\hat{f}(y_i) = \frac{P(\tilde{y}_i = l)}{\zeta_{l+1}-\zeta_l},~~y_i \in [\zeta_{l+1} + \zeta_l).
 $$
 It can be proven that the approximated PDF converges to the true PDF if
 the number of pseudo-bins goes towards infinity ($m \rightarrow \infty$).
 
 
-\section{Demo application}\label{stauffer:sec:application}
+\section{Precipitation climatologies for Ireland}\label{stauffer:sec:application}
 
-For demonstration, climatological estimates for daily precipitation sums
-in and around Limerick are estimated. Precipitation observations show
-excessive zeros (days without precipitation) and a strong positive skewness.
-To account for the nature of this data, previous studies have employed a
-zero-left censored Gaussian distribution on the square-root transformed
-observations (e.g., Stauffer et.~al~2017). Although this works quite well,
-a parametric distribution needs to be assumed. For a comparison, the
-precipitation climatology for a weather station in Ardnacrusha
-(5\,km north of Limerick) is estimated using a generalized additive
-model for location, scale, and shape (GAMLSS, estimated with \verb|bamlss|)
-using the left-censored Gaussian distribution, as well as a transition
-model with $m = XXX$ breaks.
+For demonstration, climatological estimates for daily precipitation sums are
+shown, employing data from Met\,{\'E}ireann, the Irish Meteorological Service.
+These observations show excessive zeros (days without precipitation) and
+a strong positive skewness. To account for the nature of such data, previous
+studies have employed a zero-left censored Gaussian distribution on
+square-root transformed observations (e.g., Stauffer et.~al~2017).
+Although this works quite well, it requires the pre-assumption of a parametric
+distribution no longer needed when using transition regression.
 
-
-
-
-
+For comparison, the square-root transformed precipitation climatology for one
+weather station in Ardnacrusha (6\,km north of Limerick) is estimated using a
+generalized additive model for location, scale, and shape (CN; estimated with
+\verb|bamlss|) using the left-censored Gaussian distribution, quantile
+regression (QR; \verb|qgam|) as well a transition model (TM)
+model with sixty breaks ($m = 60$)
+All three models use a cyclic smooth spline on the day of the year as only
+covariate. The out-of-sample fit as well as the pinball loss
+(Fig.\,\ref{stauffer:fig1}) show that the TM works en\,par with the other two
+methods.
 
 \begin{figure}
     \includegraphics[width=\textwidth]{stauffer-figure1.pdf}
-    \caption{ADD CAPTION}
+    \caption{Precipitation data for Ardnacrusha, Ireland.
+    Left: Histogram of the square-root transformed precipitation measurements
+    (out-of-sample) overlayed with fitted densities from a censored normal
+    distribution (CN) and a transition model (TM). Center: Seasonal variation
+    in square-root transformed precipitation for each day of the year.
+    Quantile estimates (out-of-sample) are provided for CN, TM, and a
+    quantile regression model (QR) for the 1\textit{st}, 10\textit{th},
+    50\textit{th}, 90\textit{th} and 99\textit{th} percentile along with their
+    respective pinball losses (PBL). Left: Estimated transition probabilities (TP,
+    black) and calculated distribution function (CDF, red) valid for January 1\textit{st}.}
     \label{stauffer:fig1}
 \end{figure}
 
+
+To demonstrate the applicability of transition models for continuous data on
+large data sets, a spatio-temporal climatology is estimated using all available
+data from $1970-2024$ from $557$ different weather stations across Ireland,
+resulting in a total number of $\sim 3.9\cdot10^6$ individual observations.
+
+The transition model with $m = 90$ breaks includes an offset for the
+first bin (zeros; $\theta_0$),
+a spatial effect, a cyclic seasonal effect, an altitude effect, as well
+interactions thereof with $\theta$. With an additional long-term trend this
+results in the following model specification:
+$$
+\begin{array}{ll}
+\bar{y} \sim & \theta_0 + f(\theta) + f(\text{longitude},\text{latitude}) + f(\theta,\text{longitude},\text{latitude}) + \\
+    & f(\text{day}_c) + f(\theta,\text{day}_c) + f(\text{altitude}) + f(\theta,\text{altitude}) + f(\text{year})
+\end{array}
+$$
+Given the transition model depicts the full (approximated) probabilistic
+distribution, a broad range of quantities can be derived from the estimated
+model. Figure\,\ref{stauffer:fig2} depicts the estimates for July 16 with the
+expected amount of square-root transformed daily precipitation sums (left), the
+99\textit{th} percentile (center), as well as the probability of observing more
+than $1\,\sqrt{mm}$ of precipitation that day. The estimate shows higher
+expected values and probabilities on the western seaboard and highest `extremes'
+(largest 99\textit{th} percentile) in the west, south-west as well as south-east,
+associated with the hilliest areas in Ireland (cf. Walsh~2012).
 
 \begin{figure}
     \includegraphics[width=\textwidth]{stauffer-figure2.pdf}
@@ -142,7 +182,9 @@ model with $m = XXX$ breaks.
 
 \section{Software}\label{stauffer:sec:software}
 
-
+The proposed method is implemented in the \emph{R}~package \verb|transitreg|
+available on \texttt{https://www.github.com/retostauffer/transitreg} which is
+currently in an alpha state. A CRAN release is planned for summer 2025.
 
 
 \references
@@ -150,42 +192,21 @@ model with $m = XXX$ breaks.
 \begin{description}
 \item[Berger, M. and Tutz, G.] (2021)
     Transition Models for Count Data: a Flexible Alternative to Fixed Distribution Models.
-    {\it Stat Methods Appl}, {\bf 30}, 1259--1283.
-\item[Umlauf, N., Klein, N., Simon, T., and Zeileis, A.] (2021)
-     \textbf{bamlss}: A Lego Toolbox for Flexible Bayesian Regression (and Beyond).
-     {\it J.~Stat.~Soft.}, {\bf 100}(4), 1\,--\,53.
+    {\it Stat Methods Appl}, {\bf 30}, 1259--1283,
+        doi:\texttt{10.1007/s10260-021-00558-6}
+%\item[Umlauf, N., Klein, N., Simon, T., and Zeileis, A.] (2021)
+%     \textbf{bamlss}: A Lego Toolbox for Flexible Bayesian Regression (and Beyond).
+%     {\it J.~Stat.~Soft.}, {\bf 100}(4), 1\,--\,53,
+%     doi:\texttt{10.18637/jss.v100.i04}
 \item[Stauffer, R., Mayr, GJ., Messner, JW., Umlauf, N., and Zeileis A.] (2017)
      Spatio-Temporal Precipitation Climatology Over Complex Terrain Using a
      Censored Additive Regression Model.
-     {\it Int. J. Climatol.}, {\bf 37}(7), 3264--3275.
-%\item[Rigby, R.A. and Stasinopoulos, D.M.] (2005)
-%     Generalized Additive Models for Location, Scale and Shape.
-%     {\it Appl.~Stat.}, {\bf 54}(3),
-%     507\,--\,554.
-%\item[Stasinopoulos, D.M. and Rigby, R.A.] (2007)
-%     Generalized Additive Models for Location Scale and
-%     Shape (GAMLSS) in \textsf{R}. {\it J.~Stat.~Soft.}, {\bf 23}(7), 1--46.
-%\item[Stasinopoulos, M. and Rigby, R.] (2024)
-%     \textbf{gamlss}: Generalized Additive Models for Location Scale and Shape.
-%     \textsf{R} package version 5.4-22, URL: \texttt{https://CRAN.R-project.org/package=gamlss}.
-%\item[Stasinopoulos, M. and Rigby, R.] (2025)
-%     \textbf{gamlss.dist}: Distributions for Generalized Additive Models
-%     for Location, Scale and Shape.
-%     \textsf{R} package version 6.1-2, URL: \texttt{https://CRAN.R-project.org/package=gamlss.dist}.
-%\item[Umlauf, N., Klein, N., and Zeileis, A.] (2018)
-%     BAMLSS: Bayesian Additive Models for Location, Scale and Shape (and Beyond).
-%     {\it J.~Comput.~Graph.~Stat.}, {\bf 27}(3), 612\,--\,627.
-%\item[Wood, S.N., Pya, N., and Saefken, B.] (2016)
-%     Smoothing Parameter and Model Selection for General Smooth Models.
-%     {\it J.~American Statistical Association}, {\bf 111}, 1548--1575.
-%\item[Yee, T.W.] (2010)
-%     The \textbf{VGAM} Package for Categorical Data Analysis.
-%     {\it J.~Stat.~Soft.}, {\bf 32}(10), 1--34.
-%\item[Zeileis, A., Lang, M.N., and Stauffer, R.] (2024)
-%     \textbf{topmodels}: Infrastructure for Forecasting and Assessment of Probabilistic Models.
-%     {\it R package version 0.3-0}.
-%     Available at\newline
-%     \texttt{https://topmodels.R-forge.R-project.org/topmodels/}.
+     {\it Int. J. Climatol.}, {\bf 37}(7), 3264--3275,
+     doi:\texttt{10.1002/joc.4913}
+ \item[Walsh, S.] (2012)
+      A Summary of Climate Averages for Ireland, 1981-2010.
+      {\it Met\,{\'E}ireann, Climatol. Note}, {\bf 14}, 1--16, \newline
+      \texttt{https://www.met.ie/climate-ireland/SummaryClimAvgs.pdf}
 \end{description}
 
 \end{document}
