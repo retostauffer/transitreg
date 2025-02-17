@@ -36,6 +36,7 @@ transition probabilities--specifically, the conditional probability of observing
 counts exceeding a given threshold. These probabilities can be estimated using
 standard binary regression methods with an augmented dataset, enabling the use
 of any software designed for binary response models.
+
 In this paper, we extend the application of transition models to continuous
 data by employing a slicing technique that transforms continuous observations
 into count-like data. This approach facilitates the estimation of full
@@ -60,9 +61,9 @@ parametric distribution, where the distribution parameters are typically linked
 to a set of (linear) predictors that include explanatory variables. This
 assumption can be quite restrictive for certain applications or datasets.
 
-Rather then estimating the parameters of a specific distribution, transition
+Rather than estimating the parameters of a specific distribution, transition
 models instead model the probability of transitioning between intervals--that
-is, the probability that a value exceeds a given threshold--while conditioning
+is, the probability exceeding a given threshold--while conditioning
 on explanatory variables. This approach offers high flexibility, as it does not
 require assumptions about the underlying data distribution, as demonstrated by
 Berger and Tutz (2021) in the context of count data modeling.
@@ -83,13 +84,14 @@ The transition probability $P$ for count data is defined as
 $$
 P(y_i > r | y_i \ge r, \mathbf{x}_i) = F(\eta_{ir}(\alpha)),~~r = 0, 1, \dots,
 $$
-where $F(\dot)$ is a cumulative distribution function (e.g., logistic
+where $F(\cdot)$ is a cumulative distribution function (e.g., logistic
 or probit) and $r$ represents the (pseudo-)counts, with an additive predictor
 $$
 \eta_{ir}(\alpha) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \beta).
 $$
+%\eta_{ir}(\alpha) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \beta).
 The parameters $\alpha = (\theta^\top, \beta^\top)$ include count-specific
-intercepts and (possibly) smooth functions $f_j(\dot)$, which can be estimated
+intercepts and (possibly) smooth functions $f_j(\cdot)$, which can be estimated
 using standard software for binomial response models (e.g., \verb|mgcv|, \verb|nnet|,
 \verb|glmnet|, \dots).
 
@@ -102,7 +104,6 @@ boundaries $\zeta_j$ with $j = [1, \dots, m]$, where each interval $[\zeta_l,
 is assigned to its discrete representation $\tilde{y}_i$ based on the
 interval it falls into. The corresponding probability density function (PDF)
 can then be approximated as
-as
 $$
 \hat{f}(y_i) = \frac{P(\tilde{y}_i = l)}{\zeta_{l+1}-\zeta_l},~~y_i \in [\zeta_{l+1} + \zeta_l).
 $$
@@ -117,7 +118,7 @@ presented, using data from Met\,{\'E}ireann, the Irish Meteorological Service.
 These observations exhibit an excess of zeros (days without precipitation) and
 a strong positive skewness. To account for the nature of such data, previous
 studies have used a zero-left censored Gaussian distribution on
-square-root transformed observations (e.g., Stauffer et.~al~2017).
+square-root transformed observations (e.g., Stauffer et~al.,~2017).
 While this approach works well, it necessitates the assumption of a parametric
 distribution, which is not required when using transition regression.
 
@@ -128,10 +129,10 @@ employing a left-censored Gaussian distribution
 (CN; estimated with \verb|bamlss|), quantile
 regression (QR; using \verb|qgam|), and a transition model (TM; with \verb|transitreg|, see Sec.\,\ref{stauffer:sec:software})
 with sixty breaks ($m = 60$).
-All models use cyclic smooth splines on the day of the year as sole
+All models use cyclic smooth splines on the day of the year as only
 covariate. The out-of-sample fit and pinball loss can be seen in
-Figure\,\ref{stauffer:fig1}, showing that the transition model performs
-comparably to the other two methods.
+Figure\,\ref{stauffer:fig1}, showing that the transition model is on par
+with the other two methods.
 
 \begin{figure}[h]
     \includegraphics[width=\textwidth]{stauffer-figure1.pdf}
@@ -152,13 +153,13 @@ comparably to the other two methods.
 
 
 To demonstrate the applicability of transition models for continuous data on
-large data sets, a spatio-temporal climatology is estimated using all available
-data from $1970$ to $2024$, from $557$ different weather stations across Ireland,
+large datasets, a spatio-temporal climatology is estimated using all available
+data from $1977$ to $2024$, from $557$ different weather stations across Ireland,
 resulting in a total number of $3.9$ million individual observations.
 
 The transition model ($m = 90$) includes an offset for the first bin (zeros;
 $\theta_0$), a spatial effect, a cyclic seasonal effect, an altitude effect,
-and interactions between these effects with $\theta$, resulting in the
+and interactions of these effects with $\theta$, resulting in the
 following model specification:
 $$
 \begin{array}{ll}
@@ -166,15 +167,15 @@ $$
     & f(\text{day}) + f(\theta,\text{day}) + f(\text{altitude}) + f(\theta,\text{altitude})
 \end{array}
 $$
-Given that the transition model represents the full (approximated) probabilistic
+Since the transition model represents the full (approximated) probabilistic
 distribution, a wide range of quantities can be derived.
-Figure\,\ref{stauffer:fig2} illustrates the estimates for July 16,
-including the expected amount of square-root transformed daily precipitation (left),
-the 99\textit{th} percentile (center), and the probability of observing more
-than $1\,\sqrt{mm}$ of precipitation that day. The estimates indicate higher
+Figure\,\ref{stauffer:fig2} illustrates estimates for July 16,
+including the expected square-root transformed daily precipitation (left),
+the 99\textit{th} percentile (center), and the probability of exceeding
+$1\,\sqrt{mm}$ of precipitation that day. The estimates show higher
 expected values and probabilities on the western seaboard, with the highest extremes
 (99\textit{th} percentile) occurring in the west, south-west, and south-east,
-areas that are associated with the hilliest regions in Ireland (cf. Walsh~2012).
+areas associated with the hilliest regions in Ireland (cf. Walsh~2012).
 
 \begin{figure}[h]
     \includegraphics[width=\textwidth]{stauffer-figure2.pdf}
@@ -182,7 +183,7 @@ areas that are associated with the hilliest regions in Ireland (cf. Walsh~2012).
     for July~16.
     From left to right: Expectation, 99\textit{th}\,percentile, and
     probability of exceeding $1\,\sqrt{mm}\,\text{day}^{-1}$.
-    Markers ($+$) denote stations used for model training.
+    Markers ($+$) indicate stations used for model training.
     }
     \label{stauffer:fig2}
 \end{figure}
@@ -191,7 +192,7 @@ areas that are associated with the hilliest regions in Ireland (cf. Walsh~2012).
 
 The proposed method is implemented in the \emph{R}~package \verb|transitreg|,
 available at \texttt{https://www.github.com/retostauffer/transitreg}.
-Currently in alpha, a CRAN release is planned for Summer 2025.
+Currently in alpha state, a CRAN release is planned for Summer 2025.
 
 
 
