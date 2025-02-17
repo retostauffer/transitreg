@@ -3,8 +3,8 @@ library("transitreg")
 library("bamlss")
 library("qgam")
 
-PNG <- "stauffer-figure1.png"
-if (!file.exists(PNG)) {
+PDF <- "stauffer-figure1.pdf"
+if (!file.exists(PDF)) {
   df <- readRDS("observations_stn4811.rds")
 
   set.seed(6020)
@@ -73,7 +73,8 @@ if (!file.exists(PNG)) {
 
 
   ## Create figure
-  grDevices::pdf(file = "stauffer-figure1.pdf", width = 8, height = 2.5)
+  ##grDevices::pdf(file = "stauffer-figure1.pdf", width = 8, height = 2.5)
+  grDevices::pdf(file = "stauffer-figure1.pdf", width = 8 * 0.9, height = 2.5 * 0.8)
     par(mfrow = c(1, 3), mar = c(4, 4, 1, 1))
 
     # First subplot
@@ -90,7 +91,8 @@ if (!file.exists(PNG)) {
 
     # Second subplot
     plot(sqrt_rain ~ day, data = dtest, type = "h", col = rgb(0.1, 0.1, 0.1, alpha = 0.4),
-      xlab = "Day of the year", ylab = "y; sqrt(Precipitation)", ylim = c(0, 8))
+      xlab = "Day of the year", ylab = "y; sqrt(Precipitation)", ylim = c(0, 8),
+      xlim = c(1, 365), xaxs = "i", yaxs = "i")
 
     j <- order(dtest$day)
     matplot(dtest$day[j], pb2[j, ], type = "l", lty = 1, col = 2, add = TRUE)
@@ -107,12 +109,13 @@ if (!file.exists(PNG)) {
       lwd = 2, col = col, bty = "n")
 
     ####
-    distr <- prodist(m2)[1]
+    target_day <- as.integer(format(as.Date("2025-07-16"), "%j"))
+    distr <- prodist(m2)[which(dtrain$day == target_day)[1]]
     plot(distr, cdf = TRUE, tp = TRUE, main = NULL, col = 2, ylab = NA,
          xlab = "y; sqrt(Precipitation)")
     legend("bottomleft", legend = c(
-                expression(paste("CDF: P(", y <= r, ")")),
-                expression(paste("TP: P(", y > r, "|", y >= r, ")"))
+                expression(paste("CDF: P(", tilde(y) <= r, ")")),
+                expression(paste("TP: P(", tilde(y) > r, "|", tilde(y) >= r, ")"))
            ),
            bty = "n",
            pch = c(19, NA),
