@@ -17,9 +17,6 @@ library("gamlss2")
 
 \title{Transition Regression for Continuous Data}
 \titlerunning{Transition Regression for Continuous Data}
-%\title{Transition Regression for Distribution-Free Probabilistic Modeling
-%\title{Distribution-Free Probabilistic Modeling with Transition Models}
-%\titlerunning{Distribution-Free Probabilistic Modeling with Transition Models}
 
 \author{Reto Stauffer\inst{1}, Nikolaus Umlauf\inst{1}}
 \authorrunning{Stauffer and Umlauf}
@@ -89,7 +86,6 @@ or probit) and $r$ represents the (pseudo-)counts, with an additive predictor
 $$
 \eta_{ir}(\alpha) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \beta).
 $$
-%\eta_{ir}(\alpha) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \beta).
 The parameters $\alpha = (\theta^\top, \beta^\top)$ include count-specific
 intercepts and (possibly) smooth functions $f_j(\cdot)$, which can be estimated
 using standard software for binomial response models (e.g., \verb|mgcv|, \verb|nnet|,
@@ -194,8 +190,6 @@ The proposed method is implemented in the \emph{R}~package \verb|transitreg|,
 available at \texttt{https://www.github.com/retostauffer/transitreg}.
 Currently in alpha state, a CRAN release is planned for Summer 2025.
 
-
-
 \references
 
 \begin{description}
@@ -203,10 +197,6 @@ Currently in alpha state, a CRAN release is planned for Summer 2025.
     Transition Models for Count Data: a Flexible Alternative to Fixed Distribution Models.
     {\it Stat Methods Appl}, {\bf 30}, 1259--1283,
         doi:\texttt{10.1007/s10260-021-00558-6}
-%\item[Umlauf, N., Klein, N., Simon, T., and Zeileis, A.] (2021)
-%     \textbf{bamlss}: A Lego Toolbox for Flexible Bayesian Regression (and Beyond).
-%     {\it J.~Stat.~Soft.}, {\bf 100}(4), 1\,--\,53,
-%     doi:\texttt{10.18637/jss.v100.i04}
 \item[Stauffer, R., Mayr, GJ., Messner, JW., Umlauf, N., and Zeileis A.] (2017)
      Spatio-Temporal Precipitation Climatology Over Complex Terrain Using a
      Censored Additive Regression Model.
