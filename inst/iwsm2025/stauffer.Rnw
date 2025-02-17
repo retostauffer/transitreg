@@ -125,15 +125,18 @@ model with $m = XXX$ breaks.
 
 
 \begin{figure}
-    \includegraphics[width=\textwidth]{stauffer-figure1.png}
-    \caption{ENTER CAPTIPN}
+    \includegraphics[width=\textwidth]{stauffer-figure1.pdf}
+    \caption{ADD CAPTION}
     \label{stauffer:fig1}
 \end{figure}
 
 
 \begin{figure}
     \includegraphics[width=\textwidth]{stauffer-figure2.pdf}
-    \caption{ENTER CAPTIPN}
+    \caption{Climatological estimates of precipitation in $\sqrt{mm}\,\text{day}^{-1}$
+    valid for July~16. Left to right: Expectation, 99\textit{th}\,percentile, and
+    the probability of exceeding $1\,\sqrt{mm}\,\text{day}^{-1}$.
+    Markers ($+$) denote stations used for training the model.}
     \label{stauffer:fig2}
 \end{figure}
 

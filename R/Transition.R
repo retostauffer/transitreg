@@ -746,8 +746,16 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plo
     stopifnot("'n' cannot be coerced to integer > 0L" =
               is.integer(n) && length(n) == 1L && n > 0L)
 
-    title <- if (cdf) "Distribution" else "Density"
-    if (tp) title <- paste(title, "and Transition Probabilities")
+    userargs <- list(...)
+    if ("main" %in% names(list(...))) {
+        title <- userargs$main; userargs$main <- NULL
+    } else {
+        title <- if (cdf) "Distribution" else "Density"
+        if (tp) title <- paste(title, "and Transition Probabilities")
+    }
+    if ("xlab" %in% names(userargs)) { xlab <- userargs$xlab; userargs$xlab <- NULL }  else xlab <- "x"
+    if ("ylab" %in% names(userargs)) { ylab <- userargs$ylab; userargs$ylab <- NULL }  else ylab <- "P(X = x)"
+    if ("col" %in% names(userargs))  { col  <- userargs$col;  userargs$col  <- NULL }  else col  <- 0
     breaks   <- attr(x, "breaks")
 
     # Take first 1:n distributions only
@@ -764,14 +772,24 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plo
     # Plotting pdf or cdf
     if (plot) {
         type <- if (is_discrete(x[1])) "p" else "o"
-        matplot(x = rval$x, y = t(rval$y), type = type,
-                lwd = 2, lty = 1,
-                pch = 19, cex = 0.75,
-                xlab = "x",
-                ylab = "P(X = x)",
-                xlim = range(breaks),
-                ylim = if (tp) c(0, pmax(1, max(rval$y))) else NULL,
-                main = title, ...)
+        do.call(matplot,
+                c(list(x = rval$x, y = t(rval$y), type = type,
+                       lwd = 2, lty = 1,
+                       pch = 19, cex = 0.75,
+                       xlab = xlab,
+                       ylab = ylab,
+                       col  = col,
+                       xlim = range(breaks),
+                       ylim = if (tp) c(0, pmax(1, max(rval$y))) else NULL,
+                       main = title), userargs))
+        #matplot(x = rval$x, y = t(rval$y), type = type,
+        #        lwd = 2, lty = 1,
+        #        pch = 19, cex = 0.75,
+        #        xlab = "x",
+        #        ylab = "P(X = x)",
+        #        xlim = range(breaks),
+        #        ylim = if (tp) c(0, pmax(1, max(rval$y))) else NULL,
+        #        main = title, userargs)
 
         # Adding transition probability if requested
         if (!is.null(rval$tp))

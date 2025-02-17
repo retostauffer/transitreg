@@ -71,13 +71,15 @@ if (!file.exists(PNG)) {
   err_g <- sum(err_g)
   print(sort(c(bamlss_b2 = err_b, transitreg_m2 = err_m, mqgam_g2 = err_g)))
 
+
   ## Create figure
-  png(PNG, units = "in", res = 200, width = 8, height = 4)
-    par(mfrow = c(1, 2), mar = c(4, 4, 1, 1))
+  grDevices::pdf(file = "stauffer-figure1.pdf", width = 8, height = 2.5)
+    par(mfrow = c(1, 3), mar = c(4, 4, 1, 1))
 
     # First subplot
     hist(df$sqrt_rain, breaks = breaks, freq = FALSE,
-      xlab = "sqrt(Precipitation)", main = NA)
+      xlab = "y; sqrt(Precipitation)", main = NA,
+      xlim = c(0, 8))
 
     lines(pm ~ py, col = 4, lwd = 2)
     lines(db ~ mids, col = 2, lwd = 2)
@@ -88,7 +90,7 @@ if (!file.exists(PNG)) {
 
     # Second subplot
     plot(sqrt_rain ~ day, data = dtest, type = "h", col = rgb(0.1, 0.1, 0.1, alpha = 0.4),
-      xlab = "Day of the year", ylab = "sqrt(Precipitation)", ylim = c(0, 8))
+      xlab = "Day of the year", ylab = "y; sqrt(Precipitation)", ylim = c(0, 8))
 
     j <- order(dtest$day)
     matplot(dtest$day[j], pb2[j, ], type = "l", lty = 1, col = 2, add = TRUE)
@@ -103,6 +105,18 @@ if (!file.exists(PNG)) {
 
     legend("topleft", paste(paste(names(err), "PBL ="), round(err)),
       lwd = 2, col = col, bty = "n")
+
+    ####
+    distr <- prodist(m2)[1]
+    plot(distr, cdf = TRUE, tp = TRUE, main = NULL, col = 2, ylab = NA,
+         xlab = "y; sqrt(Precipitation)")
+    legend("bottomleft", legend = c(
+                expression(paste("CDF: P(", y <= r, ")")),
+                expression(paste("TP: P(", y > r, "|", y >= r, ")"))
+           ),
+           bty = "n",
+           pch = c(19, NA),
+           lwd = c(2, 1), col = c(2, 1), lty = c(1, 2))
 
   dev.off()
 }
