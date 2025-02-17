@@ -159,7 +159,7 @@ and interactions of these effects with $\theta$, resulting in the
 following model specification:
 $$
 \begin{array}{ll}
-\bar{y} \sim& \theta_0 + f(\theta) + f(\text{longitude},\text{latitude}) + f(\theta,\text{longitude},\text{latitude}) + \\
+\tilde{y} \sim& \theta_0 + f(\theta) + f(\text{longitude},\text{latitude}) + f(\theta,\text{longitude},\text{latitude}) + \\
     & f(\text{day}) + f(\theta,\text{day}) + f(\text{altitude}) + f(\theta,\text{altitude})
 \end{array}
 $$
