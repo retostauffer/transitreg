@@ -755,7 +755,7 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plo
     }
     if ("xlab" %in% names(userargs)) { xlab <- userargs$xlab; userargs$xlab <- NULL }  else xlab <- "x"
     if ("ylab" %in% names(userargs)) { ylab <- userargs$ylab; userargs$ylab <- NULL }  else ylab <- "P(X = x)"
-    if ("col" %in% names(userargs))  { col  <- userargs$col;  userargs$col  <- NULL }  else col  <- 0
+    if ("col" %in% names(userargs))  { col  <- userargs$col;  userargs$col  <- NULL }  else col  <- 1
     breaks   <- attr(x, "breaks")
 
     # Take first 1:n distributions only
