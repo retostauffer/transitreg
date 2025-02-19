@@ -68,7 +68,7 @@ climatology estimation in Tyrol, Austria.
 \section{Introduction}\label{sec:intro}
 
 In many applications, the response variable is a count, often influenced by covariates.
-Traditional models, such as Poisson and Negative Binomial regression, rely on fixed distributional
+Traditional models, such as Poisson and negative binomial regression, rely on fixed distributional
 assumptions, which can lead to mis-specifications, particularly in the presence of overdispersion
 or excess zeros. Various alternative distributions and modeling approaches have been proposed to
 address these issues.
@@ -78,7 +78,7 @@ a fixed distribution, they estimate the conditional probabilities of observing c
 given threshold, allowing the data to determine the underlying distribution. These probabilities
 can be estimated via binary regression with augmented datasets, leveraging standard software
 \cite{Berger:2021}. A key advantage of transition models is their ability to support both
-parametric and nonparametric extensions while simplifying estimation and enhancing interpretability.
+parametric and nonparametric extensions, while simplifying estimation and enhancing interpretability.
 This paper extends transition models to continuous data using a slicing technique that transforms
 continuous observations into count-like data. This bridges traditional transition models with
 advanced regression techniques, such as distributional, quantile and modal regression. The proposed
@@ -87,6 +87,9 @@ standard binary regression tools. We illustrate its versatility with an applicat
 precipitation climatology estimation in Tyrol, Austria, highlighting its broader potential.
 
 \section{Transition Models} \label{sec:tm}
+
+Transition models provide a flexible framework for count data. We first introduce the classic
+count model and then extend it to continuous responses.
 
 \subsection{Classic Count Model} \label{sec:counts}
 
@@ -98,23 +101,28 @@ observation $i$ with covariates $\mathbf{x}_i$. The transition probability is de
 \begin{equation} \label{eqn:tm}
 P(y_i > r \mid y_i \geq r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha})), \quad r = 0, 1, \dots
 \end{equation}
-where $F(\cdot)$ is a CDF (e.g., logistic or probit), and the additive predictor is  
+where $r$ denotes the count level, and $F(\cdot)$ is a cumulative distribution function (CDF),
+such as the logistic or probit function. This probability describes a transition as
+it models the likelihood of moving from count level $r$ to $r + 1$. The corresponding additive
+predictor is given by 
 $$
 \eta_{ir}(\boldsymbol{\alpha}) = \theta_r + \sum_{j=1}^k f_j(\mathbf{x}_i, r; \boldsymbol{\beta}).
 $$
 The parameters $\boldsymbol{\alpha} = (\boldsymbol{\theta}^\top, \boldsymbol{\beta}^\top)$
 include count-specific intercepts and smooth functions $f_j(\cdot)$, estimated via regression splines.
-For i.i.d. observations, the count probabilities $\pi_{ir}$ are computed recursively as  
+For i.i.d.\ observations, let $\pi_{ir}$ denote the probability that the count response equals $r$,
+i.e., $P(y_i = r | \mathbf{x}_i)$. These probabilities are computed recursively as
 $$
 \pi_{ir} = (1 - F(\eta_{ir}(\boldsymbol{\alpha}))) \prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha})).
 $$
 Parameter estimation considers the underlying Markov chain $Y_{i0}, Y_{i1}, \dots$,
-where $Y_{ir} = I(y_i = r)$. The log-likelihood simplifies to  
+where $Y_{ir} = \mathbb{1}(y_i = r)$. The log-likelihood simplifies to  
 $$
 \ell(\boldsymbol{\alpha}) = \sum_{i=1}^n \sum_{s=0}^{y_i} \Big[Y_{is} \log(1 - F(\eta_{ir})) + (1 - Y_{is}) \log(F(\eta_{ir}))\Big].
 $$
-This formulation corresponds to a binary model and can be estimated using
-generalized additive models (GAM, \cite{Wood17}).
+This formulation arises from modeling the count response as a sequence of binary transitions,
+where each step represents the probability of exceeding a given count level. It corresponds to a
+binary model and can be estimated using generalized additive models (GAM, \cite{Wood17}).
 Estimation is performed on an expanded dataset where binary responses
 $(Y_{i0}, \dots, Y_{iy_i})^\top = (0, \dots, 0, 1)$ are created, along with a new
 covariate $\boldsymbol{\Theta}_i = (0, 1, 2, \dots, y_i)^\top$ to capture
@@ -130,14 +138,14 @@ To extend transition models to continuous responses $y_i \in \mathbb{R}$, we use
 discretization approach inspired by histogram binning. The response variable is divided
 into $m - 1$ intervals using predefined bin boundaries $\zeta_1, \zeta_2, \dots, \zeta_m$,
 where each interval $(\zeta_l, \zeta_{l+1}]$ corresponds to a discrete count $r$. Each observation
-$y_i$ is assigned a count $\tilde{y}_i$ based on the interval it falls into, allowing the
+$y_i$ is assigned a pseudo count $\tilde{y}_i$ based on the interval it falls into, allowing the
 transition model from Section~\ref{sec:counts} to be applied.
 
 \subsubsection{Approximation of the CDF and Density}
 
 The described discretization approach effectively provides a stepwise approximation of the
-underlying smooth continuous distribution. For a continuous response variable $y_i$ with
-cumulative distribution function (CDF) $F(y)$, the discretization process approximates the
+underlying smooth continuous distribution. For a continuous response variable $y_i$ with CDF $F(y)$,
+the discretization process approximates the
 probabilities of $y_i$ falling into each interval as
 $P(\zeta_l < y_i \leq \zeta_{l+1}) = F(\zeta_{l+1}) - F(\zeta_l)$.
 These probabilities are represented by the transformed counts $\tilde{y}_i$, allowing the
@@ -203,14 +211,11 @@ planned for the near future.
 \centering
 \includegraphics[width=0.9\textwidth]{ts_hist.png}
 \caption{\label{fig:Kirchberg} Precipitation data for Kirchberg in Tirol, Austria.
-  The left panel shows a histogram of the square root-transformed daily precipitation values,
-  overlaid with fitted densities from a censored normal distribution (CN, red line) and
-  a transition model (TM, blue line). The right panel depicts the seasonal variation in
-  square root-transformed precipitation values, including empirical quantiles
-  (1st, 10th, 50th, 90th, and 99th percentiles) for each day of the year.
-  Quantile estimates (out-of-sample) are provided for CN, TM, and a quantile regression model (QR),
-  along with their respective pinball loss (PBL) values, demonstrating the models' performance
-  in capturing the distribution of precipitation.}
+  Left: Histogram of square root-transformed daily precipitation with fitted densities from a
+  censored normal (CN, red) and transition model (TM, blue).
+  Right: Seasonal variation in square root-transformed precipitation with empirical quantiles
+  (1st, 10th, 50th, 90th, 99th percentiles) and out-of-sample quantile estimates for CN, TM, and
+  quantile regression (QR), including their pinball loss (PBL) values.}
 \end{figure}
 \begin{figure}[!h]
 \centering
