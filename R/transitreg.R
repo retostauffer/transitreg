@@ -393,7 +393,7 @@ transitreg <- function(formula, data, subset, na.action,
 
 # Helper function for predictions on a transitreg model object.
 transitreg_predict <- function(object, newdata = NULL,
-        type = c("pdf", "cdf", "quantile", "mode", "tp"), y = NULL, prob = NULL,
+        type = c("pdf", "cdf", "quantile", "mode", "mean", "tp"), y = NULL, prob = NULL,
         elementwise = NULL, maxcounts = 1e+03,
         verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
         factor = FALSE, ncores = NULL) {
@@ -462,8 +462,8 @@ transitreg_predict <- function(object, newdata = NULL,
               prob <- rep(prob, length.out = nrow(mf))
       } else if (type %in% c("cdf", "pdf")) {
           elementwise <- is.null(y) || length(y) == 1L || length(y) == nrow(mf)
-      } else if (type == "mode") {
-          elementwise <- TRUE # for 'mode' elementwise is always TRUE
+      } else if (type == "mode" || type == "mean") {
+          elementwise <- TRUE # for 'mode', 'mean' elementwise is always TRUE
       } else if (type == "tp") {
           NULL
       } else {
@@ -480,7 +480,7 @@ transitreg_predict <- function(object, newdata = NULL,
   ##    up to 'y[i]'.
   ##  - If elementwise = FALSE: We must evaluate each distribution up to
   ##    max(y).
-  if (type %in% c("quantile", "mode", "tp")) {
+  if (type %in% c("quantile", "mode", "tp", "mean")) {
     mf[[object$response]] <- max(get_mids(object))
   } else {
     ## Else highest bin specified on 'y' (if set) or highest
@@ -893,6 +893,7 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 #' * `"pdf"`: The predicted probability density function (PDF).
 #' * `"cdf"`: The cumulative distribution function (CDF).
 #' * `"mode"`: The expected value of the response (maximum probability).
+#' * `"mean"`: Expectation (weighted mean).
 #' * `"quantile"`: The quantile of the response specified by `prob`.
 #'
 #' For `"pdf"` and `"cdf"`, the response values (`y`) must be provided unless the
@@ -951,7 +952,7 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 #' @exportS3Method predict transitreg
 #' @author Niki
 predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
-        type = c("pdf", "cdf", "quantile", "mode", "tp"), ncores = NULL,
+        type = c("pdf", "cdf", "quantile", "mode", "mean", "tp"), ncores = NULL,
         elementwise = NULL, verbose = FALSE, ...) {
 
   type <- tolower(type)

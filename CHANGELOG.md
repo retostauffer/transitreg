@@ -12,6 +12,7 @@
   distributions using a custom `proresiduals` S3 method.
 * Refined plotting (to be in line with the `distributions3` plotting functions).
 * Updated man pages where needed (tbc).
+* `predict()` now supports `type = "mean"` to calculate the expectation (weighted mean).
 
 ## Version 0.1-9010
 
