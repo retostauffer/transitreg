@@ -132,15 +132,16 @@ fit <- cbind(
   "97.5\%"  = predict(b, nd, type = "quantile", p = 1 - 0.05/2),
   "median" = predict(b, nd, type = "quantile", p = 0.5),
   "2.5\%"   = predict(b, nd, type = "quantile", p = 0.05/2),
-  "mode"   = predict(b, nd, type = "mode")
+  "mode"   = predict(b, nd, type = "mode"),
+  "mean"   = predict(b, nd, type = "mean")
 )
 
 ## Plot data and fitted counts.
 plot(y ~ x, pch = 16, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
 matplot(nd$x, fit, type = "l", add = TRUE, lwd = 2,
-       col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
+       col = c(4, 4, 4, 2, 3), lty = c(2, 1, 2, 1, 1))
 legend("topleft", legend = colnames(fit),
-       col = c(4, 4, 4, 2), lty = c(2, 1, 2, 1))
+       col = c(4, 4, 4, 2, 3), lty = c(2, 1, 2, 1, 1))
 
 ## Visualizing three predicted distributions via Transitreg distributions
 idx <- c(25, 50, 75)
