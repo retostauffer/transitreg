@@ -1,0 +1,38 @@
+name: Running automated tests
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Ensure we fetch all history for proper versioning
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+
+      - name: Install R and dependencies
+        uses: r-lib/actions/setup-r@v2
+
+      - name: Install R package dependencies
+        run: |
+          install.packages("tinytest")
+          install.packages("topmodels", repos = c("https://zeileis.r-universe.dev", "https://cloud.r-project.org"))
+          remotes::install_local(upgrade = TRUE, dependencies = TRUE)
+        shell: Rscript {0}
+
+      - name: Running tests
+        run: |
+          library("topmodels"); tinytest::test_all()
+        shell: Rscript {0}
+
+
+

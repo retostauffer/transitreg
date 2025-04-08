@@ -156,7 +156,6 @@ transitreg_tmf <- function(data, response, breaks, theta_vars = NULL,
   data[[response]] <- yc
 
 
-
   # -----------------------------------------------------------------
   # Preparing the rest
   # -----------------------------------------------------------------
@@ -276,8 +275,8 @@ transitreg_tmf <- function(data, response, breaks, theta_vars = NULL,
                               dimnames = list(NULL, colnames(data[[n]])))
       }
   }
-
-  result <- as.data.frame(result)
+  ## setNames: Ensure to use un-modified names
+  result <- setNames(as.data.frame(result), names(result))
 
   ## scaler == TRUE (comes from `scale.x = TRUE` when calling `transitreg()`; initial
   ## standartizaion of all covariates as well as theta. Perform scaling and keep the

@@ -2,8 +2,7 @@
 # Testing implementation distributions3 objects and methods
 # -------------------------------------------------------------------
 
-suppressPackageStartupMessages(library("tinytest"))
-suppressPackageStartupMessages(library("transitreg"))
+if (interactive()) { library("tinytest"); library("transitreg") }
 
 # -------------------------------------------------------------------
 # For testing, faking transition probabilities by drawing from
@@ -15,13 +14,12 @@ N <- 10
 d1 <- Transition(convert_tp(ppois(0:N, 3), "cdf", "tp"), seq.int(0, N+1))
 d2 <- Transition(convert_tp(ppois(0:N, 3), "cdf", "tp"), as.double(seq.int(0, N + 1)))
 
-plot(d1)
-f(); k <- rtransit(500, d1); hist(k)
-f(); k <- plot(d1, cdf = F, plot = TRUE, tp = TRUE); k
+k <- rtransit(500, d1); hist(k)
+k <- plot(d1, cdf = F, plot = TRUE, tp = TRUE); k
 x <- seq(0, 5, by = 0.5)
-f(); dtransit(x, d1)
-f(); ptransit(x, d1)
-f(); qtransit(seq(0.1, 0.9, by = 0.1), d1)
+dtransit(x, d1)
+ptransit(x, d1)
+qtransit(seq(0.1, 0.9, by = 0.1), d1)
 
 
 # Drawing from a Poisson distribution to check if the
@@ -58,7 +56,7 @@ expect_error(dtransit(breaks_int, dint, log = "YES PLEASE"),
                 pattern = "'log' must evaluate to TRUE/FALSE",
                 info = "Incorrect argument on 'log'.")
 expect_error(dtransit(breaks_int, dint, log = vector("logical")),
-                pattern = "'list' object cannot be coerced to type 'logical'",
+                pattern = "'log' must evaluate to TRUE/FALSE",
                 info = "Incorrect argument on 'log'.")
 expect_error(dtransit(breaks_int, dint, log = list()),
                 pattern = "'list' object cannot be coerced to type 'logical'",

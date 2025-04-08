@@ -13,6 +13,8 @@
 * Refined plotting (to be in line with the `distributions3` plotting functions).
 * Updated man pages where needed (tbc).
 * `predict()` now supports `type = "mean"` to calculate the expectation (weighted mean).
+* The `transitreg()` formula interface should not properly handle 
+  transformed conversion objects (i.e., `sqrt(y)`, `I(y^2)`, ...).
 
 ## Version 0.1-9010
 

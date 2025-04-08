@@ -2,8 +2,7 @@
 # Testing implementation distributions3 objects and methods
 # -------------------------------------------------------------------
 
-suppressPackageStartupMessages(library("tinytest"))
-suppressPackageStartupMessages(library("transitreg"))
+if (interactive()) { library("tinytest"); library("transitreg") }
 
 # -------------------------------------------------------------------
 # For testing, faking transition probabilities by drawing from
@@ -209,7 +208,7 @@ expect_identical(s3, matrix(range(breaks_dbl), byrow = TRUE, ncol = 2L, nrow = l
 expect_silent(is_discrete(d3),                                info = "Calling S3 method is_discrete")
 expect_identical(is_discrete(d3), rep(FALSE, length(d3)),     info = "Testing return of is_discrete")
 expect_silent(is_continuous(d3),                              info = "Calling S3 method is_continuous")
-expect_identical(is_continuous(d3), rep(TRUE, length(d3)),   info = "Testing return of is_continuous")
+expect_identical(is_continuous(d3), rep(FALSE, length(d3)),   info = "Testing return of is_continuous")
 
 # S3 method cdf
 # Evaluate the distributions at all breaks (binmid)

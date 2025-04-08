@@ -251,20 +251,20 @@ transitreg <- function(formula, data, subset, na.action,
   ## Setting up empty list for return value
   rval <- list()
   rval$response <- response_name(formula)
-  rval$ymax     <- max(mf[[rval$response]])
+  rval$ymax     <- max(mf[[1L]])
 
   ## Setting up 'breaks and bins'
   if (is.numeric(breaks) && length(breaks) == 1L) {
       # Create, and store breaks and bins
-      breaks <- rval$breaks <- make_breaks(mf[[rval$response]], breaks = breaks)
+      breaks <- rval$breaks <- make_breaks(mf[[1L]], breaks = breaks)
       rval$bins   <- length(breaks) - 1L ## 10 breaks = 9 bins
       rval$breaks <- breaks
   ## User-specified breaks, check if they span the required range
   } else if (is.numeric(breaks)) {
       tmp_bk <- range(breaks)
-      tmp_y  <- range(mf[[rval$response]])
+      tmp_y  <- range(mf[[1L]])
       if (tmp_bk[[1L]] > tmp_y[[1L]] || tmp_bk[[2L]] < tmp_y[[2L]])
-          stop("'breaks' do not cover the full range of the response \"", rval$response, "\".")
+          stop("'breaks' do not cover the full range of the response \"", names(mf)[1L], "\".")
       # Store breaks and bins
       rval$bins   <- length(breaks) - 1L
       rval$breaks <- breaks
@@ -286,13 +286,13 @@ transitreg <- function(formula, data, subset, na.action,
 
   ## Transform data.
   tmf <- transitreg_tmf(mf,
-                        response   = rval$response,
+                        response   = NULL,
                         breaks     = breaks, # <- note: not rval$breaks
                         theta_vars = theta_vars,
                         scaler     = scale.x, verbose = verbose, ...)
 
   ## Response (as bins)
-  y    <- num2bin(mf[[rval$response]], breaks = breaks)
+  y    <- num2bin(mf[[1L]], breaks = breaks)
   ymax <- max(y, na.rm = TRUE)
 
   ## Testing theta_vars. Will fail if:
@@ -350,7 +350,7 @@ transitreg <- function(formula, data, subset, na.action,
   rval$factor      <- isTRUE(list(...)$factor)
 
   # Highest count in response
-  rval$maxcounts   <- num2bin(max(mf[[rval$response]]), breaks = breaks)
+  rval$maxcounts   <- num2bin(max(mf[[1L]]), breaks = breaks)
 
   if (inherits(rval$model, "nnet")) {
     tp <- predict(rval$model, type = "raw")
@@ -436,12 +436,18 @@ transitreg_predict <- function(object, newdata = NULL,
   if (is.null(newdata)) {
     mf <- model.frame(object)
   } else {
-    tmp <- names(model.frame(object))
-    tmp <- tmp[!tmp == object$response]
-    if (!all(tmp[!tmp == object$response] %in% names(newdata)))
-        stop("'newdata' does not provide all required variables, ",
+    tmp <- names(model.frame(object))[-1]
+    if (!all(tmp %in% names(newdata)))
+        stop("'newdata' does not provide all required covariates, ",
              "missing: ", paste(tmp[!tmp %in% names(newdata)], collapse = ", "))
-    mf <- newdata
+    mf <- newdata[names(newdata) %in% tmp]
+    ## Appending response
+    tmp <- names(model.frame(object))[1]
+    ## Try if we can evaluate the response within 'newdata',
+    ## else we assume 'y' was set and contains the new response.
+    tmp_resp <- tryCatch(eval(parse(text = tmp), envir = list2env(x = newdata, parent = baseenv())),
+                         error = function(e) return(FALSE))
+    mf <- cbind(data.frame(y = if (isFALSE(tmp_resp)) NA_real_ else tmp_resp), mf)
     rm(tmp)
   }
 
@@ -481,16 +487,16 @@ transitreg_predict <- function(object, newdata = NULL,
   ##  - If elementwise = FALSE: We must evaluate each distribution up to
   ##    max(y).
   if (type %in% c("quantile", "mode", "tp", "mean")) {
-    mf[[object$response]] <- max(get_mids(object))
+    mf[[1L]] <- max(get_mids(object))
   } else {
     ## Else highest bin specified on 'y' (if set) or highest
     ## highest ever seen observation (yc_tab).
     if (isTRUE(elementwise) && !is.null(y)) {
-        mf[[object$response]] <- rep(y, length.out = nrow(mf))
+        mf[[1L]] <- rep(y, length.out = nrow(mf))
     } else if (isFALSE(elementwise) && is.null(y)) {
-        mf[[object$response]] <- max(as.integer(names(object$yc_tab)))
+        mf[[1L]] <- max(as.integer(names(object$yc_tab)))
     } else if (!is.null(y)) {
-        mf[[object$response]] <- max(y)
+        mf[[1L]] <- max(y)
     }
   }
 
@@ -512,8 +518,9 @@ transitreg_predict <- function(object, newdata = NULL,
   ## ------------------------------------------------
   ## Calculating how long the tmf matrix will be.
   ## tmf_rc is the 'tmf data.frame row count' we expect.
+
   tmf_rc <- integer(nrow(mf))
-  tmf_rc[!obs_na] <- num2bin(mf[!obs_na, object$response], get_breaks(object))
+  tmf_rc[!obs_na] <- num2bin(mf[!obs_na, 1L], get_breaks(object))
   tmf_rc <- cumsum(tmf_rc) # Cumulative sum
 
   tmf_maxrows <- 1e7
@@ -528,7 +535,7 @@ transitreg_predict <- function(object, newdata = NULL,
     ## Creating 'transition model frame' for the prediction of the
     ## transition probabilities using the object$model (binary response model).
     tmf <- transitreg_tmf(mf[blockindex == block & !obs_na, , drop = FALSE],
-                          response   = object$response,
+                          response   = NULL,
                           breaks     = breaks,
                           theta_vars = object$theta_vars,
                           scaler     = object$scaler, verbose = verbose)
@@ -567,7 +574,7 @@ transitreg_predict <- function(object, newdata = NULL,
   } else if (type %in% c("cdf", "pdf")) {
       ## Sorting 'y'. This is important for the .C routine!
       if (elementwise) {
-          yC <- num2bin(mf[!obs_na, object$response], breaks = breaks)
+          yC <- num2bin(mf[!obs_na, 1L], breaks = breaks)
       } else {
           yC <- num2bin(sort(unique(y)), breaks = breaks)
       }

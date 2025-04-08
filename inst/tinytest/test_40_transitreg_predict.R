@@ -2,8 +2,7 @@
 # Testing implementation of CDF, PDF, pmax
 # -------------------------------------------------------------------
 
-suppressPackageStartupMessages(library("tinytest"))
-suppressPackageStartupMessages(library("transitreg"))
+if (interactive()) { library("tinytest"); library("transitreg") }
 
 # -------------------------------------------------------------------
 # Drawing random values from a Normal distribution, estimate a
@@ -15,7 +14,7 @@ set.seed(6020)
 truth <- list(mu = 77, sd = 13, N = 1000)
 
 # Creating data.frame with training data
-data <- data.frame(y = rnorm(truth$N, truth$mu, truth$sd),
+data <- data.frame(z = rnorm(truth$N, truth$mu, truth$sd),
                    x = runif(truth$N)) # Completely uninformative
 
 # Specify a searies of breaks for the binning of the continuous
@@ -24,11 +23,10 @@ data <- data.frame(y = rnorm(truth$N, truth$mu, truth$sd),
 # distribution.
 breaks <- seq(0, 200, length.out = 301)
 
-expect_silent(mod <- transitreg(y ~ s(theta), data = data, breaks = breaks),
+expect_silent(mod <- transitreg(z ~ s(theta), data = data, breaks = breaks),
               info = "Estimating transitional regression model")
 expect_inherits(mod, "transitreg", info = "Checking transitreg() return class")
 expect_identical(mod$breaks, breaks, info = "Testing if the breaks have been stored correctly")
-# TODO(R): Currently it stores the bins on breaks _and_ bins?
 
 # Calculating center of the bins
 binmid <- (head(mod$breaks, -1) + tail(mod$breaks, -1)) / 2
