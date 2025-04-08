@@ -26,6 +26,7 @@ jobs:
         run: |
           install.packages("tinytest")
           install.packages("remotes")
+          install.packages("gamlss.data")
           install.packages("topmodels", repos = c("https://zeileis.r-universe.dev", "https://cloud.r-project.org"))
           remotes::install_local(upgrade = TRUE, dependencies = TRUE)
         shell: Rscript {0}
