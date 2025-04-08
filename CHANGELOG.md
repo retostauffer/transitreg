@@ -15,6 +15,8 @@
 * `predict()` now supports `type = "mean"` to calculate the expectation (weighted mean).
 * The `transitreg()` formula interface should not properly handle 
   transformed conversion objects (i.e., `sqrt(y)`, `I(y^2)`, ...).
+* Implemented GitHub action for running tinytests on push; tests need to be
+  extended to cover all features/use cases.
 
 ## Version 0.1-9010
 
