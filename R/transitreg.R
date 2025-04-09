@@ -263,13 +263,20 @@ transitreg <- function(formula, data, subset, na.action,
   if (is.numeric(breaks) && length(breaks) == 1L) {
       # Create, and store breaks and bins
       breaks <- rval$breaks <- make_breaks(mf[[1L]], breaks = breaks)
-      rval$bins   <- length(breaks) - 1L ## 10 breaks = 9 bins
+      rval$bins   <- length(breaks) - 1L ## i.e., 10 breaks = 9 bins
       rval$breaks <- breaks
   ## User-specified breaks, check if they span the required range
   } else if (is.numeric(breaks)) {
       tmp_bk <- range(breaks)
       tmp_y  <- range(mf[[1L]])
-      if (tmp_bk[[1L]] > tmp_y[[1L]] || tmp_bk[[2L]] < tmp_y[[2L]])
+
+      ## Stop if breaks do not cover the range of the data on uncensored
+      ## ends of the scale. If censored, values outside the breaks are
+      ## considered to be censored (i.e., fall into the first/last pseudo-bin
+      ## later on).
+      if (tmp_bk[[1L]] > tmp_y[[1L]] && (censored == "uncensored" || censored == "right"))
+          stop("'breaks' do not cover the full range of the response \"", names(mf)[1L], "\".")
+      if (tmp_bk[[2L]] < tmp_y[[2L]] && (censored == "uncensored" || censored == "left"))
           stop("'breaks' do not cover the full range of the response \"", names(mf)[1L], "\".")
       # Store breaks and bins
       rval$bins   <- length(breaks) - 1L
@@ -290,6 +297,12 @@ transitreg <- function(formula, data, subset, na.action,
       rm(tmp, ymax)
   }
 
+  ## Censoring? Extend breaks
+  cens_left  <- censored == "left"  || censored == "both"
+  cens_right <- censored == "right" || censored == "both"
+  if (cens_left)  breaks <- c(min(breaks), breaks)
+  if (cens_right) breaks <- c(breaks, max(breaks))
+
   ## Transform data.
   tmf <- transitreg_tmf(mf,
                         response   = NULL,
@@ -298,7 +311,6 @@ transitreg <- function(formula, data, subset, na.action,
                         theta_vars = theta_vars,
                         scaler     = scale.x,
                         verbose    = verbose, ...)
-
   ## Response (as bins)
   y    <- num2bin(mf[[1L]], breaks = breaks, censored = censored)
   ymax <- max(y, na.rm = TRUE)
@@ -358,7 +370,7 @@ transitreg <- function(formula, data, subset, na.action,
   rval$factor      <- isTRUE(list(...)$factor)
 
   # Highest count in response
-  rval$maxcounts   <- num2bin(max(mf[[1L]]), breaks = breaks)
+  rval$maxcounts   <- num2bin(max(mf[[1L]]), breaks = breaks, censored = censored)
 
   if (inherits(rval$model, "nnet")) {
     tp <- predict(rval$model, type = "raw")
@@ -370,16 +382,26 @@ transitreg <- function(formula, data, subset, na.action,
   ui <- unique(tmf$index)
   probs <- cprobs <- numeric(length(ui))
 
+  ## TODO(R): 'discrete' is a logical vector; do we need this or is one single logical value enough?
+
   ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
   ## both simultanously in C to improve speed.
-  args <- list(uidx = ui, idx = tmf$index,
-               tp = tp, y = y, breaks = breaks,
+  args <- list(uidx     = ui,
+               idx      = tmf$index,
+               tp       = tp,
+               y        = y,
+               breaks   = breaks,
+               censored = censored,
                discrete = rep(is.null(rval$breaks), length(ui)),
-               ncores = ncores)
+               ncores   = ncores)
 
   ## Calling C
+  print('here')
   args <- check_args_for_treg_predict_pdfcdf(args)
+  str(args)
   tmp  <- do.call(function(...) .Call("treg_predict_pdfcdf", ...), args)
+  print(lapply(tmp, summary))
+  stop("TODO(RETO): Update C code now for handling censoring")
 
   ## Fixing values close to 0/1
   tmp$pdf[tmp$pdf < 1e-15]    <- 1e-15

@@ -23,7 +23,7 @@
  * these in the mgcv code.
  */
 
-//#define OMP_REPORT // define to have all routines using omp report on start and end.
+// define to have all routines using omp report on start and end.
 #define OMP_REPORT
 
 /* For safe memory handling from R */
@@ -91,7 +91,7 @@ double treg_calc_mean(int* positions, int count, double* tpptr, double* binsptr)
 SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
         SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete);
 SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y,
-        SEXP breaks, SEXP discrete, SEXP ncores);
+        SEXP breaks, SEXP censored, SEXP discrete, SEXP ncores);
 SEXP treg_detect_cores();
 
 

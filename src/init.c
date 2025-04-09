@@ -17,7 +17,7 @@
 
 static const R_CallMethodDef callMethods[] = {
   {"treg_predict",             (DL_FUNC) &treg_predict,          9},
-  {"treg_predict_pdfcdf",      (DL_FUNC) &treg_predict_pdfcdf,   6},
+  {"treg_predict_pdfcdf",      (DL_FUNC) &treg_predict_pdfcdf,   7},
   {"treg_detect_cores",        (DL_FUNC) &treg_detect_cores,     0},
   {NULL, NULL, 0} // Termination entry
 };

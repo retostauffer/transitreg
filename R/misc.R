@@ -429,6 +429,8 @@ get_elementwise_colnames <- function(x, prefix = NULL, digits = pmax(3L, getOpti
 #' @param breaks numeric vector with point intersections to create the bins.
 #' @param censored character, defines if the (pseudo-)bins are censored or not
 #'        (see 'Details' section).
+#' @param verbose logical, if `TRUE` some messages are printed if needed
+#'        (defaults to `FALSE`).
 #'
 #' @details
 #' Converts the numeric values in `x` into (pseudo-)bins by cutting the data
@@ -458,7 +460,7 @@ get_elementwise_colnames <- function(x, prefix = NULL, digits = pmax(3L, getOpti
 #' transitreg:::num2bin(x, breaks = breaks, censored = "both")
 #' transitreg:::num2bin(x, breaks = breaks, censored = "both")
 #'
-num2bin <- function(x, breaks = NULL, censored = c("uncensored", "left", "right", "both")) {
+num2bin <- function(x, breaks = NULL, censored = c("uncensored", "left", "right", "both"), verbose = FALSE) {
     if (is.null(x)) return(x)
     if (is.null(breaks))
         stop("Either breaks (continuous response) or bins (discrete response) must be set")
@@ -466,15 +468,40 @@ num2bin <- function(x, breaks = NULL, censored = c("uncensored", "left", "right"
         stop("Response contains missing values (not allowed).")
     censored <- match.arg(censored)
 
+    # TODO(R): Add test cases where breaks are not unique at the lower
+    #          and upper end; used for censoring.
+    cens_left  <- censored == "left"  || censored == "both"
+    cens_right <- censored == "right" || censored == "both"
+
+    # Censored? ignore duplicated breaks on the left or right end if needed.
+    if (cens_left)  breaks <- c(min(breaks), breaks[!breaks == min(breaks)])
+    if (cens_right) breaks <- c(max(breaks), breaks[!breaks == max(breaks)])
+    breaks <- sort(breaks) # Sorted breaks without duplicates on left/right (if possible)
+    print(breaks)
+
     # 'Cut' data, limit to -1 to length(brekas) - 1.
     res <- cut(x, breaks = breaks, labels = FALSE, right = FALSE, include.lowest = TRUE) - 1L
 
-    # Must be done before 'left'.
-    if (censored == "right" || censored == "both") {
+    # Adjusting the right side of the distribution in case censoring
+    # has been set (MUST be done before 'left').
+    if (cens_right) {
         res[x >= max(breaks)] <- length(breaks) - 1L
+        # The rest is just for verbose output
+        n <- if (verbose) sum(x > max(breaks)) else -999
+        if (n > 0) message(sprintf("num2bin: %d observation%s been set ", n, ifelse(n == 1, " has", "s have")),
+                           sprintf("to the right censoring point (bin %dL ", length(breaks) - 1L),
+                           sprintf("at %s; censored = \"%s\").", format(min(breaks)), censored))
     }
-    if (censored == "left" || censored == "both") {
+
+    # Adjusting the left side of the distribution in case censoring
+    # has been set (MUST be done after checking the right side).
+    if (cens_left) {
         res <- res + 1L; res[x <= min(breaks)] <- 0L
+        # The rest is just for verbose output
+        n <- if (verbose) sum(x < min(breaks)) else -999
+        if (n > 0) message(sprintf("num2bin: %d observation%s been set ", n, ifelse(n == 1, " has", "s have")),
+                           "to the left censoring point (bin 0L ",
+                           sprintf("at %s; censored = \"%s\").", format(min(breaks)), censored))
     }
 
     return(res)
@@ -574,11 +601,12 @@ check_args_for_treg_predict <- function(x, silent = FALSE) {
 #' @importFrom utils str
 check_args_for_treg_predict_pdfcdf <- function(x, silent = FALSE) {
     ## Required elements in the order as expected by C
-    enames <- c("uidx", "idx", "tp", "y", "breaks", "discrete", "ncores")
+    enames <- c("uidx", "idx", "tp", "y", "breaks", "censored", "discrete", "ncores")
 
     ## Checking types first
     tmp <- list("integer"   = c("uidx", "idx", "y", "ncores"),
                 "double"    = c("tp", "breaks"),
+                "character" = "censored",
                 "logical"   = "discrete") # TODO(R) Cover this in tests
 
     debug_stop <- function(e) { if (!silent) { cat("\nDebugging output (str(args)):\n"); str(x) }; stop(e) }
@@ -599,7 +627,9 @@ check_args_for_treg_predict_pdfcdf <- function(x, silent = FALSE) {
             "length of 'args$y' and 'args$uidx' must be identical" =
                 length(x$y) == length(x$uidx),
             "'args$discrete' must be logical with same length as args$uidx" = 
-                length(x$discrete) == length(x$uidx)
+                length(x$discrete) == length(x$uidx),
+            "'args$censored' must be one of \"uncensored\", \"left\", \"right\", \"both\"" =
+                x$censored %in% c("uncensored", "left", "right", "both")
         )},
         error = function(e) debug_stop(e)
     )

@@ -135,28 +135,20 @@ transitreg_tmf <- function(data, response, breaks,
   ## Determine response column if not specified by user.
   if (is.null(response)) response <- names(data)[1L]
   censored <- match.arg(censored)
+  breaks <- sort(breaks) # Just to be sure
 
   # -----------------------------------------------------------------
   # Converting response from original scale to (pseudo-)index
   # -----------------------------------------------------------------
 
   ## Discretize numeric response into counts.
-  yc <- num2bin(data[[response]], breaks = breaks, censored = censored)
-  ym <- (breaks[-1] + breaks[-length(breaks)]) / 2
-
-  lower <- list(...)$lower
-  upper <- list(...)$upper
-
-  if (!is.null(lower)) {
-      stopifnot("'lower' must be single numeric" = is.numeric(lower) && length(lower) == 1L)
-      ym[ym < lower] <- lower
-  }
-  if (!is.null(upper)) {
-      stopifnot("'upper' must be single numeric" = is.numeric(upper) && length(upper) == 1L)
-      ym[ym > upper] <- upper
-  }
-
+  yc <- num2bin(data[[response]], breaks = breaks, censored = censored, verbose = verbose)
   data[[response]] <- yc
+
+  ## (Censored) mid points
+  ym <- (breaks[-1] + breaks[-length(breaks)]) / 2
+  if (censored == "left"  || censored == "both") ym <- c(min(breaks), ym)
+  if (censored == "right" || censored == "both") ym <- c(ym, max(breaks))
 
 
   # -----------------------------------------------------------------
@@ -210,17 +202,11 @@ transitreg_tmf <- function(data, response, breaks,
     stop("The response must be bin indices, so integers in the range of {-1L, Inf}.")
   data[[response]] <- as.integer(data[[response]])
 
-  ## WARNING: Why do we allow for -1L in data[[response]]?
-  ## The pseudo index "-1" is for values falling below the lowest bound;
-  ## required to allow predictions outside the range. To properly handle some of the
-  ## methods we create a "pseudo_index" which is pmax(0, data[[response]]).
-  pseudo_index <- pmax(0L, data[[response]])
-
   ## Setting up the new data.frame with (pseudo-)bins
 
   ## Define length of vectors in list Sum of response pseudo indices +
   ## nrow(data), the latter to account for the additional "0" bin.
-  nout <- sum(pseudo_index) + nrow(data)
+  nout <- sum(data[[response]]) + nrow(data)
 
   ## ------ building transitreg data -------
 
@@ -233,13 +219,13 @@ transitreg_tmf <- function(data, response, breaks,
 
   ## Building index vector; each observation 1:nrow(data) gets its unique index
   result <- list()
-  result$index <- rep(seq_len(nrow(data)), times = pseudo_index + 1L)
+  result$index <- rep(seq_len(nrow(data)), times = data[[response]] + 1L)
 
   ## Creating Y; always 1 except for the last entry per index.
   fn_get_Y <- function(nout, resp) {
     res <- rep(1L, nout); res[cumsum(resp + 1)] <- 0L; return(res)
   }
-  result$Y <- fn_get_Y(nout, pseudo_index)
+  result$Y <- fn_get_Y(nout, data[[response]])
 
   ## Creating theta; a sequence from zero to the response_value for each index.
   ## The following Two lines create this sequence of sequences.
@@ -247,7 +233,7 @@ transitreg_tmf <- function(data, response, breaks,
     resettozero <- c(0L, which(diff(idx) > 0))
     return(seq_len(nout) - rep(resettozero, resp + 1L) - 1L)
   }
-  result$theta <- fn_get_theta(nout, pseudo_index, result$index)
+  result$theta <- fn_get_theta(nout, data[[response]], result$index)
 
   ## Adding theta_vars if needed.
   ## For 'theta99' in 'theta_vars' a new variable 'theta99' is generated which
@@ -270,7 +256,7 @@ transitreg_tmf <- function(data, response, breaks,
   for (n in names(data)) {
       ## If data[[n]] is a simple vector
       if (!is.matrix(data[[n]])) {
-        result[[n]] <- rep(data[[n]], pseudo_index + 1)
+        result[[n]] <- rep(data[[n]], data[[response]] + 1)
       ## Else create matrix
       } else {
         result[[n]] <- matrix(rep(data[[n]], rep(data[[response]] + 1, ncol(data[[n]]))),

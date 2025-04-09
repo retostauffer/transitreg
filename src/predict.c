@@ -561,8 +561,10 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
  *
  * @param uidx integer vector with unique indices in data.
  * @param idx integer with indices, length of idx is sample size times breaks.
- * @param p probabilities, same length as idx vector.
- * @param type character, either 'pdf', 'cdf', or 'mode'.
+ * @param tp probabilities, same length as idx vector.
+ * @param breaks real, breaks for the different bins.
+ * @param censored single character (uncensored, left, right, or both).
+ * @param discrete single logical value, is this a discrete or continuous distribution?
  * @param ncores integer, number of cores to be used (ignored if OMP not available).
  *
  * @details Does something similar to treg_predict but calculates both PDF and
@@ -574,7 +576,7 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
  * has length(uidx) (vector with cdf and pdf).
  */
 SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
-        SEXP discrete, SEXP ncores) {
+        SEXP censored, SEXP discrete, SEXP ncores) {
 
     double* tpptr    = REAL(tp);
     int*    uidxptr  = INTEGER(uidx);       // Unique indices in the dtaa
@@ -587,6 +589,12 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
     int     un       = LENGTH(uidx);
     int     i;
 
+    // Evalute 'censored' (str). Setting cens_left and/or cens_right
+    // to true if needed.
+    const char* thecens = CHAR(STRING_ELT(censored, 0));
+    bool cens_left  = strcmp(thecens, "left")  == 0 | strcmp(thecens, "both") == 0;
+    bool cens_right = strcmp(thecens, "right")  == 0 | strcmp(thecens, "both") == 0;
+
     // Number of threads for OMP, only used if _OPENMP support available.
     #if _OPENMP
     int    nthreads   = asInteger(ncores);
@@ -595,6 +603,9 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
     // Calculating bin width only once (used to calculate pdf)
     double* binwidth = malloc(nbins * sizeof(double)); // Single double pointer
     for (i = 0; i < nbins; i++) { binwidth[i] = bkptr[i + 1] - bkptr[i]; }
+    for (i = 0; i < nbins; i++) {
+        printf("   binwidth[%d] = %.5f\n", i, binwidth[i]);
+    }
 
     // Custom struct object to mimik "which()"
     integerVec which;
