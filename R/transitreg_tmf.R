@@ -11,6 +11,8 @@
 #'        to be used for transition modeling. This variable must represent
 #'        counts or categorical states.
 #' @param breaks numeric vector with the bin intersection points (break points).
+#' @param censored character, or one of `"uncensored"` (default), `"left"`, `"right"`, or `"both"`.
+#'        Specifies if the distribution is uncensored or censored on one or both ends.
 #' @param theta_vars `NULL`  or character vector with the bin-specific theta variables
 #'        to be set up (e.g., `c("theta0", "theta99")`). Can be an empty character
 #'        vector (or `NULL`) if there are no `theta_vars`.
@@ -81,7 +83,7 @@
 #' head(tmf)
 #'
 #' ## Providing response via 'newresponse' argument (bin index)
-#' idx  <- transitreg:::num2bin(mf$myresponse, bk)
+#' idx  <- transitreg:::num2bin(mf$myresponse, bk, "uncensored")
 #' tmf2 <- transitreg:::transitreg_tmf(subset(mf, select = -myresponse),
 #'                                     "myresponse", bk, newresponse = idx)
 #' head(tmf2)
@@ -107,8 +109,10 @@
 #' @importFrom stats setNames
 #'
 #' @author Niki
-transitreg_tmf <- function(data, response, breaks, theta_vars = NULL,
-                            newresponse = NULL, scaler = NULL, verbose = FALSE, ...) {
+transitreg_tmf <- function(data, response, breaks,
+                           censored = c("uncensored", "left", "right", "both"),
+                           theta_vars = NULL,
+                           newresponse = NULL, scaler = NULL, verbose = FALSE, ...) {
 
   stopifnot(
     "'data' must be a data.frame" = is.data.frame(data) && all(dim(data) > 0L),
@@ -129,16 +133,15 @@ transitreg_tmf <- function(data, response, breaks, theta_vars = NULL,
 
 
   ## Determine response column if not specified by user.
-  if (is.null(response))
-    response <- names(data)[1L]
-
+  if (is.null(response)) response <- names(data)[1L]
+  censored <- match.arg(censored)
 
   # -----------------------------------------------------------------
   # Converting response from original scale to (pseudo-)index
   # -----------------------------------------------------------------
 
   ## Discretize numeric response into counts.
-  yc <- num2bin(data[[response]], breaks)
+  yc <- num2bin(data[[response]], breaks = breaks, censored = censored)
   ym <- (breaks[-1] + breaks[-length(breaks)]) / 2
 
   lower <- list(...)$lower

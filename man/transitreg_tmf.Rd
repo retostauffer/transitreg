@@ -8,6 +8,7 @@ transitreg_tmf(
   data,
   response,
   breaks,
+  censored = c("uncensored", "left", "right", "both"),
   theta_vars = NULL,
   newresponse = NULL,
   scaler = NULL,
@@ -23,6 +24,9 @@ to be used for transition modeling. This variable must represent
 counts or categorical states.}
 
 \item{breaks}{numeric vector with the bin intersection points (break points).}
+
+\item{censored}{character, or one of \code{"uncensored"} (default), \code{"left"}, \code{"right"}, or \code{"both"}.
+Specifies if the distribution is uncensored or censored on one or both ends.}
 
 \item{theta_vars}{\code{NULL}  or character vector with the bin-specific theta variables
 to be set up (e.g., \code{c("theta0", "theta99")}). Can be an empty character
@@ -105,7 +109,7 @@ tmf <- transitreg:::transitreg_tmf(mf, "myresponse", bk)
 head(tmf)
 
 ## Providing response via 'newresponse' argument (bin index)
-idx  <- transitreg:::num2bin(mf$myresponse, bk)
+idx  <- transitreg:::num2bin(mf$myresponse, bk, "uncensored")
 tmf2 <- transitreg:::transitreg_tmf(subset(mf, select = -myresponse),
                                     "myresponse", bk, newresponse = idx)
 head(tmf2)

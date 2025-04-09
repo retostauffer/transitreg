@@ -20,6 +20,8 @@
 #'        count response. If a single number is provided, equidistant intervals are used. If a
 #'        numeric vector is provided, it is used directly as the breakpoints. This argument is
 #'        critical for continuous responses.
+#' @param censored character, or one of `"uncensored"` (default), `"left"`, `"right"`, or `"both"`.
+#'        Specifies if the distribution is uncensored or censored on one or both ends.
 #' @param model Logical value indicating whether the model frame should be included in
 #'        the return object.
 #' @param ncores `NULL` (default) or single numeric. See 'OpenMP' for more information.
@@ -198,6 +200,7 @@
 #' @export
 transitreg <- function(formula, data, subset, na.action,
                        engine = "bam", breaks = NULL,
+                       censored = c("uncensored", "left", "right", "both"),
                        model = TRUE, ncores = NULL, verbose = FALSE, ...) {
 
   if (!is.null(breaks)) breaks <- as.numeric(breaks)
@@ -210,7 +213,8 @@ transitreg <- function(formula, data, subset, na.action,
         is.null(breaks) || (is.numeric(breaks) && length(breaks) == 1L && breaks > 0) || is.numeric(breaks) && length(breaks) > 0,
     "'engine' must be character of length 1" = is.character(engine) && length(engine) == 1L
   )
-  ncores <- transitreg_get_number_of_cores(ncores, verbose = verbose)
+  ncores   <- transitreg_get_number_of_cores(ncores, verbose = verbose)
+  censored <- match.arg(censored)
 
   ## Evaluate 'engine' argument
   engine <- tolower(engine)
@@ -251,6 +255,7 @@ transitreg <- function(formula, data, subset, na.action,
 
   ## Setting up empty list for return value
   rval <- list()
+  rval$censored <- censored
   rval$response <- response_name(formula)
   rval$ymax     <- max(mf[[1L]])
 
@@ -289,11 +294,13 @@ transitreg <- function(formula, data, subset, na.action,
   tmf <- transitreg_tmf(mf,
                         response   = NULL,
                         breaks     = breaks, # <- note: not rval$breaks
+                        censored   = censored,
                         theta_vars = theta_vars,
-                        scaler     = scale.x, verbose = verbose, ...)
+                        scaler     = scale.x,
+                        verbose    = verbose, ...)
 
   ## Response (as bins)
-  y    <- num2bin(mf[[1L]], breaks = breaks)
+  y    <- num2bin(mf[[1L]], breaks = breaks, censored = censored)
   ymax <- max(y, na.rm = TRUE)
 
   ## Testing theta_vars. Will fail if:

@@ -420,21 +420,62 @@ get_elementwise_colnames <- function(x, prefix = NULL, digits = pmax(3L, getOpti
 }
 
 
-## Convert response on original scale to (pseudo-)bin index.
-## Values outside the allowed range are set to -1 (below lowest)
-## and "bins" (one higher than the last valid bin) if above highest.
-## TODO(R): Write some tests for this.
-num2bin <- function(x, breaks = NULL) {
+
+#' Convert Numerics to Pseudo-Bins
+#'
+#' Convert response on original scale to (pseudo-)bin index.
+#'
+#' @param x numeric vector.
+#' @param breaks numeric vector with point intersections to create the bins.
+#' @param censored character, defines if the (pseudo-)bins are censored or not
+#'        (see 'Details' section).
+#'
+#' @details
+#' Converts the numeric values in `x` into (pseudo-)bins by cutting the data
+#' into `length(breaks) - 1` segments. If `censored = "uncensored"` (no censoring),
+#' data outside `range(break)` will be set to `NA_integer_`.
+#' if `x < min(breaks)` or `length(breaks)` if `x > max(breaks)`.
+#'
+#' If `censored = "left"` all values `x <= min(breaks)` are assigned to as bin `0L`,
+#' followed by bin `1L` for `(breaks[1], breaks[2])`, `2L` for `[breaks[2], breaks[3])` etc.
+#' Thus, the highest bin containing data is `length(breaks)` as well.
+#'
+#' If `censored = "right"` all values `x >= max(breaks)` are set to the highest bin
+#' `length(breaks)`, those `< max(breaks)` are still set `NA_integer_`.
+#'
+#' When `censored = "both"` the rules above are combined. Due to the necessity that
+#' we need tone dedicated 'censored bin index' on the left (`0L`), the right most
+#' upper bin is shifted by `+1` compared to when we only use `censored = "right"`.
+#'
+#' Less important to know for an end-user as this is mainly handelled internally.
+#'
+#' @examples
+#' x      <- 0:10
+#' breaks <- c(2, 6, 8)
+#' transitreg:::num2bin(x, breaks = breaks)
+#' transitreg:::num2bin(x, breaks = breaks, censored = "left")
+#' transitreg:::num2bin(x, breaks = breaks, censored = "right")
+#' transitreg:::num2bin(x, breaks = breaks, censored = "both")
+#' transitreg:::num2bin(x, breaks = breaks, censored = "both")
+#'
+num2bin <- function(x, breaks = NULL, censored = c("uncensored", "left", "right", "both")) {
     if (is.null(x)) return(x)
     if (is.null(breaks))
         stop("Either breaks (continuous response) or bins (discrete response) must be set")
     if (any(is.na(x)))
         stop("Response contains missing values (not allowed).")
+    censored <- match.arg(censored)
 
     # 'Cut' data, limit to -1 to length(brekas) - 1.
     res <- cut(x, breaks = breaks, labels = FALSE, right = FALSE, include.lowest = TRUE) - 1L
-    res[x < min(breaks)] <- -1L                  # Outside range (below bin 0)
-    res[x > max(breaks)] <- length(breaks) - 1L  # Outside range (above highest bin)
+
+    # Must be done before 'left'.
+    if (censored == "right" || censored == "both") {
+        res[x >= max(breaks)] <- length(breaks) - 1L
+    }
+    if (censored == "left" || censored == "both") {
+        res <- res + 1L; res[x <= min(breaks)] <- 0L
+    }
 
     return(res)
 }

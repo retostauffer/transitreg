@@ -14,6 +14,7 @@ transitreg(
   na.action,
   engine = "bam",
   breaks = NULL,
+  censored = c("uncensored", "left", "right", "both"),
   model = TRUE,
   ncores = NULL,
   verbose = FALSE,
@@ -44,6 +45,9 @@ Default is \code{"bam"}.}
 count response. If a single number is provided, equidistant intervals are used. If a
 numeric vector is provided, it is used directly as the breakpoints. This argument is
 critical for continuous responses.}
+
+\item{censored}{character, or one of \code{"uncensored"} (default), \code{"left"}, \code{"right"}, or \code{"both"}.
+Specifies if the distribution is uncensored or censored on one or both ends.}
 
 \item{model}{Logical value indicating whether the model frame should be included in
 the return object.}

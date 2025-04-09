@@ -21,7 +21,7 @@ m1   <- transitreg(cd4 ~ theta, data = CD4)
 
 expect_inherits(m1, "transitreg", info = "Returnclass")
 expect_true(is.list(m1))
-expected <- c("new_formula", "model", "response", "model.frame",
+expected <- c("new_formula", "model", "response", "model.frame", "censored",
               "maxcounts", "theta_vars", "factor", "probs", "bins", "ymax")
 expect_true(all(names(m1) %in% expected),
             info = "Checking if all expected elements are there")
