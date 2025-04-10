@@ -391,7 +391,7 @@ transitreg <- function(formula, data, subset, na.action,
   ## TODO(R): 'discrete' is a logical vector; do we need this or is one single logical value enough?
 
   ## c_transitreg_predict_pdfcdf returns a list with PDF and CDF, calculating
-  ## both simultanously in C to improve speed.
+  ## both simultaneously in C to improve speed.
   args <- list(uidx     = ui,
                idx      = tmf$index,
                tp       = tp,
@@ -624,6 +624,7 @@ transitreg_predict <- function(object, newdata = NULL,
                idx         = index,             # int; Index vector (int)
                tp          = tp,                # num; Transition probabilities
                breaks      = as.double(breaks), # num; Point intersections of bins
+               censored    = object$censored,   # Censored?
                y           = yC,                # int; Response y, used for 'cdf/pdf'
                prob        = probC,             # num; Probabilities (used for 'quantile')
                type        = type,              # str; to predict/calculate
@@ -1049,8 +1050,8 @@ logLik.transitreg <- function(object, newdata = NULL, ...) {
   }
   ll <- sum(log(p))
   attr(ll, "nobs") <- nrow(object$model.frame)
-  attr(ll, "df") <- sum(object$model$edf)
-  class(ll) <- "logLik"
+  attr(ll, "df")   <- sum(object$model$edf)
+  class(ll)        <- "logLik"
   return(ll)
 }
 

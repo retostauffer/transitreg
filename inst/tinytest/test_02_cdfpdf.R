@@ -104,7 +104,7 @@ fn <- function(i, tp, binwidth = 1) {
     y    <- transitreg:::num2bin(ynum, bins)
     res <- .Call("treg_predict_pdfcdf",
                  uidx = 42L, idx = rep(42L, length(tp)), tp = tp,
-                 y = y, breaks = bins, discrete = FALSE,
+                 y = y, breaks = bins, censored = "uncensored", discrete = FALSE,
                  ncores = 1L, censored = "not-censored",
                  PACKAGE = "transitreg")
     return(data.frame(res))
@@ -117,14 +117,14 @@ expect_equal(res$cdf, pp)
 # Calling transitreg_predict
 bins <- seq(-0.5, by = 1, length.out = length(tp) + 1)
 p3 <- .Call("treg_predict", uidx = 3L, idx = rep(3L, length(tp)), tp = tp,
-            bins = bins, y = 0:15, prob = NA_real_, type = "cdf",
-            cors = 1L, elementwise = FALSE, discrete = TRUE,
-            censored = "not-censored")
+            breaks = bins, censored = "uncensored", y = 0:15,
+            prob = NA_real_, type = "cdf",
+            cors = 1L, elementwise = FALSE, discrete = TRUE)
 expect_equal(pp, p3)
 d3 <- .Call("treg_predict", uidx = 3L, idx = rep(3L, length(tp)), tp = tp,
-            bins = bins, y = 0:15, prob = NA_real_, type = "pdf",
-            cores = 1L, elementwise = FALSE, discrete = TRUE,
-            censored = "not-censored")
+            breaks = bins, censored = "uncensored", y = 0:15,
+            prob = NA_real_, type = "pdf",
+            cores = 1L, elementwise = FALSE, discrete = TRUE)
 expect_equal(dd, d3)
 
 

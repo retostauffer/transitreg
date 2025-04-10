@@ -21,7 +21,7 @@
 \alias{plot.Transition}
 \title{Creates a Transition Distribution}
 \usage{
-Transition(x, breaks)
+Transition(x, breaks, censored = c("uncensored", "left", "right", "both"))
 
 dtransit(x, d, log = FALSE, ncores = NULL)
 
@@ -73,6 +73,9 @@ The length the vector must be of \code{length(x) + 1} (if \code{x} is
 a vector) or \code{ncol(x) + 1} if \code{x} is a matrix. Must be
 monotonically increasing. If \code{breaks} is integer, all must be \verb{>=0}
 (used to identify count data Transition distributions).}
+
+\item{censored}{character, or one of \code{"uncensored"} (default), \code{"left"},
+\code{"right"}, or \code{"both"}.}
 
 \item{d}{An object of class \code{Transition}.}
 
