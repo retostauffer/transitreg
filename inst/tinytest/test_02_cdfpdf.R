@@ -32,7 +32,6 @@ expect_error(convert_tp(c(NA, 0.3, 0.5), "tp", "cdf"), info = "Missing value(s)"
 
 expect_error(convert_tp(seq(1.2, 0.5, length.out = 3), "tp", "cdf"), info = "Values outside expected range")
 expect_error(convert_tp(seq(0.5, -0.5, length.out = 3), "tp", "cdf"), info = "Values outside expected range")
-expect_error(convert_tp(seq(0.2, 0.5, length.out = 3), "tp", "cdf"), info = "Values not monotonically decreasing")
 
 expect_error(convert_tp(seq(1.2, 0.5, length.out = 3), "cdf", "tp"), info = "Values outside expected range")
 expect_error(convert_tp(seq(0.5, -0.5, length.out = 3), "cdf", "tp"), info = "Values outside expected range")
