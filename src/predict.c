@@ -406,8 +406,8 @@ double treg_calc_mode(int* positions, int count, double* tpptr, double* bkptr) {
  *
  * @return TODO(R): Depends on mode.
  */
-SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
-                  SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete) {
+SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP censored, SEXP y,
+                  SEXP prob, SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete) {
 
     int    *uidxptr   = INTEGER(uidx);     // Unique indices in the dtaa
     int    *idxptr    = INTEGER(idx);      // Distribution index
@@ -439,9 +439,21 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
     // ... if none of them is true, it must be "do mode"
     // bool do_mode = strcmp(thetype, "modex") == 0;
 
+    // Evalute 'censored' (str). Setting cens_left and/or cens_right to true if needed.
+    const char* thecens = CHAR(STRING_ELT(censored, 0));
+    bool cens_left  = (strcmp(thecens, "left")  == 0) || (strcmp(thecens, "both") == 0);
+    bool cens_right = (strcmp(thecens, "right") == 0) || (strcmp(thecens, "both") == 0);
+
     // Calculating bin width only once (used to calculate pdf)
     double* binwidth = malloc(nbins * sizeof(double)); // Single double pointer
     for (i = 0; i < nbins; i++) { binwidth[i] = bkptr[i + 1] - bkptr[i]; }
+
+    // Note: If censored (left or right) the last bin on these sides have a
+    // width of 0.0; this width is used to calculate the PDF, where a width
+    // of 0.0 would cause obvious issues. Thus, we replace the first/last
+    // bin with 1.0 (so that we divide by 1; keep as is) in case needed.
+    if (cens_left)  { binwidth[0]         = 1.0; }
+    if (cens_right) { binwidth[nbins - 1] = 1.0; }
 
     // Allocating return vector.
     //
@@ -589,11 +601,10 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
     int     un       = LENGTH(uidx);
     int     i;
 
-    // Evalute 'censored' (str). Setting cens_left and/or cens_right
-    // to true if needed.
+    // Evalute 'censored' (str). Setting cens_left and/or cens_right to true if needed.
     const char* thecens = CHAR(STRING_ELT(censored, 0));
-    bool cens_left  = strcmp(thecens, "left")  == 0 | strcmp(thecens, "both") == 0;
-    bool cens_right = strcmp(thecens, "right")  == 0 | strcmp(thecens, "both") == 0;
+    bool cens_left  = (strcmp(thecens, "left")  == 0) || (strcmp(thecens, "both") == 0);
+    bool cens_right = (strcmp(thecens, "right") == 0) || (strcmp(thecens, "both") == 0);
 
     // Number of threads for OMP, only used if _OPENMP support available.
     #if _OPENMP
@@ -603,9 +614,13 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
     // Calculating bin width only once (used to calculate pdf)
     double* binwidth = malloc(nbins * sizeof(double)); // Single double pointer
     for (i = 0; i < nbins; i++) { binwidth[i] = bkptr[i + 1] - bkptr[i]; }
-    for (i = 0; i < nbins; i++) {
-        printf("   binwidth[%d] = %.5f\n", i, binwidth[i]);
-    }
+
+    // Note: If censored (left or right) the last bin on these sides have a
+    // width of 0.0; this width is used to calculate the PDF, where a width
+    // of 0.0 would cause obvious issues. Thus, we replace the first/last
+    // bin with 1.0 (so that we divide by 1; keep as is) in case needed.
+    if (cens_left)  { binwidth[0]         = 1.0; }
+    if (cens_right) { binwidth[nbins - 1] = 1.0; }
 
     // Custom struct object to mimik "which()"
     integerVec which;

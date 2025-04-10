@@ -460,7 +460,8 @@ get_elementwise_colnames <- function(x, prefix = NULL, digits = pmax(3L, getOpti
 #' transitreg:::num2bin(x, breaks = breaks, censored = "both")
 #' transitreg:::num2bin(x, breaks = breaks, censored = "both")
 #'
-num2bin <- function(x, breaks = NULL, censored = c("uncensored", "left", "right", "both"), verbose = FALSE) {
+num2bin <- function(x, breaks = NULL, censored = c("uncensored", "left", "right", "both"),
+                    verbose = FALSE) {
     if (is.null(x)) return(x)
     if (is.null(breaks))
         stop("Either breaks (continuous response) or bins (discrete response) must be set")
@@ -477,7 +478,6 @@ num2bin <- function(x, breaks = NULL, censored = c("uncensored", "left", "right"
     if (cens_left)  breaks <- c(min(breaks), breaks[!breaks == min(breaks)])
     if (cens_right) breaks <- c(max(breaks), breaks[!breaks == max(breaks)])
     breaks <- sort(breaks) # Sorted breaks without duplicates on left/right (if possible)
-    print(breaks)
 
     # 'Cut' data, limit to -1 to length(brekas) - 1.
     res <- cut(x, breaks = breaks, labels = FALSE, right = FALSE, include.lowest = TRUE) - 1L
@@ -512,14 +512,23 @@ num2bin <- function(x, breaks = NULL, censored = c("uncensored", "left", "right"
 # indices equal to -1, or indices > max bins the return will
 # be set to the minimum/maximum break (i.e., the edge of the
 # defined range).
-bin2num <- function(idx, breaks) {
-    # Bin mid
+# TODO(R): Write some tests for this
+bin2num <- function(idx, breaks, censored = c("uncensored", "left", "right", "both")) {
+    censored <- match.arg(censored)
+
+    # TODO(R): Add test cases where breaks are not unique at the lower
+    #          and upper end; used for censoring.
+    cens_left  <- censored == "left"  || censored == "both"
+    cens_right <- censored == "right" || censored == "both"
+
+    # Censored? Create boule-breaks on left/right if needed
+    if (cens_left)  breaks <- c(rep(min(breaks), 2L), breaks[!breaks == min(breaks)])
+    if (cens_right) breaks <- c(rep(max(breaks), 2L), breaks[!breaks == max(breaks)])
+    breaks <- sort(breaks) # Sorted breaks without duplicates on left/right (if possible)
+
+    # Bin mid, draw bin-mid for each index to convert to numeric
     bm <- (head(breaks, -1) + tail(breaks, -1)) / 2
-    ## Append minimum on the lower end and maximum on the upper end,
-    ## used for 'indices' falling out of the range; they are set -1
-    ## on the lower end, and one index above the higehst bin.
-    bm <- c(min(breaks), bm, max(breaks))
-    bm[idx + 2L]
+    return(bm[idx + 1L])
 }
 
 
@@ -560,14 +569,14 @@ make_breaks <- function(y, breaks = 30) {
 #' @importFrom utils str
 check_args_for_treg_predict <- function(x, silent = FALSE) {
     ## Expected elements (in the order expected by C)
-    enames <- c("uidx", "idx", "tp", "breaks", "y", "prob",
+    enames <- c("uidx", "idx", "tp", "breaks", "censored", "y", "prob",
                 "type", "ncores", "elementwise", "discrete")
 
     ## Checking types first
     tmp <- list("integer"   = c("uidx", "idx", "y", "ncores"),
                 "double"    = c("tp", "breaks", "prob"),
                 "logical"   = c("elementwise", "discrete"),
-                "character" = "type")
+                "character" = c("type", "censored"))
 
     debug_stop <- function(e) { if (!silent) { cat("\nDebugging output (str(args)):\n"); str(x) }; stop(e) }
     for (n in names(tmp)) {

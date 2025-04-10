@@ -214,7 +214,11 @@ transitreg <- function(formula, data, subset, na.action,
     "'engine' must be character of length 1" = is.character(engine) && length(engine) == 1L
   )
   ncores   <- transitreg_get_number_of_cores(ncores, verbose = verbose)
+
+  ## Censored?
   censored <- match.arg(censored)
+  cens_left  <- censored == "left"  || censored == "both"
+  cens_right <- censored == "right" || censored == "both"
 
   ## Evaluate 'engine' argument
   engine <- tolower(engine)
@@ -259,10 +263,18 @@ transitreg <- function(formula, data, subset, na.action,
   rval$response <- response_name(formula)
   rval$ymax     <- max(mf[[1L]])
 
+  ## Used to expand the breaks if censoring is requested. Scopes 'cens_left' and 'cens_right'
+  expand_breaks <- function(x) {
+    if (cens_left)  x <- c(min(x), x)
+    if (cens_right) x <- c(x, max(x))
+    return(x)
+  }
+
   ## Setting up 'breaks and bins'
   if (is.numeric(breaks) && length(breaks) == 1L) {
       # Create, and store breaks and bins
-      breaks <- rval$breaks <- make_breaks(mf[[1L]], breaks = breaks)
+      breaks      <- rval$breaks <- make_breaks(mf[[1L]], breaks = breaks)
+      breaks      <- expand_breaks(breaks)
       rval$bins   <- length(breaks) - 1L ## i.e., 10 breaks = 9 bins
       rval$breaks <- breaks
   ## User-specified breaks, check if they span the required range
@@ -270,14 +282,14 @@ transitreg <- function(formula, data, subset, na.action,
       tmp_bk <- range(breaks)
       tmp_y  <- range(mf[[1L]])
 
-      ## Stop if breaks do not cover the range of the data on uncensored
-      ## ends of the scale. If censored, values outside the breaks are
-      ## considered to be censored (i.e., fall into the first/last pseudo-bin
-      ## later on).
-      if (tmp_bk[[1L]] > tmp_y[[1L]] && (censored == "uncensored" || censored == "right"))
+      ## Stop if breaks do not cover the range of the data on uncensored ends
+      ## of the scale. If censored, values outside the breaks are considered to
+      ## be censored (i.e., fall into the first/last pseudo-bin later on).
+      if (tmp_bk[[1L]] > tmp_y[[1L]] && cens_right)
           stop("'breaks' do not cover the full range of the response \"", names(mf)[1L], "\".")
-      if (tmp_bk[[2L]] < tmp_y[[2L]] && (censored == "uncensored" || censored == "left"))
+      if (tmp_bk[[2L]] < tmp_y[[2L]] && cens_left)
           stop("'breaks' do not cover the full range of the response \"", names(mf)[1L], "\".")
+      breaks      <- expand_breaks(breaks)
       # Store breaks and bins
       rval$bins   <- length(breaks) - 1L
       rval$breaks <- breaks
@@ -293,15 +305,9 @@ transitreg <- function(formula, data, subset, na.action,
       tmp  <- ceiling(ymax * if (ymax <= 10) { 3 } else if (ymax <= 100) { 1.5 } else { 1.25 })
       rval$bins <- as.integer(tmp)
       # Will not be stored on 'rval' but used to convert data
-      breaks <- as.numeric(seq.int(0L, rval$bins))
+      breaks <- expand_breaks(as.numeric(seq.int(0L, rval$bins)))
       rm(tmp, ymax)
   }
-
-  ## Censoring? Extend breaks
-  cens_left  <- censored == "left"  || censored == "both"
-  cens_right <- censored == "right" || censored == "both"
-  if (cens_left)  breaks <- c(min(breaks), breaks)
-  if (cens_right) breaks <- c(breaks, max(breaks))
 
   ## Transform data.
   tmf <- transitreg_tmf(mf,
@@ -396,12 +402,8 @@ transitreg <- function(formula, data, subset, na.action,
                ncores   = ncores)
 
   ## Calling C
-  print('here')
   args <- check_args_for_treg_predict_pdfcdf(args)
-  str(args)
   tmp  <- do.call(function(...) .Call("treg_predict_pdfcdf", ...), args)
-  print(lapply(tmp, summary))
-  stop("TODO(RETO): Update C code now for handling censoring")
 
   ## Fixing values close to 0/1
   tmp$pdf[tmp$pdf < 1e-15]    <- 1e-15
@@ -550,7 +552,7 @@ transitreg_predict <- function(object, newdata = NULL,
   ## tmf_rc is the 'tmf data.frame row count' we expect.
 
   tmf_rc <- integer(nrow(mf))
-  tmf_rc[!obs_na] <- num2bin(mf[!obs_na, 1L], get_breaks(object))
+  tmf_rc[!obs_na] <- num2bin(mf[!obs_na, 1L], get_breaks(object), object$censored)
   tmf_rc <- cumsum(tmf_rc) # Cumulative sum
 
   tmf_maxrows <- 1e7
@@ -567,6 +569,7 @@ transitreg_predict <- function(object, newdata = NULL,
     tmf <- transitreg_tmf(mf[blockindex == block & !obs_na, , drop = FALSE],
                           response   = NULL,
                           breaks     = breaks,
+                          censored   = object$censored,
                           theta_vars = object$theta_vars,
                           scaler     = object$scaler, verbose = verbose)
 
@@ -578,7 +581,6 @@ transitreg_predict <- function(object, newdata = NULL,
   }
   tp    <- do.call(c, tp) ## Combine transition probs
   index <- do.call(c, index) ## Combine index (observation index)
-
 
   ## ------------------------------------------------
   ## If 'type = "tp"' (transition probabilities) we already have our
@@ -604,9 +606,9 @@ transitreg_predict <- function(object, newdata = NULL,
   } else if (type %in% c("cdf", "pdf")) {
       ## Sorting 'y'. This is important for the .C routine!
       if (elementwise) {
-          yC <- num2bin(mf[!obs_na, 1L], breaks = breaks)
+          yC <- num2bin(mf[!obs_na, 1L], breaks = breaks, censored = object$censored)
       } else {
-          yC <- num2bin(sort(unique(y)), breaks = breaks)
+          yC <- num2bin(sort(unique(y)), breaks = breaks, censored = object$censored)
       }
       probC <- NA_real_    ## Dummy value required for .C call
   } else {
@@ -668,7 +670,15 @@ transitreg_predict <- function(object, newdata = NULL,
 get_breaks <- function(x) {
     stopifnot("'x' must be a transitreg model" = inherits(x, "transitreg"))
     # Enforcing numeric as this is used in .C where it must be double (numeric)
-    return(if (!is.null(x[["breaks"]])) x$breaks else seq.int(0, x$bins))
+    bk <- if (!is.null(x[["breaks"]])) x$breaks else seq.int(0, x$bins)
+
+    # Censored?
+    cens_left  <- x$censored == "left"  || x$censored == "both"
+    cens_right <- x$censored == "right" || x$censored == "both"
+    if (cens_left)  bk <- c(min(bk), bk)
+    if (cens_right) bk <- c(max(bk), bk)
+
+    return(sort(bk))
 }
 
 # Helper function to get bin mids of a transitreg model
@@ -679,14 +689,16 @@ get_mids <- function(x) {
     return(res)
 }
 
-
 #' @exportS3Method "[" transitreg
 #' @author Reto
 `[.transitreg` <- function(x, i, ..., drop = TRUE) {
     tp <- transitreg_predict(x, newdata = model.frame(x)[i, , drop = FALSE],
                             type = "tp")
     breaks <- if (is.null(x$breaks)) get_breaks(x) else x$breaks
-    return(Transition(tp, breaks))
+    ## unique(breaks) to remove duplicated breaks on the left/right hand side
+    ## in case this is a censored distribution. Will be handled by the
+    ## constructor function internally later on.
+    return(Transition(tp, unique(breaks), censored = x$censored))
 }
 
 

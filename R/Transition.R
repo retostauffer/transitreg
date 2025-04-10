@@ -10,6 +10,8 @@
 #'        a vector) or \code{ncol(x) + 1} if \code{x} is a matrix. Must be
 #'        monotonically increasing. If `breaks` is integer, all must be `>=0`
 #'        (used to identify count data Transition distributions).
+#' @param censored character, or one of `"uncensored"` (default), `"left"`,
+#'        `"right"`, or `"both"`.
 #'
 #' @return Returns an object of class \code{c("Transition", "distribution")}.
 #' TODO(R): Missing.
@@ -28,7 +30,7 @@
 #' @author Reto
 #' @rdname Transition
 #' @export
-Transition <- function(x, breaks) {
+Transition <- function(x, breaks, censored = c("uncensored", "left", "right", "both")) {
     # Sanity checks
     stopifnot(
         "'x' must be numeric (vector or matrix)" = is.numeric(x) && is.atomic(x),
@@ -37,6 +39,13 @@ Transition <- function(x, breaks) {
         "missing values in 'breaks' not allowed" = all(!is.na(breaks)),
         "'breaks' must be monotonically increasing" = all(diff(breaks) > 0)
     )
+    censored <- match.arg(censored)
+
+    # If censored we need to expand the breaks.
+    cens_left  <- censored == "left"  || censored == "both"
+    cens_right <- censored == "right" || censored == "both"
+    if (cens_left)  breaks <- c(breaks[1L], breaks)
+    if (cens_right) breaks <- c(breaks, breaks[length(breaks)])
 
     # If 'x' is a vector, convert to matrix
     if (is.vector(x)) x <- matrix(x, nrow = 1)
@@ -56,7 +65,8 @@ Transition <- function(x, breaks) {
     res <- setNames(as.data.frame(x),
                     paste("tp", seq_len(ncol(x)) - 1, sep = "_"))
 
-    structure(res, class = c("Transition", "distribution"), breaks = breaks)
+    structure(res, class = c("Transition", "distribution"),
+              breaks = breaks, censored = censored)
 }
 
 
@@ -150,10 +160,11 @@ dpq_get_results <- function(z, d, ncores, type) {
     elementwise <- length(z) == length(d)
 
     # Setting up arguments to call .C predict function
-    args <- list(uidx        = ui,                # Unique distribution index (int)
-                 idx         = idx,               # Index vector (int)
-                 tp          = t(as.matrix(d)),   # Transition probabilities
-                 breaks      = as.double(breaks), # Point intersection of breaks
+    args <- list(uidx        = ui,                  # Unique distribution index (int)
+                 idx         = idx,                 # Index vector (int)
+                 tp          = t(as.matrix(d)),     # Transition probabilities
+                 breaks      = as.double(breaks),   # Point intersection of breaks
+                 censored    = attr(d, "censored"), # Censored?
                  type        = type,
                  ncores      = ncores,
                  elementwise = elementwise,
@@ -268,15 +279,16 @@ mean_transit <- function(x, ncores = NULL, ...) {
     idx  <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
     ## Calling C to calculate the required values.
-    args <- list(uidx        = ui,                # Unique distribution index (int)
-                 idx         = idx,               # Index vector (int)
-                 tp          = t(as.matrix(x)),   # Transition probabilities
-                 breaks      = as.double(breaks), # Point intersection of breaks
-                 y           = NA_integer_,       # <- Dummy value
-                 prob        = NA_real_,          # <- Dummy value
+    args <- list(uidx        = ui,                  # Unique distribution index (int)
+                 idx         = idx,                 # Index vector (int)
+                 tp          = t(as.matrix(x)),     # Transition probabilities
+                 breaks      = as.double(breaks),   # Point intersection of breaks
+                 censored    = attr(x, "censored"), # Censored?
+                 y           = NA_integer_,         # <- Dummy value
+                 prob        = NA_real_,            # <- Dummy value
                  type        = "mean",
                  ncores      = ncores,
-                 elementwise = TRUE,             # Must always be TRUE for mean
+                 elementwise = TRUE,                # Must always be TRUE for mean
                  discrete    = is_discrete(x))
 
     # Calling C
@@ -389,15 +401,19 @@ format.Transition <- function(x, digits = pmax(3L, getOption("digits") - 3L), ..
     if (length(x) < 1L) return(character(0))
     xnames <- names(x) # Keep for later
 
+    # Censored?
+    cens <- attr(x, "censored")
+    cens <- if (cens == "uncensored") "" else substr(cens, 0, 1)
+
     # Extracting probabilites and breaks
     fmtfun <- function(i) {
         y <- as.matrix(x[i], expand = FALSE)
         if (ncol(y) > 2L) {
-            sprintf("Transition_%d(%s, ..., %s)", ncol(y),
+            sprintf("Transition_%d%s(%s, ..., %s)", ncol(y), cens,
                     format(y[1], digits = digits), format(y[ncol(y)], digits = digits))
         } else {
             # Typically unused, that is two bins only!
-            sprintf("Transition_%d(%s, %s)", ncol(y),
+            sprintf("Transition_%d%s(%s, %s)", ncol(y), cens,
                     format(y[1], digits = digits), format(y[2], digits = digits))
         }
     }
@@ -441,21 +457,24 @@ pdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
     breaks <- attr(d, "breaks")
 
     # Convert numeric values to corresponding 'bin indices' (int)
-    x <- num2bin(x, breaks)
+    x <- num2bin(x, breaks, attr(d, "censored"))
 
     if (!elementwise) x <- sort(x) # Important
     ui  <- seq_along(d) # Unique index
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
     # Setting up arguments to call .C predict function
-    args <- list(uidx     = ui,                # Unique distribution index (int)
-                 idx      = idx,               # Index vector (int)
-                 tp       = t(as.matrix(d)),   # Transition probabilities
-                 breaks   = as.double(breaks), # Point intersection of breaks
-                 y        = x,                 # Where to evaluate the pdf
-                 prob     = NA_real_,          # Dummy, only used for 'quantile'
-                 type     = "pdf", ncores = ncores, elementwise = elementwise,
-                 discrete = is_discrete(d))
+    args <- list(uidx        = ui,                  # Unique distribution index (int)
+                 idx         = idx,                 # Index vector (int)
+                 tp          = t(as.matrix(d)),     # Transition probabilities
+                 breaks      = as.double(breaks),   # Point intersection of breaks
+                 censored    = attr(d, "censored"), # Censored?
+                 y           = x,                   # Where to evaluate the pdf
+                 prob        = NA_real_,            # Dummy, only used for 'quantile'
+                 type        = "pdf",
+                 ncores      = ncores,
+                 elementwise = elementwise,
+                 discrete    = is_discrete(d))
 
     # Calling C
     args <- check_args_for_treg_predict(args)
@@ -509,19 +528,20 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
 
     # Convert numeric values to corresponding 'bin indices' (int)
     xorig <- x
-    x <- num2bin(x, breaks)
+    x <- num2bin(x, breaks, attr(d, "censored"))
 
     if (!elementwise) x <- sort(x) # Important
     ui  <- seq_along(d) # Unique index
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
     ## Calling C to calculate the required values.
-    args <- list(uidx        = ui,                # Unique distribution index (int)
-                 idx         = idx,               # Index vector (int)
-                 tp          = t(as.matrix(d)),   # Transition probabilities
-                 breaks      = as.double(breaks), # Point intersection of breaks
-                 y           = x,                 # Where to evaluate the pdf
-                 prob        = NA_real_,          # Dummy, only used for 'quantile'
+    args <- list(uidx        = ui,                  # Unique distribution index (int)
+                 idx         = idx,                 # Index vector (int)
+                 tp          = t(as.matrix(d)),     # Transition probabilities
+                 breaks      = as.double(breaks),   # Point intersection of breaks
+                 censored    = attr(d, "censored"), # Censored?
+                 y           = x,                   # Where to evaluate the pdf
+                 prob        = NA_real_,            # Dummy, only used for 'quantile'
                  type        = "cdf",
                  ncores      = ncores,
                  elementwise = elementwise,
@@ -596,12 +616,13 @@ quantile.Transition <- function(x, probs, drop = TRUE, elementwise = NULL,
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
     ## Calling C to calculate the required values.
-    args <- list(uidx        = ui,                # Unique distribution index (int)
-                 idx         = idx,               # Index vector (int)
-                 tp          = t(as.matrix(x)),   # Transition probabilities
-                 breaks      = as.double(breaks), # Point intersection of breaks
-                 y           = NA_integer_,       # Dummy, only used for cdf/pdf
-                 prob        = probs,             # Probabilities where to evaluate the distribution
+    args <- list(uidx        = ui,                  # Unique distribution index (int)
+                 idx         = idx,                 # Index vector (int)
+                 tp          = t(as.matrix(x)),     # Transition probabilities
+                 breaks      = as.double(breaks),   # Point intersection of breaks
+                 censored    = attr(x, "censored"), # Censored?
+                 y           = NA_integer_,         # Dummy, only used for cdf/pdf
+                 prob        = probs,               # Probabilities where to evaluate the distribution
                  type        = "quantile",
                  ncores      = ncores,
                  elementwise = elementwise,
@@ -756,7 +777,10 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plo
     if ("xlab" %in% names(userargs)) { xlab <- userargs$xlab; userargs$xlab <- NULL }  else xlab <- "x"
     if ("ylab" %in% names(userargs)) { ylab <- userargs$ylab; userargs$ylab <- NULL }  else ylab <- "P(X = x)"
     if ("col" %in% names(userargs))  { col  <- userargs$col;  userargs$col  <- NULL }  else col  <- 1
-    breaks   <- attr(x, "breaks")
+    breaks     <- attr(x, "breaks")
+    censored   <- attr(x, "censored")
+    cens_left  <- censored == "left"  || censored == "both"
+    cens_right <- censored == "right" || censored == "both"
 
     # Take first 1:n distributions only
     if (length(x) > n & !all) x <- x[seq_len(n)]
@@ -767,6 +791,24 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plo
         rval$y <- cdf(x, rval$x, elementwise = FALSE, drop = FALSE)
     } else {
         rval$y <- pdf(x, rval$x, elementwise = FALSE, drop = FALSE)
+    }
+    ylim <- range(rval$y)
+
+    # If censored: Extract censoring point(s) as they are plotted
+    # separately (point masses)
+    rval$cens <- list(x = NULL, y = NULL)
+    if (!cdf && cens_left) {
+        rval$cens$x <- c(rval$cens$x, rval$x[1L])
+        rval$cens$y <- c(rval$cens$y, rval$y[, 1L, drop = FALSE])
+        rval$x      <- rval$x[-1L]
+        rval$y      <- rval$y[, -1L, drop = FALSE]
+    }
+    if (!cdf && cens_right) {
+        k <- length(rval$x)
+        rval$cens$x <- c(rval$cens$x, rep(rval$x[k], nrow(rval$y)))
+        rval$cens$y <- c(rval$cens$y, rval$y[, k, drop = FALSE])
+        rval$x      <- rval$x[-k]
+        rval$y      <- rval$y[, -k, drop = FALSE]
     }
 
     # Plotting pdf or cdf
@@ -780,8 +822,10 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plo
                        ylab = ylab,
                        col  = col,
                        xlim = range(breaks),
-                       ylim = if (tp) c(0, pmax(1, max(rval$y))) else NULL,
+                       ylim = if (tp) c(0, pmax(1, max(rval$y))) else ylim,
                        main = title), userargs))
+
+        points(rval$cens$x, rval$cens$y, pch = 18, cex = 2, col = col)
         #matplot(x = rval$x, y = t(rval$y), type = type,
         #        lwd = 2, lty = 1,
         #        pch = 19, cex = 0.75,

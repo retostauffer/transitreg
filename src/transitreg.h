@@ -88,8 +88,8 @@ doubleVec get_binmid(SEXP breaks);
 double treg_calc_mode(int* positions, int count, double* pptr, double* binsptr);
 double treg_calc_mean(int* positions, int count, double* tpptr, double* binsptr);
 
-SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP y, SEXP prob,
-        SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete);
+SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP censored, SEXP y,
+        SEXP prob, SEXP type, SEXP ncores, SEXP elementwise, SEXP discrete);
 SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y,
         SEXP breaks, SEXP censored, SEXP discrete, SEXP ncores);
 SEXP treg_detect_cores();
