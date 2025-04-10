@@ -344,7 +344,6 @@ cdf_to_tp <- function(x, ...) {
 # @param \dots unused.
 tp_to_cdf <- function(tp, ...) {
     stopifnot(is.numeric(tp), all(tp >= 0 & tp <= 1), length(tp) >= 1L)
-    stopifnot(all(diff(tp) <= .Machine$double.eps))
 
     res <- (1 - tp[1])
     if (length(tp) > 1) {
@@ -363,7 +362,7 @@ tp_to_cdf <- function(tp, ...) {
 # @param \dots unused.
 tp_to_pdf <- function(tp, width = NULL, ...) {
     stopifnot(is.numeric(tp), all(tp >= 0 & tp <= 1), length(tp) >= 1L)
-    stopifnot(all(diff(tp) <= 0))
+
     if (!is.null(width)) {
         stopifnot(
             "'width' (if provided) must be numeric" = is.numeric(width),

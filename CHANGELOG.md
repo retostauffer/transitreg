@@ -2,7 +2,6 @@
 ## Version 0.1-9011-90XX
 
 * Further (major) changes as the package is still under development.
-* Removed the 'censored' option both from R and C.
 * Revamped how 'discrete' and 'pseudo-discrete' (continuous) models
   are handled, as well as how to depict this in `Transition` disbributions.
   For short, if `breaks` are integers, the model/distribution is assumed to 
@@ -17,6 +16,8 @@
   transformed conversion objects (i.e., `sqrt(y)`, `I(y^2)`, ...).
 * Implemented GitHub action for running tinytests on push; tests need to be
   extended to cover all features/use cases.
+* Re-implemented censoring (uncensored, left-censored, right-censored, or both).
+  Censoring points are pseudo-bins with a width of 0, handled as point mass probabilities.
 
 ## Version 0.1-9010
 
