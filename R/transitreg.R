@@ -285,9 +285,11 @@ transitreg <- function(formula, data, subset, na.action,
       ## Stop if breaks do not cover the range of the data on uncensored ends
       ## of the scale. If censored, values outside the breaks are considered to
       ## be censored (i.e., fall into the first/last pseudo-bin later on).
-      if (tmp_bk[[1L]] > tmp_y[[1L]] && cens_right)
+      print(tmp_bk)
+      print(tmp_y)
+      if (tmp_bk[[1L]] > tmp_y[[1L]] && !cens_left)
           stop("'breaks' do not cover the full range of the response \"", names(mf)[1L], "\".")
-      if (tmp_bk[[2L]] < tmp_y[[2L]] && cens_left)
+      if (tmp_bk[[2L]] < tmp_y[[2L]] && !cens_right)
           stop("'breaks' do not cover the full range of the response \"", names(mf)[1L], "\".")
       breaks      <- expand_breaks(breaks)
       # Store breaks and bins
@@ -337,6 +339,20 @@ transitreg <- function(formula, data, subset, na.action,
     if (all(!is.na(match(y, theta_int))))
         stop("Formula contains ", paste(sprintf("'theta%d'", theta_int), collapse = ", "), ", ",
              "covering all bins observations fall into (overspecified).")
+
+    # If censored is left/right/both, inform the user that adding an offset
+    # for that break might be required/useful without stopping.
+    if (cens_left) {
+        if (!"theta0" %in% theta_vars)
+            warning("consider adding 'theta0' to your formula when using ",
+                    sprintf("'censored = \"%s\"'.", censored))
+    }
+    if (cens_right) {
+        tmpbk <- sprintf("theta%d", length(breaks) - (cens_left + cens_right))
+        if (!tmpbk %in% theta_vars)
+            warning(sprintf("consider adding '%s' to your formula when using ", tmpbk),
+                    sprintf("'censored = \"%s\"'.", censored))
+    }
   }
 
   ## Store scaler, returned as attribute on 'tmf' if used.
