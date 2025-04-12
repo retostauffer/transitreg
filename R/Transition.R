@@ -37,7 +37,7 @@ Transition <- function(x, breaks, censored = c("uncensored", "left", "right", "b
         "length of 'x' must be > 0" = length(x) > 0L,
         "'breaks' must be a numeric vector" = is.atomic(breaks) && is.numeric(breaks),
         "missing values in 'breaks' not allowed" = all(!is.na(breaks)),
-        "'breaks' must be monotonically increasing" = all(diff(breaks) > 0)
+        "'breaks' must be monotonically increasing" = all(diff(breaks) >= 0)
     )
     censored <- match.arg(censored)
 
@@ -305,19 +305,24 @@ mean_transit <- function(x, ncores = NULL, ...) {
 #' @exportS3Method c Transition
 c.Transition <- function(...) {
     x <- list(...)
-    if (length(x) == 1) return(x[[1]])
+    if (length(x) == 1L) return(x[[1]])
 
     # Else check whether or not we can combine the objects
-    for (i in seq.int(2, length(x))) {
+    for (i in seq.int(2L, length(x))) {
         stopifnot("input not of class Transition" = inherits(x[[i]], "Transition"))
-        if (!all.equal(attr(x[[1]], "breaks"), attr(x[[2]], "breaks")))
-            stop("breaks of the ", i, ifelse(i == 2, "nd", "th"),
-                 "object not the same as for the first object. Can't be combined.")
+        if (!isTRUE(all.equal(attr(x[[1]], "breaks"), attr(x[[i]], "breaks"))))
+            stop("breaks of the ", i, ifelse(i == 2, "nd", "th"), " distribution ",
+                 "not the same as for the first distribution. Can't be combined.")
+        if (!isTRUE(all.equal(attr(x[[1]], "censored"), attr(x[[i]], "censored"))))
+            stop("the ", i, ifelse(i == 2, "nd", "th"), " distribution does not match ",
+                 "censoring of the first distribution. Can't be combined.")
     }
 
     # Combine and return
     res <- do.call(rbind, lapply(x, as.matrix))
-    Transition(res, attr(x[[1]], "breaks"))
+    # Note: unique(breaks) as the Transition constructor function
+    # deals with censoring on it's own.
+    Transition(res, breaks = unique(attr(x[[1]], "breaks")), censored = attr(x[[1]], "censored"))
 }
 
 
@@ -767,20 +772,29 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plo
     stopifnot("'n' cannot be coerced to integer > 0L" =
               is.integer(n) && length(n) == 1L && n > 0L)
 
+    # Extracting breaks and censoring
+    breaks     <- attr(x, "breaks")
+    censored   <- attr(x, "censored")
+    cens_left  <- censored == "left"  || censored == "both"
+    cens_right <- censored == "right" || censored == "both"
+
     userargs <- list(...)
     if ("main" %in% names(list(...))) {
         title <- userargs$main; userargs$main <- NULL
     } else {
         title <- if (cdf) "Distribution" else "Density"
-        if (tp) title <- paste(title, "and Transition Probabilities")
+        if (cens_left && cens_right) {
+            title <- paste(title, "censored on both ends")
+        } else if (cens_left) {
+            title <- paste(title, "left censored")
+        } else if (cens_right) {
+            title <- paste(title, "right censored")
+        }
+        if (tp) title <- paste(title, "plus transition probabilities")
     }
     if ("xlab" %in% names(userargs)) { xlab <- userargs$xlab; userargs$xlab <- NULL }  else xlab <- "x"
     if ("ylab" %in% names(userargs)) { ylab <- userargs$ylab; userargs$ylab <- NULL }  else ylab <- "P(X = x)"
     if ("col" %in% names(userargs))  { col  <- userargs$col;  userargs$col  <- NULL }  else col  <- 1
-    breaks     <- attr(x, "breaks")
-    censored   <- attr(x, "censored")
-    cens_left  <- censored == "left"  || censored == "both"
-    cens_right <- censored == "right" || censored == "both"
 
     # Take first 1:n distributions only
     if (length(x) > n & !all) x <- x[seq_len(n)]
@@ -794,28 +808,18 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plo
     }
     ylim <- range(rval$y)
 
-    # If censored: Extract censoring point(s) as they are plotted
-    # separately (point masses)
-    rval$cens <- list(x = NULL, y = NULL)
-    if (!cdf && cens_left) {
-        rval$cens$x <- c(rval$cens$x, rval$x[1L])
-        rval$cens$y <- c(rval$cens$y, rval$y[, 1L, drop = FALSE])
-        rval$x      <- rval$x[-1L]
-        rval$y      <- rval$y[, -1L, drop = FALSE]
-    }
-    if (!cdf && cens_right) {
-        k <- length(rval$x)
-        rval$cens$x <- c(rval$cens$x, rep(rval$x[k], nrow(rval$y)))
-        rval$cens$y <- c(rval$cens$y, rval$y[, k, drop = FALSE])
-        rval$x      <- rval$x[-k]
-        rval$y      <- rval$y[, -k, drop = FALSE]
-    }
+    # Define censored points if needed
+    rval$censored <- rep(FALSE, length(rval$x))
+    if (!cdf && cens_left)  rval$censored[1L] <- TRUE
+    if (!cdf && cens_right) rval$censored[length(rval$x)] <- TRUE
 
     # Plotting pdf or cdf
     if (plot) {
         type <- if (is_discrete(x[1])) "p" else "o"
+        idx <- which(!rval$censored)
+        # Plotting non-censored bins
         do.call(matplot,
-                c(list(x = rval$x, y = t(rval$y), type = type,
+                c(list(x = rval$x[idx], y = t(rval$y[, idx, drop = FALSE]), type = type,
                        lwd = 2, lty = 1,
                        pch = 19, cex = 0.75,
                        xlab = xlab,
@@ -825,23 +829,20 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plo
                        ylim = if (tp) c(0, pmax(1, max(rval$y))) else ylim,
                        main = title), userargs))
 
-        points(rval$cens$x, rval$cens$y, pch = 18, cex = 2, col = col)
-        #matplot(x = rval$x, y = t(rval$y), type = type,
-        #        lwd = 2, lty = 1,
-        #        pch = 19, cex = 0.75,
-        #        xlab = "x",
-        #        ylab = "P(X = x)",
-        #        xlim = range(breaks),
-        #        ylim = if (tp) c(0, pmax(1, max(rval$y))) else NULL,
-        #        main = title, userargs)
+        # Adding censored bins if needed
+        idx  <- which(rval$censored)
+        ypos <- as.vector(rval$y[, idx])
+        points(rep(rval$x[idx], length(ypos)),
+               ypos, pch = 18, cex = 2,
+               col = rep(col, times = nrow(rval$y)))
 
         # Adding transition probability if requested
         if (!is.null(rval$tp))
             matplot(x = rval$x, y = t(rval$tp), type = "l",
-                    lwd = 1, lty = 2, add = TRUE)
+                    lwd = 1, lty = 2, add = TRUE, col = col)
 
         for (s in c(1, 3))
-            axis(side = s, at = breaks, labels = FALSE, col = 1, tck = 0.025)
+            axis(side = s, at = breaks, labels = FALSE, col = 1, tck = 0.015)
     }
     invisible(rval)
 }
