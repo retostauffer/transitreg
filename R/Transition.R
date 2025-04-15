@@ -832,8 +832,6 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plo
         # Adding censored bins if needed
         idx  <- which(rval$censored)
         ypos <- as.vector(rval$y[, idx])
-        print(rep(rval$x[idx], each = nrow(rval$y)))
-        print(ypos)
         points(rep(rval$x[idx], each = nrow(rval$y)),
                ypos, pch = 18, cex = 2,
                col = rep(col, times = nrow(rval$y)))

@@ -45,7 +45,6 @@ integerVec find_positions(int x, int* y, int n) {
     return which; // Return the struct with index position and length
 }
 
-
 /* Helper function for type = "mean".
  * Calculates elementwise pdf and multiplies it with center of the bin
  * ((bkptr[i + 1] + bkptr[i]) * 0.5) to get the weighted average.
@@ -72,6 +71,29 @@ double treg_calc_mean(int* positions, int count, double* tpptr, double* bkptr) {
     return res;
 }
 
+///////* Calculate 'width of bins' based on the breaks provided. */
+doubleVec treg_get_binwidth(SEXP breaks, bool cens_left, bool cens_right) {
+    int nb = LENGTH(breaks) - 1L;
+    double* bkptr = REAL(breaks);
+
+    // Initialize/allocate return object
+    doubleVec res;
+    res.values = (double*)malloc(nb * sizeof(double));  // Allocate vector result
+    res.length = nb;
+
+    // Calculating mid of bins
+    for (int i = 0; i < nb; i++) { res.values[i] = (bkptr[i + 1] - bkptr[i]); }
+
+    // Note: If censored (left or right) the last bin on these sides have a
+    // width of 0.0; this width is used to calculate the PDF, where a width
+    // of 0.0 would cause obvious issues. Thus, we replace the first/last
+    // bin with 1.0 (so that we divide by 1; keep as is) in case needed.
+    if (cens_left)  { res.values[0]              = 1.0; }
+    if (cens_right) { res.values[res.length - 1] = 1.0; }
+
+    return res;
+}
+
 ///////* Calculate 'mid of bins' based on the breaks provided. */
 //////doubleVec get_binmid(SEXP breaks) {
 //////    int nb = LENGTH(breaks) - 1L;
@@ -90,7 +112,7 @@ double treg_calc_mean(int* positions, int count, double* tpptr, double* bkptr) {
 
 /* Helper function for type = "pdf" */
 doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
-                        double* bkptr, double* binwidth, int nbins, int* y, int ny, bool disc) {
+                        double* bkptr, doubleVec binwidth, int nbins, int* y, int ny, bool disc) {
 
     // Temporary double vector to calculate PDF along i = 0, ..., count - 1
     double* tmp = malloc(count * sizeof(double)); // Single double pointer
@@ -108,7 +130,7 @@ doubleVec treg_calc_pdf(int* positions, int count, double* tpptr,
             //return R_NaReal; 
         }
         // Updating temporary PDF vector
-        tmp[i] = prod * (1.0 - tp_tmp) / binwidth[i];
+        tmp[i] = prod * (1.0 - tp_tmp) / binwidth.values[i];
         // Updating product of transition probabilities
         prod *= tp_tmp;
     }
@@ -432,10 +454,10 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP censored, SEXP
     // Evaluate 'type' to define what to do. Store a set of
     // boolean values to only do the string comparison once.
     const char* thetype = CHAR(STRING_ELT(type, 0));
-    bool do_pdf  = strcmp(thetype, "pdf")  == 0;
-    bool do_cdf  = strcmp(thetype, "cdf")  == 0;
+    bool do_pdf  = strcmp(thetype, "pdf")      == 0;
+    bool do_cdf  = strcmp(thetype, "cdf")      == 0;
     bool do_q    = strcmp(thetype, "quantile") == 0;
-    bool do_mean = strcmp(thetype, "mean") == 0;
+    bool do_mean = strcmp(thetype, "mean")     == 0;
     // ... if none of them is true, it must be "do mode"
     // bool do_mode = strcmp(thetype, "modex") == 0;
 
@@ -445,15 +467,8 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP censored, SEXP
     bool cens_right = (strcmp(thecens, "right") == 0) || (strcmp(thecens, "both") == 0);
 
     // Calculating bin width only once (used to calculate pdf)
-    double* binwidth = malloc(nbins * sizeof(double)); // Single double pointer
-    for (i = 0; i < nbins; i++) { binwidth[i] = bkptr[i + 1] - bkptr[i]; }
-
-    // Note: If censored (left or right) the last bin on these sides have a
-    // width of 0.0; this width is used to calculate the PDF, where a width
-    // of 0.0 would cause obvious issues. Thus, we replace the first/last
-    // bin with 1.0 (so that we divide by 1; keep as is) in case needed.
-    if (cens_left)  { binwidth[0]         = 1.0; }
-    if (cens_right) { binwidth[nbins - 1] = 1.0; }
+    doubleVec binwidth;
+    binwidth = treg_get_binwidth(breaks, cens_left, cens_right);
 
     // Allocating return vector.
     //
@@ -555,8 +570,8 @@ SEXP treg_predict(SEXP uidx, SEXP idx, SEXP tp, SEXP breaks, SEXP censored, SEXP
         free(which.index); // Free allocated memory
     }
 
-    /* free allocated memory */
-    free(binwidth);
+    // Free allocated memory
+    free(binwidth.values);
 
     UNPROTECT(1); // Releasing protected objects
     return res;
@@ -611,16 +626,10 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
     int    nthreads   = asInteger(ncores);
     #endif
 
-    // Calculating bin width only once (used to calculate pdf)
-    double* binwidth = malloc(nbins * sizeof(double)); // Single double pointer
-    for (i = 0; i < nbins; i++) { binwidth[i] = bkptr[i + 1] - bkptr[i]; }
 
-    // Note: If censored (left or right) the last bin on these sides have a
-    // width of 0.0; this width is used to calculate the PDF, where a width
-    // of 0.0 would cause obvious issues. Thus, we replace the first/last
-    // bin with 1.0 (so that we divide by 1; keep as is) in case needed.
-    if (cens_left)  { binwidth[0]         = 1.0; }
-    if (cens_right) { binwidth[nbins - 1] = 1.0; }
+    // Calculating width of bins
+    doubleVec binwidth;
+    binwidth = treg_get_binwidth(breaks, cens_left, cens_right);
 
     // Custom struct object to mimik "which()"
     integerVec which;
@@ -674,8 +683,8 @@ SEXP treg_predict_pdfcdf(SEXP uidx, SEXP idx, SEXP tp, SEXP y, SEXP breaks,
         free(tmpcdf.values);
     }
 
-    /* free allocated memory */
-    free(binwidth);
+    // Free allocated memory
+    free(binwidth.values);
 
     /* ----------------------------------- */
     /* Generating list */

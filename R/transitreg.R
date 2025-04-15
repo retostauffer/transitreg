@@ -285,8 +285,6 @@ transitreg <- function(formula, data, subset, na.action,
       ## Stop if breaks do not cover the range of the data on uncensored ends
       ## of the scale. If censored, values outside the breaks are considered to
       ## be censored (i.e., fall into the first/last pseudo-bin later on).
-      print(tmp_bk)
-      print(tmp_y)
       if (tmp_bk[[1L]] > tmp_y[[1L]] && !cens_left)
           stop("'breaks' do not cover the full range of the response \"", names(mf)[1L], "\".")
       if (tmp_bk[[2L]] < tmp_y[[2L]] && !cens_right)

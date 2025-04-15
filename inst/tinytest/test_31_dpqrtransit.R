@@ -14,12 +14,13 @@ N <- 10
 d1 <- Transition(convert_tp(ppois(0:N, 3), "cdf", "tp"), seq.int(0, N+1))
 d2 <- Transition(convert_tp(ppois(0:N, 3), "cdf", "tp"), as.double(seq.int(0, N + 1)))
 
-k <- rtransit(500, d1); hist(k)
-k <- plot(d1, cdf = F, plot = TRUE, tp = TRUE); k
-x <- seq(0, 5, by = 0.5)
-dtransit(x, d1)
-ptransit(x, d1)
-qtransit(seq(0.1, 0.9, by = 0.1), d1)
+# RETO(TODO): Just for testing; remove in the future
+#k <- rtransit(500, d1); hist(k)
+#k <- plot(d1, cdf = F, plot = TRUE, tp = TRUE)
+#x <- seq(0, 5, by = 0.5)
+#dtransit(x, d1)
+#ptransit(x, d1)
+#qtransit(seq(0.1, 0.9, by = 0.1), d1)
 
 
 # Drawing from a Poisson distribution to check if the
