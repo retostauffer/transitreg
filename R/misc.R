@@ -539,17 +539,65 @@ bin2num <- function(idx, breaks, censored = c("uncensored", "left", "right", "bo
 #'
 #' @param y a numeric vector with response data.
 #' @param breaks a single numeric (integer) >= 1, number of breaks to be created.
+#' @param censored character, one of `"uncensored"`, `"left"`, `"right"`.
 #'
 #' @return Returns a numeric vector with the breaks.
-make_breaks <- function(y, breaks = 30) {
-  stopifnot(
-    "'y' must be numeric" = is.numeric(y),
-    "'breaks' must be numeric of length 1" = is.numeric(breaks) && length(breaks) == 1L,
-    "'breaks' must be >= 1" = breaks >= 1
-  )
-  dy     <- diff(range(y))
-  return(seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks))
+make_breaks <- function(y, breaks = NULL, censored = c("uncensored", "left", "right")) {
+    stopifnot(
+        "'y' must be numeric length > 0L" = is.numeric(y) && length(y) > 0L,
+        "'breaks' must 'NULL' or numeric vector of length > 0L" =
+            is.null(breaks) || (is.numeric(breaks) && length(breaks) > 0L)
+    )
+    censored <- match.arg(censored)
+
+    # Check if all breaks are positive integers, as well as all response values.
+    # This is used identify count data models.
+    eps <- sqrt(.Machine$double.eps)
+    y_int  <- all(abs(y - round(y)) <= eps) && all(round(y) >= 0L)
+
+    if (y_int) ny <- max(y <- unique(round(y))) else ny <- max(y <- unique(y))
+
+    # -------------------------------
+    # (1) If all values in 'y' look like count data, and no breaks are specified,
+    #     we expect this to be a count data model call.
+    print(ny)
+    if (y_int && is.null(breaks)) {
+        res <- seq.int(0L, round(max(y)) * if (ny <= 10) { 3 } else if (ny <= 100) { 1.5 } else { 1.25 })
+
+    # -------------------------------
+    # (2) If all values in 'y' look like count data and number of breaks is provided,
+    #     the number of breaks must exceed max(y).
+    } else if (y_int && length(breaks) == 1L) {
+        breaks <- as.integer(breaks)
+        stopifnot("response looks like count data, 'breaks' (integer) must be >= max(response) + 1" =
+                  breaks >= (max(y) + 1))
+        res <- seq.int(0L, breaks)
+
+    # -------------------------------
+    # (3) If 'breaks' is numeric of length 1, the user just specified how many
+    #     breaks they want. Automatically generate them in the range of y.
+    } else if (is.numeric(breaks) && length(breaks) == 1L) {
+        stopifnot("if 'breaks' is a single numeric, it must be >= 3" = breaks >= 3)
+        breaks <- as.integer(breaks)
+        dy     <- diff(range(y))
+        res    <- seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks)
+    } else {
+        tmp <- list(y = y, ny = ny, y_int = y_int, censored = censored, breaks = breaks)
+        str(tmp)
+        stop("whoops, case not catched yet")
+    }
+
+    return(res)
 }
+#make_breaks <- function(y, breaks = 30) {
+#  stopifnot(
+#    "'y' must be numeric" = is.numeric(y),
+#    "'breaks' must be numeric of length 1" = is.numeric(breaks) && length(breaks) == 1L,
+#    "'breaks' must be >= 1" = breaks >= 1
+#  )
+#  dy     <- diff(range(y))
+#  return(seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks))
+#}
 
 
 # Helper functions to check the arguments we hand over to C. This

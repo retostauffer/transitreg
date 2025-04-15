@@ -2,8 +2,8 @@
 # Testing the functions in R/misc.R
 # -------------------------------------------------------------------
 
-suppressPackageStartupMessages(library("tinytest"))
-suppressPackageStartupMessages(library("transitreg"))
+
+if (interactive()) { library("tinytest"); library("transitreg") }
 
 
 # -------------------------------------------------------------------

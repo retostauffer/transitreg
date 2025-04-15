@@ -263,6 +263,10 @@ transitreg <- function(formula, data, subset, na.action,
   rval$response <- response_name(formula)
   rval$ymax     <- max(mf[[1L]])
 
+  bk <- make_breaks(unique(mf[[1L]]), breaks, censored)
+  print(bk)
+  stop(" -- reto check se breaks --- ")
+
   ## Used to expand the breaks if censoring is requested. Scopes 'cens_left' and 'cens_right'
   expand_breaks <- function(x) {
     if (cens_left)  x <- c(min(x), x)
