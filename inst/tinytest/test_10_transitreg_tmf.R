@@ -184,8 +184,8 @@ expect_equivalent(subset(tmf2, select = c(index, Y, theta, myresponse, x, y, z))
               info = "Compare 'basic' part against tmf without theta_vars")
 
 # Now testing the 'tvars'.
-expect_true(all(c("theta2", "theta5") %in% names(tmf2)), info = "Test that 'theta2', 'theta5' were added")
-expect_true(!"theta10" %in% names(tmf2), info = "Text that 'theta10' was not created (outside range)")
+expect_true(all(c("theta2", "theta5", "theta10") %in% names(tmf2)), info = "Test that 'theta2', 'theta5' were added")
+expect_true(all(tmf2$theta10 == 0), info = "Test that 'theta10' is empty (no obs).")
 
 # Testing content of theta2 and theta5
 expect_identical(tmf2$theta2, ifelse(tmf2$theta == 2L, 1L, 0L), info = "Testing convent of 'theta2'")

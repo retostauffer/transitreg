@@ -346,7 +346,7 @@ transitreg <- function(formula, data, subset, na.action,
                     sprintf("'censored = \"%s\"'.", censored))
     }
     if (cens_right) {
-        tmpbk <- sprintf("theta%d", length(breaks) - (cens_left + cens_right))
+        tmpbk <- sprintf("theta%d", length(breaks) - 2L)
         if (!tmpbk %in% theta_vars)
             warning(sprintf("consider adding '%s' to your formula when using ", tmpbk),
                     sprintf("'censored = \"%s\"'.", censored))
@@ -685,13 +685,16 @@ transitreg_predict <- function(object, newdata = NULL,
 get_breaks <- function(x) {
     stopifnot("'x' must be a transitreg model" = inherits(x, "transitreg"))
     # Enforcing numeric as this is used in .C where it must be double (numeric)
-    bk <- if (!is.null(x[["breaks"]])) x$breaks else seq.int(0, x$bins)
-
-    # Censored?
-    cens_left  <- x$censored == "left"  || x$censored == "both"
-    cens_right <- x$censored == "right" || x$censored == "both"
-    if (cens_left)  bk <- c(min(bk), bk)
-    if (cens_right) bk <- c(max(bk), bk)
+    if (!is.null(x[["breaks"]])) {
+        bk <- x$breaks 
+    } else {
+        bk <- seq.int(0, x$bins)
+        # Censored?
+        cens_left  <- x$censored == "left"  || x$censored == "both"
+        cens_right <- x$censored == "right" || x$censored == "both"
+        if (cens_left)  bk <- c(min(bk), bk)
+        if (cens_right) bk <- c(max(bk), bk)
+    }
 
     return(sort(bk))
 }

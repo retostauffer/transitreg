@@ -82,7 +82,7 @@ doubleVec treg_get_binwidth(SEXP breaks, bool cens_left, bool cens_right) {
     res.length = nb;
 
     // Calculating mid of bins
-    for (int i = 0; i < nb; i++) { res.values[i] = (bkptr[i + 1] - bkptr[i]); }
+    for (int i = 0; i < res.length; i++) { res.values[i] = (bkptr[i + 1] - bkptr[i]); }
 
     // Note: If censored (left or right) the last bin on these sides have a
     // width of 0.0; this width is used to calculate the PDF, where a width
@@ -90,6 +90,14 @@ doubleVec treg_get_binwidth(SEXP breaks, bool cens_left, bool cens_right) {
     // bin with 1.0 (so that we divide by 1; keep as is) in case needed.
     if (cens_left)  { res.values[0]              = 1.0; }
     if (cens_right) { res.values[res.length - 1] = 1.0; }
+
+    /* TODO: Remove, just for testing ...
+    printf(" [c] cens (%d, %d) %d\n", cens_left, cens_right, res.length);
+    printf("     %.5f  %.5f\n", res.values[0], res.values[res.length - 1]);
+    for (int i = 0; i < res.length; i++) {
+        printf(" [%d] %.4f - %.4f  = %.3f\n", i, bkptr[i], bkptr[i + 1], res.values[i]);
+    }
+    */
 
     return res;
 }

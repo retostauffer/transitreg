@@ -242,11 +242,8 @@ transitreg_tmf <- function(data, response, breaks,
       theta_vars <- theta_vars[order(as.integer(regmatches(theta_vars, regexpr("[0-9]+$", theta_vars))))]
       for (tv in theta_vars) {
           tint <- as.integer(regmatches(tv, regexpr("[0-9]+$", tv)))
-          ## If this theta does not exist, skip (do not add a new variable
-          ## with constant zero values).
-          if (sum(result$theta == tint) == 0) break
-          ## Else setting up the new binary variable
-          result[[tv]] <- integer(length(result$theta)) # Initialize 0s
+          ## Setting up new dummy variable
+          result[[tv]] <- integer(length(result$theta))
           result[[tv]][result$theta == tint] <- 1L
       }
 
