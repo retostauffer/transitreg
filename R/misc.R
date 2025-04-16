@@ -579,35 +579,15 @@ make_breaks <- function(y, breaks, censored) {
     # (1) If all values in 'y' look like count data, and no breaks are specified,
     #     we expect this to be a count data model call.
     if (y_int && is.null(breaks)) {
-        res <- seq.int(0L, round(max(y)) * if (ny <= 10) { 3 } else if (ny <= 100) { 1.5 } else { 1.25 })
+        # Censored count data models are not allowed (for now)
+        if (!isTRUE(censored == "uncensored"))
+            stop("response looks like count data and no 'breaks' were specified. Censoring not allowed.")
+
+        res <- NULL
+        nbins <- round(max(y)) * if (ny <= 10) { 3 } else if (ny <= 100) { 1.5 } else { 1.25 }
 
     # -------------------------------
-    # (2) If all values in 'y' look like count data and number of breaks is provided
-    } else if (y_int && length(breaks) == 1L) {
-        breaks <- as.integer(breaks)
-        # Censored == NULL or character
-        if (is.null(censored) || is.character(censored)) {
-            stopifnot("response looks like count data, 'breaks' (integer) must be >= max(response) + 1" =
-                      breaks >= (max(y) + 1))
-            res <- seq.int(0L, breaks)
-        # Else 'censored' is numeric
-        } else {
-            censored <- as.integer(censored)
-            if (length(censored) == 1L || (length(censored) == 2L && is.na(censored[[2]]))) {
-                res <- seq(censored[[1]], censored[[1]] + breaks)
-                censored <- "left"
-            } else if (length(censored) == 2L && is.na(censored[[1]])) {
-                res <- seq(0L, censored[[2]])
-                censored <- "right"
-            } else {
-                res <- seq(censored[[1]], censored[[2]])
-                censored <- "both"
-            }
-
-        }
-
-    # -------------------------------
-    # (3) If 'breaks' is numeric of length 1, the user just specified how many
+    # (2) If 'breaks' is numeric of length 1, the user just specified how many
     #     breaks they want. Automatically generate them in the range of y.
     } else if (is.numeric(breaks) && length(breaks) == 1L) {
         stopifnot("if 'breaks' is a single numeric, it must be >= 3" = breaks >= 3)
@@ -632,10 +612,9 @@ make_breaks <- function(y, breaks, censored) {
         }
 
     # -------------------------------
-    # (4) If 'breaks' is a numeric vector, check if these breaks make sense
+    # (3) If 'breaks' is a numeric vector, check if these breaks make sense
     } else if (is.numeric(breaks) && length(breaks) > 1L) {
-        bk_int      <- all(abs(breaks - round(breaks)) <= eps) && all(round(breaks) >= 0L)
-        res <- if (bk_int) as.integer(round(breaks)) else breaks
+        res <- as.numeric(breaks)
 
         # Breaks not spanning the range?
         if ((censored == "uncensored" || censored == "right") && min(y) < min(res))
@@ -652,20 +631,14 @@ make_breaks <- function(y, breaks, censored) {
     }
 
     # Censored left or right?
-    if (censored == "left"  || censored == "both")    res <- c(min(res), res)
-    if (censored == "right" || censored == "both")    res <- c(res, max(res))
+    if (!is.null(res) && (censored == "left"  || censored == "both")) res <- c(min(res), res)
+    if (!is.null(res) && (censored == "right" || censored == "both")) res <- c(res, max(res))
 
-    return(list(breaks = res, censored = censored))
+    # Number of bins if breaks were specified
+    if (!is.null(res)) nbins <- length(res) - 1L
+
+    return(list(breaks = res, bins = as.integer(nbins), censored = censored))
 }
-#make_breaks <- function(y, breaks = 30) {
-#  stopifnot(
-#    "'y' must be numeric" = is.numeric(y),
-#    "'breaks' must be numeric of length 1" = is.numeric(breaks) && length(breaks) == 1L,
-#    "'breaks' must be >= 1" = breaks >= 1
-#  )
-#  dy     <- diff(range(y))
-#  return(seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks))
-#}
 
 
 # Helper functions to check the arguments we hand over to C. This

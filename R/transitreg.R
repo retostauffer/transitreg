@@ -257,61 +257,20 @@ transitreg <- function(formula, data, subset, na.action,
   mf[[1L]] <- quote(stats::model.frame)
   mf <- eval(mf, parent.frame())
 
+  ## Setting up breaks
+  tmp_breaks <- make_breaks(y = unique(mf[[1L]]), breaks = breaks, censored = censored)
+  breaks     <- tmp_breaks$breaks
+  censored   <- tmp_breaks$censored
+  bins       <- tmp_breaks$bins
+  rm(tmp_breaks)
+
   ## Setting up empty list for return value
   rval <- list()
   rval$censored <- censored
   rval$response <- response_name(formula)
   rval$ymax     <- max(mf[[1L]])
-
-  bk <- make_breaks(unique(mf[[1L]]), breaks, censored)
-  print(bk)
-  stop(" -- reto check se breaks --- ")
-
-  ## Used to expand the breaks if censoring is requested. Scopes 'cens_left' and 'cens_right'
-  expand_breaks <- function(x) {
-    if (cens_left)  x <- c(min(x), x)
-    if (cens_right) x <- c(x, max(x))
-    return(x)
-  }
-
-  ## Setting up 'breaks and bins'
-  if (is.numeric(breaks) && length(breaks) == 1L) {
-      # Create, and store breaks and bins
-      breaks      <- rval$breaks <- make_breaks(mf[[1L]], breaks = breaks)
-      breaks      <- expand_breaks(breaks)
-      rval$bins   <- length(breaks) - 1L ## i.e., 10 breaks = 9 bins
-      rval$breaks <- breaks
-  ## User-specified breaks, check if they span the required range
-  } else if (is.numeric(breaks)) {
-      tmp_bk <- range(breaks)
-      tmp_y  <- range(mf[[1L]])
-
-      ## Stop if breaks do not cover the range of the data on uncensored ends
-      ## of the scale. If censored, values outside the breaks are considered to
-      ## be censored (i.e., fall into the first/last pseudo-bin later on).
-      if (tmp_bk[[1L]] > tmp_y[[1L]] && !cens_left)
-          stop("'breaks' do not cover the full range of the response \"", names(mf)[1L], "\".")
-      if (tmp_bk[[2L]] < tmp_y[[2L]] && !cens_right)
-          stop("'breaks' do not cover the full range of the response \"", names(mf)[1L], "\".")
-      breaks      <- expand_breaks(breaks)
-      # Store breaks and bins
-      rval$bins   <- length(breaks) - 1L
-      rval$breaks <- breaks
-  # No breaks specified? In this case the response must be count data
-  } else {
-      # Check that the response is positive integers only.
-      if (any(mf[[rval$response]] < 0) ||
-          any(abs(mf[[rval$response]] %% 1) > sqrt(.Machine$double.eps))) {
-          stop("Response not count data. 'breaks' must be specified for binning.")
-      }
-      # There are no breaks, but bins
-      ymax <- as.integer(max(mf[[rval$response]], na.rm = TRUE))
-      tmp  <- ceiling(ymax * if (ymax <= 10) { 3 } else if (ymax <= 100) { 1.5 } else { 1.25 })
-      rval$bins <- as.integer(tmp)
-      # Will not be stored on 'rval' but used to convert data
-      breaks <- expand_breaks(as.numeric(seq.int(0L, rval$bins)))
-      rm(tmp, ymax)
-  }
+  rval$breaks   <- breaks
+  rval$bins     <- bins
 
   ## Transform data.
   tmf <- transitreg_tmf(mf,
@@ -414,7 +373,7 @@ transitreg <- function(formula, data, subset, na.action,
                idx      = tmf$index,
                tp       = tp,
                y        = y,
-               breaks   = breaks,
+               breaks   = as.numeric(breaks),
                censored = censored,
                discrete = rep(is.null(rval$breaks), length(ui)),
                ncores   = ncores)
@@ -716,11 +675,14 @@ get_mids <- function(x) {
 `[.transitreg` <- function(x, i, ..., drop = TRUE) {
     tp <- transitreg_predict(x, newdata = model.frame(x)[i, , drop = FALSE],
                             type = "tp")
-    breaks <- if (is.null(x$breaks)) get_breaks(x) else x$breaks
+    # TODO(R): DElete next line?
+    ##breaks <- if (is.null(x$breaks)) get_breaks(x) else x$breaks
     ## unique(breaks) to remove duplicated breaks on the left/right hand side
     ## in case this is a censored distribution. Will be handled by the
     ## constructor function internally later on.
-    return(Transition(tp, unique(breaks), censored = x$censored))
+    # TODO(R): DElete next line?
+    #return(Transition(tp, unique(breaks), censored = x$censored))
+    return(Transition(tp, unique(x$breaks), censored = x$censored))
 }
 
 

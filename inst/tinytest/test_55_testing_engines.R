@@ -3,8 +3,7 @@
 # -------------------------------------------------------------------
 
 
-suppressPackageStartupMessages(library("tinytest"))
-suppressPackageStartupMessages(library("transitreg"))
+if (interactive()) { library("tinytest"); library("transitreg") }
 
 data(cars)
 cars <- na.omit(cars)

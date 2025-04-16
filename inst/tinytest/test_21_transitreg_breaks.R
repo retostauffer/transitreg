@@ -2,8 +2,9 @@
 # Basic tests of transitreg models
 # -------------------------------------------------------------------
 
-suppressPackageStartupMessages(library("tinytest"))
-suppressPackageStartupMessages(library("transitreg"))
+
+if (interactive()) { library("tinytest"); library("transitreg") }
+
 
 # -------------------------------------------------------------------
 # Simulating data; 100 random values from a Poisson distribution.
