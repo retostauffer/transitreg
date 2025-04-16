@@ -4,12 +4,14 @@
 \alias{make_breaks}
 \title{Create Breaks for (Pseudo-)bins}
 \usage{
-make_breaks(y, breaks = 30)
+make_breaks(y, breaks, censored)
 }
 \arguments{
 \item{y}{a numeric vector with response data.}
 
 \item{breaks}{a single numeric (integer) >= 1, number of breaks to be created.}
+
+\item{censored}{character, one of \code{"uncensored"}, \code{"left"}, \code{"right"}.}
 }
 \value{
 Returns a numeric vector with the breaks.

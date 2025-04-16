@@ -272,10 +272,13 @@ transitreg <- function(formula, data, subset, na.action,
   rval$breaks   <- breaks
   rval$bins     <- bins
 
+  ## Get count data breaks if needed
+  if (is.null(breaks)) breaks <- seq.int(0, bins)
+
   ## Transform data.
   tmf <- transitreg_tmf(mf,
                         response   = NULL,
-                        breaks     = breaks, # <- note: not rval$breaks
+                        breaks     = breaks,
                         censored   = censored,
                         theta_vars = theta_vars,
                         scaler     = scale.x,
@@ -675,14 +678,13 @@ get_mids <- function(x) {
 `[.transitreg` <- function(x, i, ..., drop = TRUE) {
     tp <- transitreg_predict(x, newdata = model.frame(x)[i, , drop = FALSE],
                             type = "tp")
-    # TODO(R): DElete next line?
-    ##breaks <- if (is.null(x$breaks)) get_breaks(x) else x$breaks
+    ## count data? Generate breaks
+    breaks <- if (is.null(x$breaks)) get_breaks(x) else x$breaks
+
     ## unique(breaks) to remove duplicated breaks on the left/right hand side
     ## in case this is a censored distribution. Will be handled by the
     ## constructor function internally later on.
-    # TODO(R): DElete next line?
-    #return(Transition(tp, unique(breaks), censored = x$censored))
-    return(Transition(tp, unique(x$breaks), censored = x$censored))
+    return(Transition(tp, unique(breaks), censored = x$censored))
 }
 
 

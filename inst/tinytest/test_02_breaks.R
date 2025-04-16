@@ -6,6 +6,7 @@
 
 if (interactive()) { library("tinytest"); library("transitreg") }
 
+
 # Helper function for 'default numeric breaks'
 dfbk <- function(x, n, censored = "uncensored") {
     d <- diff(range(x))

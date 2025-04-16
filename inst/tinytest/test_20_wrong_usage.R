@@ -2,8 +2,7 @@
 # Basic tests of transitreg models
 # -------------------------------------------------------------------
 
-suppressPackageStartupMessages(library("tinytest"))
-suppressPackageStartupMessages(library("transitreg"))
+if (interactive()) { library("tinytest"); library("transitreg") }
 
 
 set.seed(6020)
@@ -13,10 +12,11 @@ data <- data.frame(y = rpois(100, 3))
 # ---------------------------------------------------------------------
 # Testing missing required args
 # ---------------------------------------------------------------------
-expect_silent(transitreg(y ~ s(theta, k = 3), data = data), info = "Test it works in general")
 expect_error(transitreg(), info = "Missing 'formula' and 'data'")
 expect_error(transitreg(formula = y ~ theta), info = "Missing 'data'")
 expect_error(transitreg(data = data), info = "Missing 'formula'")
+expect_silent(transitreg(y ~ s(theta, k = 3), data = data),
+             info = "Checking if the basic call works")
 
 expect_error(transitreg(y ~ s(theta, k = 3), data = data, ncores = "foo"),
               info = "'ncores' not numeric")
