@@ -613,7 +613,23 @@ make_breaks <- function(y, breaks, censored) {
         stopifnot("if 'breaks' is a single numeric, it must be >= 3" = breaks >= 3)
         breaks <- as.integer(breaks)
         dy     <- diff(range(y))
-        res    <- seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks)
+
+        if (is.character(censored)) {
+            res     <- seq(min(y) - 0.1 * dy, max(y) + 0.1 * dy, length = breaks)
+        } else if (length(censored) == 1L || (length(censored) == 2L && is.na(censored[[2L]]))) {
+            if (censored[1L] > max(y)) stop("censoring point > max(y)")
+            res     <- seq(censored[[1]], max(y) + 0.1 * dy, length = breaks)
+            censored <- "left"
+        } else if (length(censored) == 2L && is.na(censored[[1L]])) {
+            if (censored[2L] < min(y)) stop("censoring point < min(y)")
+            res     <- seq(min(y) - 0.1 * dy, censored[[2L]], length = breaks)
+            censored <- "right"
+        } else {
+            if (censored[1L] >= censored[2]) stop("invalid censoring points provided")
+            if (censored[2L] < min(y) || censored[1] > max(y)) stop("censoring outside range of data")
+            res     <- seq(censored[[1L]], censored[[2L]], length = breaks)
+            censored <- "both"
+        }
 
     # -------------------------------
     # (4) If 'breaks' is a numeric vector, check if these breaks make sense
@@ -628,8 +644,7 @@ make_breaks <- function(y, breaks, censored) {
             stop("breaks not spanning the range of the response (max(response) > max(breaks))")
 
     # -------------------------------
-    # (5) Numeric response
-
+    # (X) Uncatched case
     } else {
         tmp <- list(y = y, ny = ny, y_int = y_int, censored = censored, breaks = breaks)
         str(tmp)

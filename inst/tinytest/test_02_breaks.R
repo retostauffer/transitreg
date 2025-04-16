@@ -314,3 +314,116 @@ expect_equal(b$breaks, tmp,                      info = paste(msg, "values."))
 expect_identical(b$censored, "uncensored",       info = paste(msg, "censored return."))
 
 
+# ---------------------
+# Censoring via character
+
+##
+msg <- "Numeric response, breaks single numeric, censored left; checking"
+expect_silent(b <- transitreg:::make_breaks(xnum, breaks = 10, censored = "left"),
+        info = paste(msg, "execution silent."))
+expect_inherits(b$breaks, "numeric",             info = paste(msg, "return class."))
+expect_identical(length(b$breaks), 11L,          info = paste(msg, "length of breaks vector"))
+tmp <- c(-6, seq(-6, 6, length.out = 10))
+expect_equal(b$breaks, tmp,                      info = paste(msg, "values."))
+expect_identical(b$censored, "left",             info = paste(msg, "censored return."))
+
+##
+msg <- "Numeric response, breaks single numeric, censored right; checking"
+expect_silent(b <- transitreg:::make_breaks(xnum, breaks = 10, censored = "right"),
+        info = paste(msg, "execution silent."))
+expect_inherits(b$breaks, "numeric",             info = paste(msg, "return class."))
+expect_identical(length(b$breaks), 11L,          info = paste(msg, "length of breaks vector"))
+tmp <- c(seq(-6, 6, length.out = 10), +6)
+expect_equal(b$breaks, tmp,                      info = paste(msg, "values."))
+expect_identical(b$censored, "right",            info = paste(msg, "censored return."))
+
+##
+msg <- "Numeric response, breaks single numeric, censored both; checking"
+expect_silent(b <- transitreg:::make_breaks(xnum, breaks = 10, censored = "both"),
+        info = paste(msg, "execution silent."))
+expect_inherits(b$breaks, "numeric",             info = paste(msg, "return class."))
+expect_identical(length(b$breaks), 12L,          info = paste(msg, "length of breaks vector"))
+tmp <- c(-6, seq(-6, 6, length.out = 10), +6)
+expect_equal(b$breaks, tmp,                      info = paste(msg, "values."))
+expect_identical(b$censored, "both",             info = paste(msg, "censored return."))
+
+
+# ---------------------
+# Censoring via numeric
+
+## Left censoring ...
+
+expect_error(transitreg:::make_breaks(xnum, breaks = 10, censored = +10),
+        pattern = "censoring point > max\\(y\\)",
+        info = "Invalid left censoring point")
+
+##
+msg <- "Numeric response, left censoring via numeric vector; checking"
+expect_silent(b <- transitreg:::make_breaks(xnum, breaks = 10, censored = +2),
+        info = paste(msg, "execution silent."))
+expect_inherits(b$breaks, "numeric",             info = paste(msg, "return class."))
+expect_identical(length(b$breaks), 11L,          info = paste(msg, "length of breaks vector"))
+tmp <- c(2, seq(2, 6, length.out = 10))
+expect_equal(b$breaks, tmp,                      info = paste(msg, "values."))
+expect_identical(b$censored, "left",             info = paste(msg, "censored return."))
+
+##
+msg <- "Numeric response, left censoring via numeric vector; checking"
+expect_silent(b <- transitreg:::make_breaks(xnum, breaks = 10, censored = c(+2, NA)),
+        info = paste(msg, "execution silent."))
+expect_inherits(b$breaks, "numeric",             info = paste(msg, "return class."))
+expect_identical(length(b$breaks), 11L,          info = paste(msg, "length of breaks vector"))
+tmp <- c(2, seq(2, 6, length.out = 10))
+expect_equal(b$breaks, tmp,                      info = paste(msg, "values."))
+expect_identical(b$censored, "left",             info = paste(msg, "censored return."))
+
+## Right censoring ...
+
+expect_error(transitreg:::make_breaks(xnum, breaks = 10, censored = c(NA, -10)),
+        pattern = "censoring point < min\\(y\\)",
+        info = "Invalid left censoring point")
+
+##
+msg <- "Numeric response, right censoring via numeric vector; checking"
+expect_silent(b <- transitreg:::make_breaks(xnum, breaks = 10, censored = c(NA, +2)),
+        info = paste(msg, "execution silent."))
+expect_inherits(b$breaks, "numeric",             info = paste(msg, "return class."))
+expect_identical(length(b$breaks), 11L,          info = paste(msg, "length of breaks vector"))
+tmp <- c(seq(-6, 2, length.out = 10), 2)
+expect_equal(b$breaks, tmp,                      info = paste(msg, "values."))
+expect_identical(b$censored, "right",            info = paste(msg, "censored return."))
+
+## Both censoring ...
+
+expect_error(transitreg:::make_breaks(xnum, breaks = 10, censored = c(10, -10)),
+        pattern = "invalid censoring points",
+        info = "Left censoring point > right censoring point")
+expect_error(transitreg:::make_breaks(xnum, breaks = 10, censored = c(10, 10)),
+        pattern = "invalid censoring points",
+        info = "Left censoring point == right censoring point")
+expect_error(transitreg:::make_breaks(xnum, breaks = 10, censored = c(-100, -50)),
+        pattern = "censoring outside range of data",
+        info = "No data within censoring range")
+
+##
+msg <- "Numeric response, left-right censoring via numeric vector; checking"
+expect_silent(b <- transitreg:::make_breaks(xnum, breaks = 10, censored = c(-10, 10)),
+        info = paste(msg, "execution silent."))
+expect_inherits(b$breaks, "numeric",             info = paste(msg, "return class."))
+expect_identical(length(b$breaks), 12L,          info = paste(msg, "length of breaks vector"))
+tmp <- c(-10, seq(-10, 10, length.out = 10), 10)
+expect_equal(b$breaks, tmp,                      info = paste(msg, "values."))
+expect_identical(b$censored, "both",             info = paste(msg, "censored return."))
+
+##
+msg <- "Numeric response, left-right censoring via numeric vector; checking"
+expect_silent(b <- transitreg:::make_breaks(xnum, breaks = 10, censored = c(-3, +2.5)),
+        info = paste(msg, "execution silent."))
+expect_inherits(b$breaks, "numeric",             info = paste(msg, "return class."))
+expect_identical(length(b$breaks), 12L,          info = paste(msg, "length of breaks vector"))
+tmp <- c(-3, seq(-3, 2.5, length.out = 10), 2.5)
+expect_equal(b$breaks, tmp,                      info = paste(msg, "values."))
+expect_identical(b$censored, "both",             info = paste(msg, "censored return."))
+
+
+
