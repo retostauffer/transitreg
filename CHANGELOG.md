@@ -18,6 +18,8 @@
   extended to cover all features/use cases.
 * Re-implemented censoring (uncensored, left-censored, right-censored, or both).
   Censoring points are pseudo-bins with a width of 0, handled as point mass probabilities.
+* Refractured how breaks are calculated for different scenarios.
+
 
 ## Version 0.1-9010
 
