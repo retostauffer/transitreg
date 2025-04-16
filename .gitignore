@@ -5,3 +5,10 @@
 /src/*.so
 /lib
 /_coverage.html
+
+# Ignore some file types in the 'inst' folder by default
+/inst/*.R
+/inst/*.pdf
+/inst/*.zip
+/inst/*.rda
+/inst/*.rds

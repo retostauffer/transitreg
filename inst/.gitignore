@@ -2,8 +2,14 @@
 
 # Test files
 /_*
-# By default, do not store html, rds, rda, zip
+
+# Ignore by default
 /*.html
 /*.rds
 /*.rda
 /*.zip
+/*.tar
+/*.tar.gz
+/*.Rmd
+/*.tif
+/*.asc

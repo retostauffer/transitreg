@@ -1,7 +1,11 @@
 
-# Ignore generated files
-/ies2025.aux
-/ies2025.log
-/ies2025.out
-/ies2025.pdf
-/ies2025.tex
+
+/*.aux
+/*.log
+/*.pdf
+/*.tex
+/*.bbl
+/*.bbl
+/*.out
+
+
