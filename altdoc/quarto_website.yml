@@ -7,36 +7,49 @@ project:
 #   freeze: false
 
 website:
-  title: "$ALTDOC_PACKAGE_NAME"
+  title: "transitreg"
+    #site-url: https://retostauffer.github.io/transitreg
   code-links: true
   navbar:
     search: true
+    left:
+      - text: Get started
+        file: vignettes/transitreg.qmd
+      - text: Vignettes
+        menu:
+          - text: "Test"
+            file: vignettes/test.qmd
+      - text: Changelog
+        file: CHANGELOG.md
     right:
       - icon: github
         href: https://github.com/retostauffer/transitreg
         aria-label: transitreg
   sidebar:
-    collapse-level: 1
-    contents:
-      - text: Home
-        file: index.md
-      - section: $ALTDOC_VIGNETTE_BLOCK
-      - section: $ALTDOC_MAN_BLOCK
-      - text: News
-        file: $ALTDOC_NEWS
-      - text: Changelog
-        file: $ALTDOC_CHANGELOG
-      - text: License
-        file: $ALTDOC_LICENSE
-      - text: Licence
-        file: $ALTDOC_LICENCE
-      - text: Code of conduct
-        file: $ALTDOC_CODE_OF_CONDUCT
-      - text: Citation
-        file: $ALTDOC_CITATION
+    - id: documentation
+      title: Documentation
+      style: floating
+      collapse-level: 1
+      contents:
+        - text: Google
+          href: "https://www.google.com"
 
 format:
   html:
+    theme:
+      - cosmo
+      - transitreg.scss
+    number-sections: false
+    page-navigation: false
+    fontsize: 110%
+    fontcolor: "#333333"
+    linkcolor: "#F7374F"
     code-link: true
-#     theme: cosmo
-#     number-sections: false
+    code-copy: true
+    code-overflow: scroll
+    email-obfuscation: javascript
+    grid:
+      sidebar-width: 340px
+      margin-width: 340px
+
+

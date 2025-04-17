@@ -1,0 +1,24 @@
+/*-- scss:defaults --*/
+
+$body-color: #333333 !default;
+$link-color: #F7374F;
+$code-color: #333333;
+$navbar-bg: #88304E;
+$navbar-fg: #D3D3D3;
+$navbar-hl: #FFFFFF;
+$sidebar-fg: #333333;
+$sidebar-hl: #b52267;
+$toc-color: #b52267;
+$toc-hl: #F7374F;
+
+$dropdown-color: #FFFFFF;
+$dropdown-bg: #88304E;
+
+/*-- scss:rules --*/
+#quarto-header {
+    .navbar {
+        border-bottom: 0.5em solid #522546;
+        /*border-bottom: 0.5em solid #B4EBE6;*/
+    }
+}
+
