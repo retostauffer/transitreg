@@ -759,7 +759,7 @@ support.Transition <- function(d, drop = NULL, ...) {
 #' @param n Integer, maximum number of distributions to be plotted, defaults to `8L`.
 #'
 #' @importFrom utils head tail
-#' @importFrom graphics matplot axis
+#' @importFrom graphics matplot axis points
 #' @exportS3Method plot Transition
 #' @rdname Transition
 plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plot = TRUE, ...) {
