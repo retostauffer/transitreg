@@ -31,3 +31,10 @@ check: clean document
 	(cd ../ && \
 		R CMD build --no-build-vignettes transitreg && \
 		R CMD check --as-cran transitreg_$(VERSION).tar.gz)
+
+.PHONY: readme docs
+readme:
+	quarto render README.qmd --to gfm
+
+docs:
+	Rscript -e "altdoc::render_docs(verbose = TRUE)"

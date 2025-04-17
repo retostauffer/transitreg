@@ -434,8 +434,8 @@ get_elementwise_colnames <- function(x, prefix = NULL, digits = pmax(3L, getOpti
 #' @details
 #' Converts the numeric values in `x` into (pseudo-)bins by cutting the data
 #' into `length(breaks) - 1` segments. If `censored = "uncensored"` (no censoring),
-#' data outside `range(break)` will be set to `NA_integer_`.
-#' if `x < min(breaks)` or `length(breaks)` if `x > max(breaks)`.
+#' data outside `range(break)` will be set to `-1L`
+#' if `x < min(breaks)` or `length(breaks) - 1L` if `x > max(breaks)`.
 #'
 #' If `censored = "left"` all values `x <= min(breaks)` are assigned to as bin `0L`,
 #' followed by bin `1L` for `(breaks[1], breaks[2])`, `2L` for `[breaks[2], breaks[3])` etc.
@@ -480,6 +480,9 @@ num2bin <- function(x, breaks = NULL, censored = c("uncensored", "left", "right"
 
     # 'Cut' data, limit to -1 to length(brekas) - 1.
     res <- cut(x, breaks = breaks, labels = FALSE, right = FALSE, include.lowest = TRUE) - 1L
+
+    res[x < min(breaks)] <- -1L                 ## Outside
+    res[x > max(breaks)] <- length(breaks) - 1L ## Outside
 
     # Adjusting the right side of the distribution in case censoring
     # has been set (MUST be done before 'left').

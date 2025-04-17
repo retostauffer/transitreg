@@ -28,8 +28,8 @@ Convert response on original scale to (pseudo-)bin index.
 \details{
 Converts the numeric values in \code{x} into (pseudo-)bins by cutting the data
 into \code{length(breaks) - 1} segments. If \code{censored = "uncensored"} (no censoring),
-data outside \code{range(break)} will be set to \code{NA_integer_}.
-if \code{x < min(breaks)} or \code{length(breaks)} if \code{x > max(breaks)}.
+data outside \code{range(break)} will be set to \code{-1L}
+if \code{x < min(breaks)} or \code{length(breaks) - 1L} if \code{x > max(breaks)}.
 
 If \code{censored = "left"} all values \code{x <= min(breaks)} are assigned to as bin \code{0L},
 followed by bin \code{1L} for \verb{(breaks[1], breaks[2])}, \code{2L} for \verb{[breaks[2], breaks[3])} etc.

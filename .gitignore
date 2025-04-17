@@ -12,3 +12,8 @@
 /inst/*.zip
 /inst/*.rda
 /inst/*.rds
+/altdoc/freeze.rds
+/docs
+altdoc/freeze.rds
+_quarto/*
+!_quarto/_freeze/

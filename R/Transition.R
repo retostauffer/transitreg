@@ -529,13 +529,14 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
 
     # Store element names for return
     xnames <- names(d)
-    breaks   <- attr(d, "breaks")
+    breaks <- attr(d, "breaks")
+
+    if (!elementwise) x <- sort(x) # Important
 
     # Convert numeric values to corresponding 'bin indices' (int)
     xorig <- x
     x <- num2bin(x, breaks, attr(d, "censored"))
 
-    if (!elementwise) x <- sort(x) # Important
     ui  <- seq_along(d) # Unique index
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution
 
@@ -576,7 +577,7 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
         }
         # Create and return matrix
         return(matrix(res, byrow = TRUE, ncol = length(x),
-                      dimnames = list(xnames, get_elementwise_colnames(x, "p"))))
+                      dimnames = list(xnames, get_elementwise_colnames(xorig, "p"))))
     }
 }
 

@@ -44,10 +44,10 @@ expect_identical(num2bin(NULL, bk), NULL,
 
 # Values below lowest break threshold: should result in -1
 expect_identical(num2bin(c(-100, 0, min(bk) - sqrt(.Machine$double.eps)), bk),
-                 rep(NA_integer_, 3L),
+                 rep(-1L, 3L),
                  info = "Testing return for values outside support (below min break)")
 expect_identical(num2bin(c(max(bk) + sqrt(.Machine$double.eps), 100, 100000), bk),
-                 rep(NA_integer_, 3L),
+                 rep(8L, 3L),
                  info = "Testing return for values outside support (above max break)")
 
 
@@ -80,16 +80,16 @@ num2bin <- transitreg:::num2bin
 x       <- 0:10
 bkint   <- c(2, 5, 8)
 expect_identical(num2bin(x = x, breaks = bkint, censored = "uncensored"),
-                 rep(c(NA_integer_, 0L, 1L, NA_integer_), c(2, 3, 4, 2)),
+                 rep(c(-1L, 0L, 1L, 2L), c(2, 3, 4, 2)),
                  info = "Testing num2bin 'uncensored' behavior")
 expect_identical(num2bin(x = x, breaks = bkint, censored = "uncensored"),
                  num2bin(x, bkint),
                  info = "Testing num2bin default/default order")
 expect_identical(num2bin(x = x, breaks = bkint, censored = "left"),
-                 rep(c(0:2, NA_integer_), c(3, 2, 4, 2)),
+                 rep(c(0:2, 3L), c(3, 2, 4, 2)),
                  info = "Testing num2bin 'censored = \"left\"'")
 expect_identical(num2bin(x = x, breaks = bkint, censored = "right"),
-                 rep(c(NA_integer_, 0:2), c(2, 3, 3, 3)),
+                 rep(c(-1L, 0:2), c(2, 3, 3, 3)),
                  info = "Testing num2bin 'censored = \"right\"'")
 expect_identical(num2bin(x = x, breaks = bkint, censored = "both"),
                  rep(0:3, c(3, 2, 3, 3)),
