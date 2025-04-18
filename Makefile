@@ -20,7 +20,7 @@ install: document
 
 .PHONY: coverage
 coverage: install
-	Rscript -e "covr::report(covr::package_coverage(line_exclusions = list('src/init.c'), function_exclusions = list('message\\\\s*\\\\(')), file = \"_coverage.html\")"
+	Rscript -e "covr::report(covr::package_coverage(line_exclusions = list('src/init.c'), function_exclusions = list('message\\\\s*\\\\(', 'plot.transitreg')), file = \"_coverage.html\")"
 
 .PHONY: check clean
 clean:
