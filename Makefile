@@ -36,5 +36,6 @@ check: clean document
 readme:
 	quarto render README.qmd --to gfm
 
-docs:
-	Rscript -e "altdoc::render_docs(verbose = TRUE)"
+docs: readme
+	Rscript -e "altdoc::render_docs(verbose = FALSE)"
+	##Rscript -e "altdoc::render_docs(verbose = TRUE)"

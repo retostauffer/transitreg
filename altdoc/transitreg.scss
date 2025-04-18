@@ -12,6 +12,8 @@ $toc-color: #b52267;
 $toc-hl: #F7374F;
 
 $dropdown-color: #FFFFFF;
+$dropdown-link-color: #FFFFFF;
+$dropdown-link-hover-color: #522546;
 $dropdown-bg: #88304E;
 
 /*-- scss:rules --*/
@@ -22,3 +24,12 @@ $dropdown-bg: #88304E;
     }
 }
 
+#quarto-document-content {
+    ul {
+        li {
+            p {
+                margin-bottom: 0.25rem;
+            }
+        }
+    }
+}

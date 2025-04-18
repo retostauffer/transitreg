@@ -1,6 +1,6 @@
 #' Rain Ireland
 #'
-#' adsf
+#' See also [weather observations website](https://wow.met.ie/).
 #'
 #' @details
 #' Station information:

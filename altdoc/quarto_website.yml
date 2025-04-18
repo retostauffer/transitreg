@@ -3,13 +3,13 @@ project:
   output-dir: ../docs/
 
 # Note: freeze functionality can be set at a project level or for individual .qmd files
-# execute:
-#   freeze: false
+execute:
+  freeze: true
 
 website:
   title: "transitreg"
     #site-url: https://retostauffer.github.io/transitreg
-  code-links: true
+  code-links: false
   navbar:
     search: true
     left:
@@ -17,8 +17,8 @@ website:
         file: vignettes/transitreg.qmd
       - text: Vignettes
         menu:
-          - text: "Test"
-            file: vignettes/test.qmd
+          - text: "Illustration: (Censored) Continuous Response"
+            file: vignettes/continuous-censored.qmd
       - text: Changelog
         file: CHANGELOG.md
     right:

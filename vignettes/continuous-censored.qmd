@@ -1,0 +1,160 @@
+---
+title: "Illustration: (Censored) Continuous Response"
+format: 
+  html:
+    html-math-method: mathjax
+    toc: true
+    number-sections: true
+bibliography: transitreg.bib
+##vignette: >
+##  %\VignetteIndexEntry{transitreg}
+##  %\VignetteEngine{quarto::html}
+##  %\VignetteDepends{transitreg}
+##  %\VignetteKeywords{FIXME}
+##  %\VignettePackage{transitreg}
+---
+
+```{r stup}
+#| echo: false
+#| message: false
+library("transitreg")
+data(rainIreland, package = "transitreg")
+```
+
+This example illustrates the application of transition models for continuous
+data with additional censoring. To demonstrate the capabilities of
+`transitreg()`, the demo data set [`rainIreland`](/man/rainIreland.qmd)
+is used which provides historical records of daily precipitation sums for a
+weather station next to Limerick, Ireland.
+
+Precipitation is physically limited to $0\,mm\,\text{day}^{-1}$ 
+(days withour rain) and the positive observations (days with rain) often
+show a strong positive skewness which needs to be addressed.
+While `transitreg()` automatically addresses for the skewness due to it's
+flexible assumption about the response distribution, the excess of
+zero-observations (dry days) can be addressed in two ways:
+
+* Define one pseudo-bin which only contains all zero-observations.
+* Estimate a left censored transition model; dedicated point-mass
+  for all zero-observations.
+
+## Data
+
+Loading the data set shipped with this package. Contains
+$n = `r nrow(rainIreland)`$ records of daily precipitation sums
+for Patrickswell (Limerick, Ireland) observed between
+`r format(min(rainIreland$date))` and `r format(max(rainIreland$date))`.
+A square-root transformation is often applied to reduce the skewness of
+the data.
+
+```{r}
+#| plot: true
+#| fig.width: 8
+#| fig.height: 4
+par(mfrow = c(1, 2))
+data(rainIreland, package = "transitreg")
+head(rainIreland)
+hist(rainIreland$rain, freq = FALSE, breaks = 100,
+     xlab = "rain", main = "Daily precipitation sums, Patrickswell")
+hist(sqrt(rainIreland$rain), freq = FALSE, breaks = 100,
+     xlab = expression(sqrt(rain)), main = "Daily precipitation sums, Patrickswell")
+```
+
+For more details, see [`rainIreland`](/man/rainIreland.qmd).
+
+# Marginal response
+
+For illustration, the first three models are unconditional models
+(no covariates), estimating a transition model for the marginal response.
+
+* Model 1a: Untransformed precipitation observations, no censoring.
+* Model 1b: Square-root transformed precipitation, no censoring.
+* Model 1c: Left censored distribution using square-root tranformed precipitation.
+
+
+## Model 1a
+
+```{r}
+bk1 <- seq(0, 70, by = 0.5)
+m1  <- transitreg(rain ~ theta0 + s(theta),
+                  data = rainIreland,
+                  breaks = bk1)
+```
+
+```{r}
+x <- seq(0, 70, by = 0.1)
+dens1 <- pdf(m1[1], x)
+hist(rainIreland$rain, freq = FALSE, breaks = bk1)
+lines(x, dens1, col = 2, lwd = 3)
+```
+
+## Model 1b: Square-root transformed response
+
+```{r}
+bk2 <- seq(0, sqrt(70), by = 0.5)
+m2  <- transitreg(sqrt(rain) ~ theta0 + s(theta),
+                  data = rainIreland,
+                  breaks = bk2)
+```
+
+```{r}
+x <- seq(0, sqrt(70), by = 0.01)
+dens2 <- pdf(m2[1], x)
+hist(sqrt(rainIreland$rain), freq = FALSE, breaks = bk2)
+lines(x, dens2, col = 2, lwd = 3)
+```
+
+## Model 1c: Square-root transformed response with censoring
+
+```{r}
+bk3 <- seq(0, sqrt(70), by = 0.5)
+m3  <- transitreg(sqrt(rain) ~ theta0 + s(theta),
+                  data = rainIreland,
+                  breaks = bk3,
+                  censored = "left")
+```
+
+```{r}
+x <- seq(0, sqrt(70), by = 0.01)
+dens3 <- pdf(m3[1], x)
+hist(sqrt(rainIreland$rain), freq = FALSE,
+     breaks = c(0, 0.01, bk3[-1L]),
+     ylim = c(0, 0.5))
+lines(x, dens3, col = 2, lwd = 3)
+```
+
+# Conditional
+
+```{r}
+head(rainIreland)
+rainIreland <- transform(rainIreland,
+                         day = as.integer(format(date, "%j")),
+                         year = as.integer(format(date, "%Y")))
+
+
+```
+
+```{r}
+bk4 <- seq(0, sqrt(70), by = 0.5)
+m4  <- transitreg(sqrt(rain) ~ theta0 + s(theta) + te(day, theta, k = c(12, 10), bs = c("cc", "tp")) + year,
+                  data = rainIreland,
+                  breaks = bk4,
+                  censored = "left")
+plot(m4)
+```
+
+
+```{r}
+nd <- data.frame(year = 2024, day = 1:365)
+p <- predict(m4, newdata = nd, type = "quantile", prob = c(0.01, 0.25, 0.5, 0.75, 0.99))
+head(p)
+matplot(x = nd$day, y = p, type = "l", lty = 1,
+        lwd = c(1, 1, 2, 1, 1), col = c(4, 2, 1, 2, 4),
+        ylim = c(0, max(p) * 1.05),
+        ylab = expression(sqrt(rain)),
+        xlab = "day of the year")
+legend("topleft", bty = "n", legend = colnames(p),
+       pch = NA, lty = 1, lwd = c(1, 1, 2, 1, 1),
+       col = c(4, 2, 1, 2, 4), ncol = 5)
+
+```
