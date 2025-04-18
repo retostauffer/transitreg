@@ -30,16 +30,16 @@ adsf
 \details{
 Station information:
 \itemize{
-\item Country/county: Ireland, Clare
-\item Station: Ardnacrusha (Gen.Stn.No.2; ID 4011)
-\item Altitude (m): \code{28}
-\item Location (deg): \code{52.70639}N/\code{-8.61444}W
+\item Country/county: Ireland, Limerick
+\item Station: Patrickswell (Dooneen; ID 4811)
+\item Altitude (m): \code{27}
+\item Location (deg): \code{52.59500}N/\code{-8.67278}W
 }
 }
 \examples{
 data(rainIreland)
 hist(sqrt(rainIreland$rain), freq = FALSE,
-     main = "Daily precipitation sums\nArdnacrusha, Ireland",
+     main = "Daily precipitation sums\nPatrickswell, Ireland",
      xlab = expression(sqrt(rain)), col = "steelblue")
 
 }

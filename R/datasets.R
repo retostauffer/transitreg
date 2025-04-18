@@ -4,10 +4,10 @@
 #'
 #' @details
 #' Station information:
-#' * Country/county: Ireland, Clare
-#' * Station: Ardnacrusha (Gen.Stn.No.2; ID 4011)
-#' * Altitude (m): `28`
-#' * Location (deg): `52.70639`N/`-8.61444`W
+#' * Country/county: Ireland, Limerick
+#' * Station: Patrickswell (Dooneen; ID 4811)
+#' * Altitude (m): `27`
+#' * Location (deg): `52.59500`N/`-8.67278`W
 #'
 #' @format A data frame containing xyz
 #'
@@ -26,9 +26,11 @@
 #' @examples
 #' data(rainIreland)
 #' hist(sqrt(rainIreland$rain), freq = FALSE,
-#'      main = "Daily precipitation sums\nArdnacrusha, Ireland",
+#'      main = "Daily precipitation sums\nPatrickswell, Ireland",
 #'      xlab = expression(sqrt(rain)), col = "steelblue")
 #'
 #' @docType data
 #' @author Reto
 "rainIreland"
+
+

@@ -119,12 +119,12 @@ While this approach works well, it necessitates the assumption of a parametric
 distribution, which is not required when using transition regression.
 
 For comparison, the square-root transformed precipitation climatology for one
-weather station (Ardnacrusha, 6\,km north of Limerick) is estimated with a
+weather station (Patrickswell, 8\,km southwest of Limerick) is estimated with a
 generalized additive model for location, scale, and shape
 employing a left-censored Gaussian distribution
 (CN; estimated with \verb|bamlss|), quantile
-regression (QR; using \verb|qgam|), and a transition model (TM; with \verb|transitreg|, see Sec.\,\ref{stauffer:sec:software})
-with sixty breaks ($m = 60$).
+regression (QR; using \verb|qgam|), and a left censored transition model (TM; with \verb|transitreg|, see Sec.\,\ref{stauffer:sec:software})
+with sixty-one breaks ($m = 61$).
 All models use cyclic smooth splines on the day of the year as only
 covariate. The out-of-sample fit and pinball loss can be seen in
 Figure\,\ref{stauffer:fig1}, showing that the transition model is on par
@@ -132,7 +132,7 @@ with the other two methods.
 
 \begin{figure}[h]
     \includegraphics[width=\textwidth]{stauffer-figure1.pdf}
-    \caption{Precipitation climatology for Ardnacrusha, Ireland, based on
+    \caption{Precipitation climatology for Patrickswell, Ireland, based on
     43 years of data (2/3 for training, 1/3 for testing).
     Left: Histogram of the daily square-root transformed precipitation
     (out-of-sample) with fitted densities from a censored normal

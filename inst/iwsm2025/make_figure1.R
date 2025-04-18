@@ -5,33 +5,40 @@ library("qgam")
 
 PDF <- "stauffer-figure1.pdf"
 if (!file.exists(PDF)) {
-  df <- readRDS("observations_stn4811.rds")
+  data(rainIreland)
+  head(rainIreland)
+  rainIreland <- transform(rainIreland,
+                           sqrt_rain = sqrt(rain),
+                           day = as.integer(format(date, "%j")),
+                           year = as.integer(format(date, "%Y")))
+
 
   set.seed(6020)
-  idx    <- sample(1:2, size = nrow(df), prob = c(0.8, 0.4), replace = TRUE)
-  dtrain <- subset(df, idx == 1L)
-  dtest  <- subset(df, idx == 2L)
+  idx    <- sample(1:2, size = nrow(rainIreland), prob = c(0.8, 0.4), replace = TRUE)
+  dtrain <- subset(rainIreland, idx == 1L)
+  dtest  <- subset(rainIreland, idx == 2L)
 
-  breaks <- c(0, seq(0.3, 12, by = 0.2))
+  breaks <- seq(0, 12, by = 0.4)
+  breaks <- seq(0, 12, by = 0.3)
   f1 <- sqrt_rain ~ theta0 + ti(theta, k = 20)
-  m1 <- transitreg(f1, data = df, breaks = breaks)
-
+  m1 <- transitreg(f1, data = rainIreland, breaks = breaks, censored = "left")
 
   xx <- c(0, 0.3, ((head(breaks, -1) + tail(breaks, -1L)) / 2)[-1])
   nd <- data.frame("sqrt_rain" = xx)
   mids <- nd$sqrt_rain
 
-  py <- seq(0, 12, by = 0.01) #nd$sqrt_rain
+  py <- seq(0, 12, by = 0.01)
   pm <- as.vector(predict(m1, newdata = nd[1,,drop = F], y = py, type = "pdf"))
 
-  b1 <- bamlss(sqrt_rain ~ 1, data = df, family = cnorm_bamlss)
-  par <- predict(b1, newdata = data.frame("sqrt_rain" = mids), type = "parameter")
-  db <- family(b1)$d(mids, par)
+  b1 <- bamlss(sqrt_rain ~ 1, data = rainIreland, family = cnorm_bamlss)
+  xb <- seq(0, 12, by = 0.01)
+  par <- predict(b1, newdata = data.frame("sqrt_rain" = xb), type = "parameter")
+  db <- family(b1)$d(xb, par)
 
 
   # ----------------------------------------------
   f2 <- sqrt_rain ~ theta0 + ti(theta, k = 20) + ti(theta, day, bs = c("cr", "cc"), k = c(20, 20))
-  m2 <- transitreg(f2, data = dtrain, breaks = breaks)
+  m2 <- transitreg(f2, data = dtrain, breaks = breaks, censored = "left")
 
   fb2 <- sqrt_rain ~ s(day, k = 20, bs = "cc") | s(day, k = 20, bs = "cc")
   b2  <- bamlss(fb2, data = dtrain, family = cnorm_bamlss, binning = TRUE)
@@ -41,9 +48,7 @@ if (!file.exists(PDF)) {
 
   nd <- data.frame("day" = 1:365)
 
-  devtools::load_all("~/Software/transitreg")
   pm2 <- predict(m2, newdata = dtest, prob = qu, elementwise = FALSE)
-  pm2[, 1:2] <- 0 # Reto: quick fix, must be properly investigated in the software!
 
   par <- predict(b2, newdata = dtest, type = "parameter")
   pb2 <- do.call("cbind",
@@ -55,7 +60,6 @@ if (!file.exists(PDF)) {
     lapply(qu, function(j) {
       qdo(g2, j, predict, newdata = dtest)
   }))
-  pg2[pg2 < 0] <- 0 # <- lower limit
 
   err_b <- err_m <- err_g <- NULL
   for(j in 1:5) {
@@ -78,13 +82,17 @@ if (!file.exists(PDF)) {
     par(mfrow = c(1, 3), mar = c(4, 4, 1, 1))
 
     # First subplot
-    hist(df$sqrt_rain, breaks = breaks, freq = FALSE,
-      xlab = "y; sqrt(Precipitation)", main = NA,
-      xlim = c(0, 8))
+    hist(rainIreland$sqrt_rain,
+         breaks = c(0, 0.01, tail(breaks, -1)),
+         freq = FALSE,
+         xlab = "y; sqrt(Precipitation)", main = NA,
+         xlim = c(0, 8), ylim = c(0, 0.5))
 
     lines(pm ~ py, col = 4, lwd = 2)
-    lines(db ~ mids, col = 2, lwd = 2)
-    rug(df$sqrt_rain, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
+    points(py[1L], pm[1L], col = 4, pch = 19)
+    lines(db ~ xb, col = 2, lwd = 2)
+    points(xb[1L], db[1L], col = 2, pch = 1)
+    rug(rainIreland$sqrt_rain, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
 
     legend("center", c("TM", "CN"),
       lwd = 2, col = c(4, 2), bty = "n")
@@ -111,7 +119,7 @@ if (!file.exists(PDF)) {
     ####
     target_day <- as.integer(format(as.Date("2025-07-16"), "%j"))
     distr <- prodist(m2)[which(dtrain$day == target_day)[1]]
-    plot(distr, cdf = TRUE, tp = TRUE, main = NULL, col = 2, ylab = NA,
+    plot(distr, cdf = TRUE, tp = TRUE, main = NULL, col = 4, ylab = NA,
          xlab = "y; sqrt(Precipitation)")
     legend("bottomleft", legend = c(
                 expression(paste("CDF: P(", tilde(y) <= r, ")")),
@@ -119,7 +127,7 @@ if (!file.exists(PDF)) {
            ),
            bty = "n",
            pch = c(19, NA),
-           lwd = c(2, 1), col = c(2, 1), lty = c(1, 2))
+           lwd = c(2, 1), col = c(4, 1), lty = c(1, 2))
 
   dev.off()
 }
