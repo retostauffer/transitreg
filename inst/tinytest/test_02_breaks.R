@@ -102,13 +102,18 @@ expect_identical(b, transitreg:::make_breaks(xint, NULL, "uncensored"),
         info = "Testing default argument order.")
 
 ###
+msg <- "Integer response, breaks 8 (too small), uncensored; checking"
+expect_error(b <- transitreg:::make_breaks(xint, breaks = 8, censored = "uncensored"),
+        pattern = "response looks like count data, breaks must be >= max\\(response\\)",
+        info = paste(msg, "execution silent"))
+
+###
 msg <- "Integer response, breaks 10, uncensored; checking"
 expect_silent(b <- transitreg:::make_breaks(xint, breaks = 10, censored = "uncensored"),
         info = paste(msg, "execution silent"))
 expect_inherits(b$bins, "integer",           info = paste(msg, "bin class"))
 expect_identical(b$bins, 10L - 1L,           info = paste(msg, "number of bins"))
-expect_inherits(b$breaks, "numeric",         info = paste(msg, "breaks class"))
-expect_equal(b$breaks, dfbk(xint, 10),       info = paste(msg, "break values"))
+expect_true(is.null(b$breaks),               info = paste(msg, "break return class (NULL)"))
 expect_identical(b$censored, "uncensored",   info = paste(msg, "censored return"))
 
 ###
@@ -117,8 +122,7 @@ expect_silent(b <- transitreg:::make_breaks(xint, breaks = 555, censored = "unce
         info = paste(msg, "execution silent"))
 expect_inherits(b$bins, "integer",           info = paste(msg, "bin class"))
 expect_identical(b$bins, 555L - 1L,          info = paste(msg, "number of bins"))
-expect_inherits(b$breaks, "numeric",         info = paste(msg, "breaks class"))
-expect_equal(b$breaks, dfbk(xint, 555),      info = paste(msg, "break values"))
+expect_true(is.null(b$breaks),               info = paste(msg, "break return class (NULL)"))
 expect_identical(b$censored, "uncensored",   info = paste(msg, "censored return"))
 
 
@@ -169,16 +173,7 @@ expect_identical(b$censored, "uncensored",          info = paste(msg, "censored 
 
 ##
 msg <- "Integer response, censored = \"left\", breaks 20; checking"
-expect_silent(b <- transitreg:::make_breaks(c(0L, 10L), 20, "left"),
-        info = paste(msg, "execution silent"))
-expect_inherits(b$bins, "integer",                  info = paste(msg, "bin class"))
-expect_identical(b$bins, (20L - 1L) + 1L,           info = paste(msg, "number of bins"))
-expect_inherits(b$breaks, "numeric",                info = paste(msg, "breaks breaks return class"))
-expect_identical(b$breaks, dfbk(0:10, 20, "left"),  info = paste(msg, "values"))
-expect_identical(b$censored, "left",                info = paste(msg, "censored return"))
-
-##
-msg <- "Integer response, censored = \"left\", breaks 20; checking"
+(b <- transitreg:::make_breaks(c(0L, 10L), 20, "right"))
 expect_silent(b <- transitreg:::make_breaks(c(0L, 10L), 20, "right"),
         info = paste(msg, "execution silent"))
 expect_inherits(b$bins, "integer",                  info = paste(msg, "bin class"))

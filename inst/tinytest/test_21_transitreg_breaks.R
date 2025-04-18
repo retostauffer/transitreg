@@ -52,11 +52,13 @@ expect_true("bins" %in% names(m2),
                info = "Element 'bins' must be stored in the model")
 expect_identical(m2$bins, nbk - 1L,
                info = "Checking number of bins")
-expect_equal(m2$breaks, seq(-0.8, 8.8, length.out = m2$bins + 1),
-               info = "Breaks are alculated automatically via make_breaks()")
+expect_true(is.null(m2$breaks),
+               info = "Count data, no breaks set")
 # Breaks are stored on the object, get_breaks should return the exact same.
-expect_equal((tmp <- transitreg:::get_breaks(m2)), m2$breaks,
-               info = "Checking response of get_breaks() helper function")
+expect_silent(tmp <- transitreg:::get_breaks(m2),
+               info = "Extracting breaks")
+expect_inherits(tmp, "integer", info = "Integer breaks (count data model)")
+expect_identical(tmp, 0:9,      info = "Checking break values")
 # Checking get_mids helper function
 tmp_mid <- (tmp[-1L] + tmp[-length(tmp)]) / 2.0
 expect_equal(transitreg:::get_mids(m2), tmp_mid,

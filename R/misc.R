@@ -568,8 +568,8 @@ make_breaks <- function(y, breaks, censored) {
 
     # Check if all breaks are positive integers, as well as all response values.
     # This is used identify count data models.
-    eps <- sqrt(.Machine$double.eps)
-    y_int      <- all(abs(y - round(y)) <= eps) && all(round(y) >= 0L)
+    eps   <- sqrt(.Machine$double.eps)
+    y_int <- all(abs(y - round(y)) <= eps) && all(round(y) >= 0L)
 
     # If response does not look like count data, 'breaks' must be set.
     if (!y_int && is.null(breaks))
@@ -588,6 +588,14 @@ make_breaks <- function(y, breaks, censored) {
 
         res <- NULL
         nbins <- round(max(y)) * if (ny <= 10) { 3 } else if (ny <= 100) { 1.5 } else { 1.25 }
+
+    } else if (y_int && (is.numeric(breaks) && length(breaks) == 1L) && isTRUE(censored == "uncensored")) {
+        if (breaks < max(y))
+            stop("response looks like count data, breaks must be >= max(response)")
+
+        res      <- NULL
+        censored <- censored #"uncensored"
+        nbins    <- breaks - 1L
 
     # -------------------------------
     # (2) If 'breaks' is numeric of length 1, the user just specified how many
