@@ -25,7 +25,7 @@ licensed under the Creative Commons Attribution 4.0 International
 rainIreland
 }
 \description{
-adsf
+See also \href{https://wow.met.ie/}{weather observations website}.
 }
 \details{
 Station information:
@@ -33,7 +33,7 @@ Station information:
 \item Country/county: Ireland, Limerick
 \item Station: Patrickswell (Dooneen; ID 4811)
 \item Altitude (m): \code{27}
-\item Location (deg): \code{52.59500}N/\code{-8.67278}W
+\item Location (deg): \code{52.59500}N/\code{-8.67278}E
 }
 }
 \examples{

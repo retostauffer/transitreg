@@ -17,6 +17,8 @@ website:
         file: vignettes/transitreg.qmd
       - text: Vignettes
         menu:
+          - text: "Illustration: Continuous Response"
+            file: vignettes/continuous.qmd
           - text: "Illustration: (Censored) Continuous Response"
             file: vignettes/continuous-censored.qmd
       - text: Changelog

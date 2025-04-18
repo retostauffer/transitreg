@@ -1,0 +1,136 @@
+---
+title: "Illustration: Continuous Response"
+format: 
+  html:
+    html-math-method: mathjax
+    toc: true
+    number-sections: true
+bibliography: transitreg.bib
+##vignette: >
+##  %\VignetteIndexEntry{transitreg}
+##  %\VignetteEngine{quarto::html}
+##  %\VignetteDepends{transitreg}
+##  %\VignetteKeywords{FIXME}
+##  %\VignettePackage{transitreg}
+---
+
+```{r setup}
+#| echo: false
+#| message: false
+Sys.setlocale("LC_TIME", "C")
+library("transitreg")
+data(weatherShannon, package = "transitreg")
+```
+
+This example illustrates the application of transition models for continuous
+data using the demo data set [`weatherShannon`](/man/weatherShannon.qmd) 
+which consists of historical weather observations at
+Shannon airport, Ireland.
+
+# Data
+
+Besides other variables, the data set contains records of daily
+maximum temperature (`maxtp`). For computational reasons, only the
+last 10 years are used in this illustration.
+
+```{r}
+weatherShannon <- subset(weatherShannon, date >= as.Date("2015-01-01"))
+```
+
+## Unconditional model
+
+```{r}
+m1 <- transitreg(maxtp ~ s(theta), breaks = 201, data = weatherShannon)
+```
+
+Estimated distribution:
+
+```{r}
+#| fig: true
+#| fig.width: 6
+#| fig.height: 4
+#| out.width: 100%
+d1 <- m1[1] # or prodist(m1)[1L]
+c(continuous = is_continuous(d1), discrete   = is_discrete(d1))
+
+plot(d1, main = "Estimated density")
+plot(d1, cdf = TRUE, tp = TRUE,
+     main = "Estimated distribution plus\ntransition probabilities")
+``
+
+```{r}
+# Weighted mean
+mean(d1)
+# Quantiles
+quantile(d1, probs = seq(0, 1, by = 0.1))
+# Probability for days with a maximum temperature < 0 degrees
+cdf(d1, x = 0)
+# Probability of days with a maximum temperature of ~0 degrees.
+# to be precise, the probability for a daily maximum between:
+pdf(d1, x = 0)
+m1$breaks[which(m1$breaks >= 0)[1L] - 1:0]
+```
+
+```{r}
+pithist(m1)
+#rootogram(m1)
+#qqrplot(m1)
+```
+
+## Conditional climatological model
+
+```{r}
+weatherShannon <- transform(weatherShannon,
+                       day  = as.integer(format(date, "%j")),
+                       year = as.integer(format(date, "%Y")))
+
+f2 <- maxtp ~ s(theta) + te(day, theta, bs = c("cc", "tp"))
+m2 <- transitreg(f2, breaks = 101, data = weatherShannon)
+pithist(m2)
+rootogram(m2, breaks = 15)
+
+tmp_dates <- as.Date(sprintf("2024-%02d-01", c(1, 4, 7, 10)))
+idx <- which(with(weatherShannon, date %in% tmp_dates))
+
+plot(m2[idx], col = 1:4)
+legend("left", legend = tmp_dates, col = 1:4, lty = 1, pch = 19)
+
+plot(m2[idx], cdf = TRUE, tp = TRUE, col = 1:4)
+legend("left", legend = tmp_dates, col = 1:4, lty = 1, pch = 19)
+```
+
+## Prediction
+
+```{r}
+nd <- data.frame(day = 111)
+tp <- predict(m2, newdata = nd, type = "tp")
+tp[, 1:4] # Transition probabilities
+
+d2 <- Transition(tp, breaks = m2$breaks)
+print(d2)
+plot(d2, cdf = T)
+```
+
+```{r}
+pithist(m2)
+rootogram(m2)
+qqrplot(m2)
+```
+
+```{r}
+bkx <- seq(-20, 50, length.out = 151)
+m3 <- transitreg(f2, breaks = bkx, data = weatherShannon)
+
+plot(m3[idx], col = 1:4)
+legend("left", legend = tmp_dates, col = 1:4, lty = 1, pch = 19)
+
+p <- predict(m3, type = "pdf", y = m3$breaks)
+w <- tail(m3$breaks, -1L) - head(m3$breaks, -1)
+summary(apply(p, 1, function(x) sum(x * w)))
+```
+
+```{r}
+pithist(m3)
+rootogram(m3)
+qqrplot(m3)
+```
