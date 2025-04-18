@@ -56,7 +56,7 @@ c(continuous = is_continuous(d1), discrete   = is_discrete(d1))
 plot(d1, main = "Estimated density")
 plot(d1, cdf = TRUE, tp = TRUE,
      main = "Estimated distribution plus\ntransition probabilities")
-``
+```
 
 ```{r}
 # Weighted mean
