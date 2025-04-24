@@ -858,12 +858,11 @@ proresiduals.transitreg <- function(object, ...) {
     args <- c(list(object = object), list(...))
     if (!is.null(object$breaks)) {
         # Find minimum distance to lower end of bin/interval
-        if (is.null(args$newdata))
-            args$newdata <- model.frame(object)
+        y <- newresponse(object, newdata = args$newdata)
 
         ## Setting response to 'lower end of bin' for wormplot
-        args$newdata[[object$response]] <-
-            object$breaks[1L + num2bin(args$newdata[[object$response]], object$breaks)]
+        args$newdata[[names(y)]] <- object$breaks[1L + num2bin(y[[1L]],
+                breaks = object$breaks, censored = object$censored)]
     }
     do.call(topmodels:::proresiduals.default, args)
 }
@@ -876,13 +875,24 @@ proresiduals.transitreg <- function(object, ...) {
 #' @exportS3Method newresponse transitreg
 newresponse.transitreg <- function(object, newdata = NULL, ...) {
     ## Response name
-    yn <- object$response
+    yraw  <- object$response
+    yprep <- names(model.frame(object))[1L]
 
+    # If 'newdata' is null, take model frame (training data)
     if (is.null(newdata)) newdata <- model.frame(object)
-    if (is.null(newdata[[object$response]]))
-        stop("Response variable '", object$response, "' missing in newdata!")
+    # If response (or raw response) can't be found: error.
+    # Example:
+    #  - Imagine the formula is sqrt(rain) ~ ....
+    #  - yraw: 'rain'
+    #  - yprep: 'sqrt(rain)'
+    #  - If we can find 'yraw' but not 'yprep' we calculate the prepared one on the fly.
+    #    If 'yprep' can be found, it is taken as is.
+    if (is.null(newdata[[yraw]]) && is.null(newdata[[yprep]]))
+        stop("Response variable '", yraw, "' or '", yprep, "' missing in newdata!")
+    if (is.null(newdata[[yprep]]))
+        newdata[[yprep]] <- with(newdata, eval(parse(text = yprep)))
 
-    y <- setNames(data.frame(newdata[[object$response]]), yn)
+    y <- setNames(data.frame(newdata[[yprep]]), yprep)
     return(y)
 }
 

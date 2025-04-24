@@ -37,7 +37,7 @@ last 10 years are used in this illustration.
 weatherShannon <- subset(weatherShannon, date >= as.Date("2015-01-01"))
 ```
 
-## Unconditional model
+# Unconditional model
 
 ```{r}
 m1 <- transitreg(maxtp ~ s(theta), breaks = 201, data = weatherShannon)
@@ -77,7 +77,7 @@ pithist(m1)
 #qqrplot(m1)
 ```
 
-## Conditional climatological model
+# Conditional climatological model
 
 ```{r}
 weatherShannon <- transform(weatherShannon,
@@ -123,10 +123,6 @@ m3 <- transitreg(f2, breaks = bkx, data = weatherShannon)
 
 plot(m3[idx], col = 1:4)
 legend("left", legend = tmp_dates, col = 1:4, lty = 1, pch = 19)
-
-p <- predict(m3, type = "pdf", y = m3$breaks)
-w <- tail(m3$breaks, -1L) - head(m3$breaks, -1)
-summary(apply(p, 1, function(x) sum(x * w)))
 ```
 
 ```{r}
