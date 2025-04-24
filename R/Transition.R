@@ -535,10 +535,16 @@ cdf.Transition <- function(d, x, drop = TRUE, elementwise = NULL, ncores = NULL,
 
     # Convert numeric values to corresponding 'bin indices' (int)
     xorig <- x
-    # Important: acting like we are uncensored to ensure that 'x's outside
-    # the breaks are set to `-1` (lower end) and `bins + 1` (upper end)
-    # required to provide proper CDFs of `0.0` and `1.0` if outside range.
-    x <- num2bin(x, unique(breaks), "uncensored")
+    x <- num2bin(x, breaks, attr(d, "censored"))
+
+    # Censored?
+    # Set observations outside support to -1 (below lowest bin)
+    # and length(breaks) (above hightest bin).
+    censored   <- attr(d, "censored")
+    cens_left  <- censored == "left"  || censored == "both"
+    cens_right <- censored == "right" || censored == "both"
+    if (cens_left)  x[xorig < min(breaks)] <- -1L
+    if (cens_right) x[xorig > max(breaks)] <- length(breaks)
 
     ui  <- seq_along(d) # Unique index
     idx <- rep(ui, each = length(breaks) - 1) # Index of distribution

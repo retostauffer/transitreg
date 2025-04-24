@@ -17,7 +17,7 @@ bibliography: transitreg.bib
 ```{r setup}
 #| echo: false
 #| message: false
-Sys.setlocale("LC_TIME", "C")
+invisible(Sys.setlocale("LC_TIME", "C"))
 library("transitreg")
 data(weatherShannon, package = "transitreg")
 ```

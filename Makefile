@@ -37,5 +37,5 @@ readme:
 	quarto render README.qmd --to gfm
 
 docs: readme
-	Rscript -e "altdoc::render_docs(verbose = FALSE)"
+	Rscript -e "altdoc::render_docs(verbose = FALSE, parallel = TRUE)"
 	##Rscript -e "altdoc::render_docs(verbose = TRUE)"

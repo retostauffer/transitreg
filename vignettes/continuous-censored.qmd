@@ -17,7 +17,7 @@ bibliography: transitreg.bib
 ```{r setup}
 #| echo: false
 #| message: false
-Sys.setlocale("LC_TIME", "C")
+invisible(Sys.setlocale("LC_TIME", "C"))
 library("transitreg")
 data(weatherShannon, package = "transitreg")
 ```
@@ -62,7 +62,7 @@ hist(sqrt(weatherShannon$rain), freq = FALSE, breaks = 100,
      xlab = expression(sqrt(rain)), main = "Daily precipitation sums, Shannon airport")
 ```
 
-For more details, see [`weatherShannon`](man/weatherShannon.qmd).
+For more details, see [`weatherShannon`](/man/weatherShannon.qmd).
 
 # Marginal response
 
