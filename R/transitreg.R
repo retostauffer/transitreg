@@ -222,7 +222,7 @@ transitreg <- function(formula, data, subset, na.action,
 
   ## Evaluate 'engine' argument
   engine <- tolower(engine)
-  engine <- match.arg(engine, c("bam", "gam", "nnet", "glmnet"))
+  engine <- match.arg(engine, c("bam", "gam", "nnet", "glmnet", "tensorflow"))
 
   ## Check if `scale.x` was specified via the `...` argument (hidden feature).
   ## If so, it must be TRUE or FALSE. Else it is set TRUE if `engine = "nnet"`
@@ -231,7 +231,7 @@ transitreg <- function(formula, data, subset, na.action,
   if (!is.null(scale.x))
       stopifnot("'scale.x' (if specified via '...') must be TRUE or FALSE" =
                 isTRUE(scale.x) || isFALSE(scale.x))
-  if (is.null(scale.x)) scale.x <- engine == "nnet" ## defaults to TRUE if engine = "nnet"
+  if (is.null(scale.x)) scale.x <- engine %in% c("nnet", "tensorflow") ## defaults to TRUE if engine = "nnet"
 
   ## Evaluate the model frame
   mf <- match.call(expand.dots = FALSE)
@@ -381,6 +381,8 @@ transitreg <- function(formula, data, subset, na.action,
     rval$model <- nnet::nnet(rval$new_formula, data = tmf, ...)
   } else if (engine == "glmnet") {
     rval$model <- transitreg_glmnet(rval$new_formula, data = tmf, ...)
+  } else if (engine == "tensorflow") {
+    rval$model <- transitreg_tensorflow(rval$new_formula, data = tmf, ...)
   }
   options("warn" = warn)
 
@@ -392,10 +394,10 @@ transitreg <- function(formula, data, subset, na.action,
   # Highest count in response
   rval$maxcounts   <- num2bin(max(mf[[1L]]), breaks = breaks, censored = censored)
 
-  if (inherits(rval$model, "nnet")) {
-    tp <- predict(rval$model, type = "raw")
+  if (inherits(rval$model, "nnet") || inherits(rval$model, "transitreg_tensorflow")) {
+    tp <- predict(rval$model, newdata = tmf, type = "raw")
   } else {
-    tp <- predict(rval$model, type = "response")
+    tp <- predict(rval$model, newdata = tmf, type = "response")
   }
 
   ## Compute probabilities.
