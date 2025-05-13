@@ -4,7 +4,6 @@
 
 if (interactive()) { library("tinytest"); library("transitreg") }
 
-
 set.seed(6020)
 data <- data.frame(y = rpois(100, 3.5))
 
@@ -91,8 +90,27 @@ tmp <- head(data); names(tmp) <- "foo"
 expect_error(newresponse(m, newdata = tmp),
              pattern = "Response variable 'y' missing in newdata!",
              info = "Testing newdata with missing response variable")
-rm(tmp)
 
+
+# Note that the error above looks different if the response is a
+# transformed response. I.e., if the formula is `sqrt(y) ~ ...`
+# then both `y` or `sqrt(y)` are valid response variables in the
+# newdata object. Testing ...
+msqrt   <- transitreg(sqrt(y) ~ s(theta, k = 3), data = data,
+                      breaks = seq(0, 3, length.out = 10))
+expect_error(newresponse(msqrt, newdata = tmp),
+             pattern = "Response variable 'y' or 'sqrt\\(y\\)' missing in newdata!",
+             info = "Testing newdata with missing response variable")
+
+# Checking that both (providing y or sqrt(y) yield the same result
+expect_silent(ry <- newresponse(msqrt, newdata = data.frame(y = 5)),
+              info = "newresponse() with response provided as 'y' on newdata should run silent.")
+expect_silent(rsqrty <- newresponse(msqrt, newdata = data.frame(y = 5)),
+              info = "newresponse() with response provided as 'sqrt(y)' on newdata should run silent.")
+expect_identical(ry, rsqrty,
+              info = "Expecting the same result from newresponse() no matter if the response on newdata is provided as 'y' or 'sqrt(y)'.")
+
+rm(tmp)
 
 # -------------------------------------------------------------------
 # Prediction methods

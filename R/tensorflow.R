@@ -1,3 +1,27 @@
+#' Estimat Transition Probabilities via `tensorflow`/`keras3`
+#'
+#' Experimental engine used to estimate the transition probabilities
+#' in a [transitreg()] model.
+#'
+#' @param formula An object of class `formula`.
+#' @param data A data.frame containing the required data to fit a tensorflow
+#'        model (given `formula`) using [keras3::keras_model_sequential()].
+#' @param nlayers Number of layers.
+#' @param units ... (TODO)
+#' @param epochs ... (TODO)
+#' @param batch_size ... (TODO)
+#' @param activation ... (TODO)
+#' @param dropout ... (TODO)
+#' @param validation_split ... (TODO)
+#' @param patience ... (TODO)
+#' @param trace ... (TODO)
+#' @param ncores Number of cores to be used to train the model.
+#' @param \dots currently unused.
+#'
+#' @importFrom stats model.matrix
+#' @author Niki
+#' @rdname transitreg_tensorflow
+#' @export
 transitreg_tensorflow <- function(formula, data, nlayers = 2, units = 20,
                                   epochs = 1000, batch_size = 16, activation = "relu", dropout = 0.1,
                                   validation_split = 0.2, patience = 10, trace = 0,
@@ -88,6 +112,14 @@ transitreg_tensorflow <- function(formula, data, nlayers = 2, units = 20,
   return(mod)
 }
 
+#' @param object an object of class `transitreg_tensorflow`.
+#' @param newdata Data frame with the variables required for the prediction.
+#' @param \dots currently unused.
+#'
+#' @author Niki
+#' @importFrom stats model.matrix
+#' @exportS3Method predict transitreg_tensorflow
+#' @rdname transitreg_tensorflow
 predict.transitreg_tensorflow <- function(object, newdata, ...) {
   # Remove custom class
   class(object) <- setdiff(class(object), "transitreg_tensorflow")

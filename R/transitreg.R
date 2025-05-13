@@ -889,8 +889,10 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
     #  - yprep: 'sqrt(rain)'
     #  - If we can find 'yraw' but not 'yprep' we calculate the prepared one on the fly.
     #    If 'yprep' can be found, it is taken as is.
-    if (is.null(newdata[[yraw]]) && is.null(newdata[[yprep]]))
-        stop("Response variable '", yraw, "' or '", yprep, "' missing in newdata!")
+    if (is.null(newdata[[yraw]]) && is.null(newdata[[yprep]])) {
+        yprep <- if (yraw == yprep) "" else paste0("or '", yprep, "' ")
+        stop("Response variable '", yraw, "' ", yprep, "missing in newdata!")
+    }
     if (is.null(newdata[[yprep]]))
         newdata[[yprep]] <- with(newdata, eval(parse(text = yprep)))
 

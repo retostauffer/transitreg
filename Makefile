@@ -8,11 +8,11 @@ document:
 	Rscript -e "devtools::document()"
 
 .PHONY: test
-test: install
+test: clean install
 	Rscript -e "library('transitreg'); tinytest::test_all()"
 
 .PHONY: install
-install: document
+install: clean document
 	@echo Installing current version: $(VERSION)
 	(cd ../ && \
 		R CMD build --no-build-vignettes transitreg && \
@@ -26,10 +26,12 @@ coverage: install
 clean:
 	-rm src/*.so
 	-rm src/*.o
+	-rm vignettes/*.html
+	-rm -r vignettes/*_files/
 check: clean document
 	@echo Checking current version: $(VERSION)
 	(cd ../ && \
-		R CMD build --no-build-vignettes transitreg && \
+		R CMD build --resave-data --no-build-vignettes transitreg && \
 		R CMD check --as-cran transitreg_$(VERSION).tar.gz)
 
 .PHONY: readme docs

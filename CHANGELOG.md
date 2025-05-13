@@ -1,4 +1,14 @@
 
+## Version 0.2-0
+
+* Updated package version to `0.2-0` to reflect the current development status
+  and its first public announcement/presentation at several upcoming
+  conferences. The package is still under active development and will benefit
+  greatly from community feedback. If you encounter any issues, have
+  suggestions for improvements, or would like to request features, please don't
+  hesitate to reach out via <https://github.com/retostauffer/transitreg/issues>.
+
+
 ## Version 0.1-9011-90XX
 
 * Further (major) changes as the package is still under development.
@@ -19,6 +29,10 @@
 * Re-implemented censoring (uncensored, left-censored, right-censored, or both).
   Censoring points are pseudo-bins with a width of 0, handled as point mass probabilities.
 * Refractured how breaks are calculated for different scenarios.
+* Added `altdoc` skeleton (development; not yet in a presentable shape).
+* Added a development version of an `keras3`/`tensorflow` engine to estimate
+  the underlying binary response model.
+* Test data set `Shannon` added for examples, tests, and (upcoming) vignettes.
 
 
 ## Version 0.1-9010

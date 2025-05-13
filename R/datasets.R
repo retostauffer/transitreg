@@ -1,61 +1,36 @@
-#' Rain Ireland
-#'
-#' See also [weather observations website](https://wow.met.ie/).
-#'
-#' @details
-#' Station information:
-#' * Country/county: Ireland, Limerick
-#' * Station: Patrickswell (Dooneen; ID 4811)
-#' * Altitude (m): `27`
-#' * Location (deg): `52.59500`N/`-8.67278`E
-#'
-#' @format A data frame containing xyz
-#'
-#' * `date`: The observations are valid from
-#'    0900 UTC of the previous day until 0900 UTC of the date provided.
-#' * `rain`: 24 hour precipitation sum in mm.
-#'
-#' For details regarding the observations and recording period please
-#' see 'Rainfall Stations' on <https://www.met.ie/climate/what-we-measure>.
-#'
-#' @source Met Éireann, the Irish Meteorological Service,
-#' licensed under the Creative Commons Attribution 4.0 International
-#' (CC BY 4.0) license via. Available at
-#' <https://www.met.ie/climate/available-data/historical-data>.
-#'
-#' @examples
-#' data(rainIreland)
-#' hist(sqrt(rainIreland$rain), freq = FALSE,
-#'      main = "Daily precipitation sums\nPatrickswell, Ireland",
-#'      xlab = expression(sqrt(rain)), col = "steelblue")
-#'
-#' @docType data
-#' @author Reto
-"rainIreland"
 
-#' Weather Shannon Airport (Ireland)
+#' Weather Data Shannon Airport (Ireland)
 #'
-#' See also [weather observations website](https://wow.met.ie/).
+#' This data set contains daily meteorological observations from Shannon Airport,
+#' located on the west coast of Ireland, covering the period from September 1,
+#' 1945, to January 31, 2025 (29,008 days, approximately 79.5 years). The data,
+#' provided by the Irish Meteorological Service (Met Éireann), includes daily
+#' minimum and maximum temperatures, precipitation amounts, and sunshine duration.
 #'
 #' @details
-#' Station information:
+#' **Station information**
+#'
 #' * Country/county: Ireland, Clare
 #' * Station: Shannon Airport (ID 518)
-#' * Altitude (m): `15`
-#' * Location (deg): `52.69028`N/`-8.91806`E
+#' * Altitude: 15 m a.m.s.l.
+#' * Location: 52.69028°N, 8.91806°W
 #'
-#' @format Data frame with historical meteorological observations
-#' at Shannon airport (Clare county, Ireland). Observations are
-#' valid between 0000 UTC and 0000 UTC.
+#' For more details, see the [weather observations website](https://wow.met.ie/).
 #'
-#' * `date`: Date of observation.
-#' * `maxtp`: Daily maximum temperature [degrees Celsius].
-#' * `mintp`: Daily minimum temperature [degrees Celsius].
-#' * `rain`: Daily precipitation sum [millimeters].
-#' * `sun`: Sunshine duration [hours]
+#' @format A data frame containing historical meteorological observations from
+#' Shannon Airport (Clare County, Ireland) spanning over 79 years, without gaps
+#' or missing values. Observations are valid from 0000 UTC to 0000 UTC.
 #'
-#' For details regarding the observations and recording period please
-#' see <https://www.met.ie/climate/what-we-measure>.
+#' The data frame contains the following variables:
+#'
+#' * `date`: Date of observation  
+#' * `maxtp`: Daily maximum temperature \[°C\]
+#' * `mintp`: Daily minimum temperature \[°C\]
+#' * `rain`: Daily precipitation sum \[mm\]
+#' * `sun`: Sunshine duration \[hours\]
+#'
+#' For more details about the observations and recording period,  
+#' visit <https://www.met.ie/climate/what-we-measure>.
 #'
 #' @source Met Éireann, the Irish Meteorological Service,
 #' licensed under the Creative Commons Attribution 4.0 International

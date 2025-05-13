@@ -11,3 +11,8 @@
 ^docs$
 ^altdoc$
 ^_quarto$
+
+
+^vignettes/*_files/
+^vignettes/*.html
+^vignettes/*.qmd
