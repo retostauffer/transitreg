@@ -22,7 +22,7 @@ Description: Provides infrastructure for estimating flexible transition models,
 License: GPL-2 | GPL-3
 Depends: R (>= 4.1.0), mgcv, topmodels, distributions3
 Imports: Formula
-Suggests: colorspace, nnet, quarto, glmnet
+Suggests: colorspace, nnet, quarto, glmnet, keras3, tensorflow
 VignetteBuilder: quarto
 LazyData: yes
 Encoding: UTF-8
