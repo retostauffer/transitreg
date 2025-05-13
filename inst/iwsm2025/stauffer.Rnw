@@ -105,6 +105,30 @@ $$
 $$
 It can be shown that the approximated PDF converges to the true PDF as
 the number of pseudo-bins approaches infinity ($m \rightarrow \infty$).
+%%This discretization effectively provides a stepwise approximation of the
+%%underlying smooth continuous distribution.
+For a continuous response variable $y_i$ with CDF $F(y)$, the discretization
+approximates the probabilities of $y_i$ falling into each interval as
+$P(\zeta_l \leq y_i < \zeta_{l+1}) = F(\zeta_{l+1}) - F(\zeta_l)$.
+These probabilities are represented by the transformed counts $\tilde{y}_i$, allowing the
+transition model to reconstruct the discrete probabilities as
+$P(\tilde{y}_i = r) = P(\zeta_r \leq y_i < \zeta_{r+1})$.
+The transition model estimates the probability of transitioning between counts
+$$
+P(\tilde{y}_i > r \mid \tilde{y}_i \geq r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha})),
+$$
+and recursively computes
+$$  
+P(\tilde{y}_i = r, \mathbf{x}_i) = P(\tilde{y}_i = r \mid \tilde{y}_i \geq r, \mathbf{x}_i) \prod_{s=0}^{r-1} P(\tilde{y}_i > s \mid \tilde{y}_i \geq s, \mathbf{x}_i).
+$$                                                                                            For any value $y_i \in [\zeta_l, \zeta_{l+1})$, the CDF can be approximated by
+$$
+\hat{F}(y_i) = \sum_{r=0}^{l-1} P(\tilde{y}_i = r) + \frac{y_i - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y}_i = l),
+$$
+where the first term sums probabilities for bins below $y_i$, and the second term performs
+linear interpolation within the current bin. As the number of bins $m$ increases and bin
+widths shrink, this stepwise approximation converges uniformly to the true CDF ($F(y)$).
+
+
 
 
 \section{Transition models for Irish precipitation}\label{stauffer:sec:application}
