@@ -1,0 +1,91 @@
+---
+title: "Illustration: Two sided Censored Continuous Response"
+format: 
+  html:
+    html-math-method: mathjax
+    toc: true
+    number-sections: true
+bibliography: transitreg.bib
+##vignette: >
+##  %\VignetteIndexEntry{transitreg}
+##  %\VignetteEngine{quarto::html}
+##  %\VignetteDepends{transitreg}
+##  %\VignetteKeywords{FIXME}
+##  %\VignettePackage{transitreg}
+---
+
+```{r setup}
+#| echo: false
+#| message: false
+invisible(Sys.setlocale("LC_TIME", "C"))
+library("transitreg")
+```
+
+```{r}
+get_sunshine_by_doy <- function(doy, latitude) {
+    # Solar declination in radians
+    decl <- 23.44 * pi / 180 * sin(2 * pi * (284 + doy) / 365)
+    x <- pmax(-1, pmin(1, -tan(latitude * pi / 180) * tan(decl))) # [-1, +1]
+    2 * acos(x) * 180 / pi / 15 # Convert angle to hours
+}
+
+# Loading data set; transform/prepare variables
+data(weatherShannon, package = "transitreg")
+sun <- within(subset(weatherShannon, select = c(date, sun)), {
+            day    = pmin(365L, as.integer(format(date, "%j")));
+            maxsun = floor(get_sunshine_by_doy(day, 52.69028));
+            #maxsun = pmin(floor(maxsun), sun); # Limit to full hours
+            relsun = pmin(100, round(100 * sun / maxsun))
+       })
+rm(weatherShannon)
+summary(sun)
+```
+
+# Testing
+
+```{r}
+bk <- seq(0, 100, by = 10) # 11 breaks, 10 bins
+m <- transitreg(relsun ~ theta0 + s(theta, k = 8) + te(day, theta, bs = c("cc", "tp"), k = c(8, 8)) + theta11,
+                data = sun,
+                breaks = bk,
+                censored = "both")
+```
+
+
+
+```{r}
+idx_winter <- which(sun$date == as.Date("2024-12-23"))
+idx_summer <- which(sun$date == as.Date("2024-07-21"))
+
+plot(m[c(idx_winter, idx_summer)], col = c(4, 2))
+```
+
+
+# Uncens
+
+```{r}
+bk <- seq(0, 100, by = 5) # 21 breaks, 20 bins
+m2 <- transitreg(relsun ~ theta0 + s(theta, k = 8) + te(day, theta, bs = c("cc", "tp"), k = c(8, 8)) + theta19,
+                data = sun,
+                breaks = bk)
+
+qqrplot(m2, simint = FALSE)
+plot(m2[c(idx_winter, idx_summer)], col = c(4, 2))
+```
+
+```{r}
+sun$relexpectation <- predict(m2, type = "mean")
+with(subset(sun, format(date, "%Y") == "2024"),
+     plot(relexpectation ~ date, type = "l", col = 2, lwd = 2,
+          xlab = "Percent", ylab = "date (2024)",
+          main = "E(relsun) in percent possible"))
+
+with(sun, plot(maxsun ~ day))
+sun$expectation <- sun$relexpectation * sun$maxsun / 100
+plot(expectation ~ day, data = sun)
+with(subset(sun, format(date, "%Y") == "2024"),
+     plot(expectation ~ date, col = "tomato",
+          xlab = "hours", ylab = "date (2024)",
+          main = "E(sun) in hours"))
+plot(maxsun ~ day, data = sun)
+```

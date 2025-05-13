@@ -21,6 +21,8 @@ website:
             file: vignettes/continuous.qmd
           - text: "Illustration: (Censored) Continuous Response"
             file: vignettes/continuous-censored.qmd
+          - text: "Illustration: Two sided Censored Continuous Response"
+            file: vignettes/continuous-censored-both.qmd
       - text: Changelog
         file: CHANGELOG.md
     right:
