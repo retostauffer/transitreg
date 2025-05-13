@@ -63,9 +63,10 @@
 #' <https://www.met.ie/climate/available-data/historical-data>.
 #'
 #' @examples
-#' data(weatherShannon)
-#' summary(weatherShannon)
+#' data(Shannon)
+#' summary(Shannon)
 #'
 #' @docType data
 #' @author Reto
-"weatherShannon"
+"Shannon"
+

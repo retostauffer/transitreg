@@ -19,11 +19,11 @@ bibliography: transitreg.bib
 #| message: false
 invisible(Sys.setlocale("LC_TIME", "C"))
 library("transitreg")
-data(weatherShannon, package = "transitreg")
+data(Shannon, package = "transitreg")
 ```
 
 This example illustrates the application of transition models for continuous
-data using the demo data set [`weatherShannon`](/man/weatherShannon.qmd) 
+data using the demo data set [`Shannon`](/man/Shannon.qmd) 
 which consists of historical weather observations at
 Shannon airport, Ireland.
 
@@ -34,13 +34,13 @@ maximum temperature (`maxtp`). For computational reasons, only the
 last 10 years are used in this illustration.
 
 ```{r}
-weatherShannon <- subset(weatherShannon, date >= as.Date("2015-01-01"))
+Shannon <- subset(Shannon, date >= as.Date("2015-01-01"))
 ```
 
 # Unconditional model
 
 ```{r}
-m1 <- transitreg(maxtp ~ s(theta), breaks = 201, data = weatherShannon)
+m1 <- transitreg(maxtp ~ s(theta), breaks = 201, data = Shannon)
 ```
 
 Estimated distribution:
@@ -80,17 +80,17 @@ pithist(m1)
 # Conditional climatological model
 
 ```{r}
-weatherShannon <- transform(weatherShannon,
+Shannon <- transform(Shannon,
                        day  = as.integer(format(date, "%j")),
                        year = as.integer(format(date, "%Y")))
 
 f2 <- maxtp ~ s(theta) + te(day, theta, bs = c("cc", "tp"))
-m2 <- transitreg(f2, breaks = 101, data = weatherShannon)
+m2 <- transitreg(f2, breaks = 101, data = Shannon)
 pithist(m2)
 rootogram(m2, breaks = 15)
 
 tmp_dates <- as.Date(sprintf("2024-%02d-01", c(1, 4, 7, 10)))
-idx <- which(with(weatherShannon, date %in% tmp_dates))
+idx <- which(with(Shannon, date %in% tmp_dates))
 
 plot(m2[idx], col = 1:4)
 legend("left", legend = tmp_dates, col = 1:4, lty = 1, pch = 19)
@@ -119,7 +119,7 @@ qqrplot(m2)
 
 ```{r}
 bkx <- seq(-20, 50, length.out = 151)
-m3 <- transitreg(f2, breaks = bkx, data = weatherShannon)
+m3 <- transitreg(f2, breaks = bkx, data = Shannon)
 
 plot(m3[idx], col = 1:4)
 legend("left", legend = tmp_dates, col = 1:4, lty = 1, pch = 19)

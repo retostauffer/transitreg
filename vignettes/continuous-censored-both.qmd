@@ -30,14 +30,14 @@ get_sunshine_by_doy <- function(doy, latitude) {
 }
 
 # Loading data set; transform/prepare variables
-data(weatherShannon, package = "transitreg")
-sun <- within(subset(weatherShannon, select = c(date, sun)), {
+data(Shannon, package = "transitreg")
+sun <- within(subset(Shannon, select = c(date, sun)), {
             day    = pmin(365L, as.integer(format(date, "%j")));
             maxsun = floor(get_sunshine_by_doy(day, 52.69028));
             #maxsun = pmin(floor(maxsun), sun); # Limit to full hours
             relsun = pmin(100, round(100 * sun / maxsun))
        })
-rm(weatherShannon)
+rm(Shannon)
 summary(sun)
 ```
 

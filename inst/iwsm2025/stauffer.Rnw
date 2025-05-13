@@ -143,12 +143,23 @@ While this approach works well, it necessitates the assumption of a parametric
 distribution, which is not required when using transition regression.
 
 For comparison, the square-root transformed precipitation climatology for one
-weather station (Patrickswell, 8\,km southwest of Limerick) is estimated with a
+weather station (Shannon airport, 20\,km west-northwest of Limerick) is estimated with a
 generalized additive model for location, scale, and shape
 employing a left-censored Gaussian distribution
 (CN; estimated with \verb|bamlss|), quantile
 regression (QR; using \verb|qgam|), and a left censored transition model (TM; with \verb|transitreg|, see Sec.\,\ref{stauffer:sec:software})
-with sixty-one breaks ($m = 61$).
+with fourty-one breaks ($m = 41$).
+
+<<eval = FALSE>>=
+remotes::install_github("retostauffer/transitreg")
+data(Shannon)
+f <- sqrt(rain) ~ theta0 + ti(theta, k = 20) +
+     ti(theta, day, bs = c("cr", "cc"), k = c(20, 20))
+m <- transitreg(f, data = Shannon,
+     breaks = seq(0, 12, by = 0.3), censored = "left")
+@
+
+
 All models use cyclic smooth splines on the day of the year as only
 covariate. The out-of-sample fit and pinball loss can be seen in
 Figure\,\ref{stauffer:fig1}, showing that the transition model is on par
@@ -156,8 +167,8 @@ with the other two methods.
 
 \begin{figure}[h]
     \includegraphics[width=\textwidth]{stauffer-figure1.pdf}
-    \caption{Precipitation climatology for Patrickswell, Ireland, based on
-    43 years of data (2/3 for training, 1/3 for testing).
+    \caption{Precipitation climatology at Shannon airport, Ireland, based on
+    79 years of data (2/3 for training, 1/3 for testing).
     Left: Histogram of the daily square-root transformed precipitation
     (out-of-sample) with fitted densities from a censored normal
     distribution (CN) and a transition model (TM). Center: Seasonal variation
@@ -189,7 +200,7 @@ $$
 $$
 Since the transition model represents the full (approximated) probabilistic
 distribution, a wide range of quantities can be derived.
-Figure\,\ref{stauffer:fig2} illustrates estimates for July 16,
+Figure\,\ref{stauffer:fig2} illustrates estimates for July~16,
 including the expected square-root transformed daily precipitation (left),
 the 99\textit{th} percentile (center), and the probability of exceeding
 $1\,\sqrt{mm}$ of precipitation that day. The estimates show higher

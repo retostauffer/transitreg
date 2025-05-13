@@ -19,12 +19,12 @@ bibliography: transitreg.bib
 #| message: false
 invisible(Sys.setlocale("LC_TIME", "C"))
 library("transitreg")
-data(weatherShannon, package = "transitreg")
+data(Shannon, package = "transitreg")
 ```
 
 This example illustrates the application of transition models for continuous
 data with additional censoring. To demonstrate the capabilities of
-`transitreg()`, the demo data set [`weatherShannon`](/man/weatherShannon.qmd) is used
+`transitreg()`, the demo data set [`Shannon`](/man/Shannon.qmd) is used
 which provides historical records of daily precipitation sums for a weather
 station at Shannon airport, Ireland.
 
@@ -41,11 +41,11 @@ addressed in two ways:
 
 # Data
 
-The data set [`weatherShannon`](/man/weatherShannon.qmd) contains
-$n = `r nrow(weatherShannon)`$ records of daily precipitation sums
+The data set [`Shannon`](/man/Shannon.qmd) contains
+$n = `r nrow(Shannon)`$ records of daily precipitation sums
 for Shannon airport (Ireland) observed between
-`r format(min(weatherShannon$date), format = "%B, %Y")` and
-`r format(max(weatherShannon$date), format = "%B, %Y")`.
+`r format(min(Shannon$date), format = "%B, %Y")` and
+`r format(max(Shannon$date), format = "%B, %Y")`.
 A square-root transformation is often applied to reduce the skewness of
 the data.
 
@@ -54,15 +54,15 @@ the data.
 #| fig.width: 8
 #| fig.height: 4
 par(mfrow = c(1, 2))
-data(weatherShannon, package = "transitreg")
-head(weatherShannon)
-hist(weatherShannon$rain, freq = FALSE, breaks = 100,
+data(Shannon, package = "transitreg")
+head(Shannon)
+hist(Shannon$rain, freq = FALSE, breaks = 100,
      xlab = "rain", main = "Daily precipitation sums, Shannon airport")
-hist(sqrt(weatherShannon$rain), freq = FALSE, breaks = 100,
+hist(sqrt(Shannon$rain), freq = FALSE, breaks = 100,
      xlab = expression(sqrt(rain)), main = "Daily precipitation sums, Shannon airport")
 ```
 
-For more details, see [`weatherShannon`](/man/weatherShannon.qmd).
+For more details, see [`Shannon`](/man/Shannon.qmd).
 
 # Marginal response
 
@@ -79,14 +79,14 @@ For illustration, the first three models are unconditional models
 ```{r}
 bk1a <- seq(0, 70, by = 0.5)
 m1a  <- transitreg(rain ~ theta0 + s(theta),
-                   data = weatherShannon,
+                   data = Shannon,
                    breaks = bk1a)
 ```
 
 ```{r}
 x <- seq(0, 70, by = 0.1)
 dens1a <- pdf(m1a[1], x)
-hist(weatherShannon$rain, freq = FALSE, breaks = bk1a)
+hist(Shannon$rain, freq = FALSE, breaks = bk1a)
 lines(x, dens1a, col = 2, lwd = 3)
 ```
 
@@ -95,14 +95,14 @@ lines(x, dens1a, col = 2, lwd = 3)
 ```{r}
 bk1b <- seq(0, sqrt(70), by = 0.5)
 m1b  <- transitreg(sqrt(rain) ~ theta0 + s(theta),
-                   data = weatherShannon,
+                   data = Shannon,
                    breaks = bk1b)
 ```
 
 ```{r}
 x <- seq(0, sqrt(70), by = 0.01)
 dens1b <- pdf(m1b[1], x)
-hist(sqrt(weatherShannon$rain), freq = FALSE, breaks = bk1b)
+hist(sqrt(Shannon$rain), freq = FALSE, breaks = bk1b)
 lines(x, dens1b, col = 2, lwd = 3)
 ```
 
@@ -111,7 +111,7 @@ lines(x, dens1b, col = 2, lwd = 3)
 ```{r}
 bk1c <- seq(0, sqrt(70), by = 0.5)
 m1c  <- transitreg(sqrt(rain) ~ theta0 + s(theta),
-                   data = weatherShannon,
+                   data = Shannon,
                    breaks = bk1c,
                    censored = "left")
 ```
@@ -119,7 +119,7 @@ m1c  <- transitreg(sqrt(rain) ~ theta0 + s(theta),
 ```{r}
 x <- seq(0, sqrt(70), by = 0.01)
 dens1c <- pdf(m1c[1], x)
-hist(sqrt(weatherShannon$rain), freq = FALSE,
+hist(sqrt(Shannon$rain), freq = FALSE,
      breaks = c(0, 0.01, bk1c[-1L]),
      ylim = c(0, 0.5))
 lines(x, dens1c, col = 2, lwd = 3)
@@ -128,8 +128,8 @@ lines(x, dens1c, col = 2, lwd = 3)
 # Conditional
 
 ```{r}
-head(weatherShannon)
-weatherShannon <- transform(weatherShannon,
+head(Shannon)
+Shannon <- transform(Shannon,
                          day = as.integer(format(date, "%j")),
                          year = as.integer(format(date, "%Y")))
 
@@ -139,7 +139,7 @@ weatherShannon <- transform(weatherShannon,
 ```{r}
 bk2 <- seq(0, sqrt(70), by = 0.5)
 m2  <- transitreg(sqrt(rain) ~ theta0 + s(theta) + te(day, theta, k = c(10, 10), bs = c("cc", "tp")),
-                  data = weatherShannon,
+                  data = Shannon,
                   breaks = bk2,
                   censored = "left")
 plot(m2)
@@ -151,11 +151,11 @@ plot(m2)
 #| out.width: 100%
 # Plotting observed data
 plot(NA, xlim = c(0, 365),
-     ylim = sqrt(c(0, max(weatherShannon$rain))) * 1.05,
+     ylim = sqrt(c(0, max(Shannon$rain))) * 1.05,
      main = "Climatological estimate of daily precipitation sums",
      ylab = expression(sqrt(rain)),
      xlab = "day of the year")
-tmp <- lapply(split(weatherShannon, ~ year),
+tmp <- lapply(split(Shannon, ~ year),
      function(x) lines(x$day, sqrt(x$rain), col = "#00000008"))
 
 # Predict estimated quantiles (climatology)

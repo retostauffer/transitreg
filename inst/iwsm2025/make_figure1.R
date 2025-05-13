@@ -5,46 +5,65 @@ library("qgam")
 
 PDF <- "stauffer-figure1.pdf"
 if (!file.exists(PDF)) {
-  data(rainIreland)
-  head(rainIreland)
-  rainIreland <- transform(rainIreland,
-                           sqrt_rain = sqrt(rain),
-                           day = as.integer(format(date, "%j")),
-                           year = as.integer(format(date, "%Y")))
+  data(Shannon)
+  head(Shannon)
+  Shannon <- transform(Shannon,
+                       day = as.integer(format(date, "%j")),
+                       year = as.integer(format(date, "%Y")))
 
 
-  set.seed(6020)
-  idx    <- sample(1:2, size = nrow(rainIreland), prob = c(0.8, 0.4), replace = TRUE)
-  dtrain <- subset(rainIreland, idx == 1L)
-  dtest  <- subset(rainIreland, idx == 2L)
+  #set.seed(1)
+  set.seed(666)
+  idx    <- sample(1:2, size = nrow(Shannon), prob = c(2/3, 1/3), replace = TRUE)
+  dtrain <- subset(Shannon, idx == 1L)
+  dtest  <- subset(Shannon, idx == 2L)
 
-  breaks <- seq(0, 12, by = 0.4)
   breaks <- seq(0, 12, by = 0.3)
-  f1 <- sqrt_rain ~ theta0 + ti(theta, k = 20)
-  m1 <- transitreg(f1, data = rainIreland, breaks = breaks, censored = "left")
+  f1 <- sqrt(rain) ~ theta0 + ti(theta, k = 20)
+  m1 <- transitreg(f1, data = Shannon, breaks = breaks, censored = "left")
 
-  xx <- c(0, 0.3, ((head(breaks, -1) + tail(breaks, -1L)) / 2)[-1])
-  nd <- data.frame("sqrt_rain" = xx)
-  mids <- nd$sqrt_rain
+  xx <- c(0, ((head(breaks, -1) + tail(breaks, -1L)) / 2)[-1])
+  nd <- data.frame("rain" = xx^2)
+  mids <- nd$rain
 
   py <- seq(0, 12, by = 0.01)
   pm <- as.vector(predict(m1, newdata = nd[1,,drop = F], y = py, type = "pdf"))
 
-  b1 <- bamlss(sqrt_rain ~ 1, data = rainIreland, family = cnorm_bamlss)
+  b1file <- "__bamlss_b1.rds"
+  if (!file.exists(b1file)) {
+    b1 <- bamlss(sqrt(rain) ~ 1, data = Shannon, family = cnorm_bamlss)
+    saveRDS(b1, b1file)
+  } else {
+    b1 <- readRDS(b1file)
+  }
+
   xb <- seq(0, 12, by = 0.01)
   par <- predict(b1, newdata = data.frame("sqrt_rain" = xb), type = "parameter")
   db <- family(b1)$d(xb, par)
 
 
   # ----------------------------------------------
-  f2 <- sqrt_rain ~ theta0 + ti(theta, k = 20) + ti(theta, day, bs = c("cr", "cc"), k = c(20, 20))
+  f2 <- sqrt(rain) ~ theta0 + ti(theta, k = 20) + ti(theta, day, bs = c("cr", "cc"), k = c(20, 20))
   m2 <- transitreg(f2, data = dtrain, breaks = breaks, censored = "left")
 
-  fb2 <- sqrt_rain ~ s(day, k = 20, bs = "cc") | s(day, k = 20, bs = "cc")
-  b2  <- bamlss(fb2, data = dtrain, family = cnorm_bamlss, binning = TRUE)
+  fb2 <- sqrt(rain) ~ s(day, k = 20, bs = "cc") | s(day, k = 20, bs = "cc")
+
+  b2file <- "__bamlss_b2.rds"
+  if (!file.exists(b2file)) {
+    b2  <- bamlss(fb2, data = dtrain, family = cnorm_bamlss, binning = TRUE)
+    saveRDS(b2, b2file)
+  } else {
+    b2 <- readRDS(b2file)
+  }
 
   qu <- c(0.01, 0.1, 0.5, 0.9, 0.99)
-  g2 <- mqgam(sqrt_rain ~ s(day, k = 20, bs = "cc"), data = dtrain, qu = qu)
+  g2file <- "__mqgam_g2.rds"
+  if (!file.exists(g2file)) {
+    g2 <- mqgam(sqrt(rain) ~ s(day, k = 20, bs = "cc"), data = dtrain, qu = qu)
+    saveRDS(g2, g2file)
+  } else {
+    g2 <- readRDS(g2file)
+  }
 
   nd <- data.frame("day" = 1:365)
 
@@ -63,9 +82,9 @@ if (!file.exists(PDF)) {
 
   err_b <- err_m <- err_g <- NULL
   for(j in 1:5) {
-    err_b <- c(err_b, qgam::pinLoss(dtest$sqrt_rain, pb2[, j], qu[j]))
-    err_m <- c(err_m, qgam::pinLoss(dtest$sqrt_rain, pm2[, j], qu[j]))
-    err_g <- c(err_g, qgam::pinLoss(dtest$sqrt_rain, pg2[, j], qu[j]))
+    err_b <- c(err_b, qgam::pinLoss(sqrt(dtest$rain), pb2[, j], qu[j]))
+    err_m <- c(err_m, qgam::pinLoss(sqrt(dtest$rain), pm2[, j], qu[j]))
+    err_g <- c(err_g, qgam::pinLoss(sqrt(dtest$rain), pg2[, j], qu[j]))
   }
   print(rbind(bamlss_b2     = err_b,
               transitreg_m2 = err_m,
@@ -73,33 +92,47 @@ if (!file.exists(PDF)) {
   err_b <- sum(err_b)
   err_m <- sum(err_m)
   err_g <- sum(err_g)
-  print(sort(c(bamlss_b2 = err_b, transitreg_m2 = err_m, mqgam_g2 = err_g)))
+  pinball_loss <- sort(c(bamlss_b2 = err_b, transitreg_m2 = err_m, mqgam_g2 = err_g))
+  print(pinball_loss)
+  print(pinball_loss[which.min(pinball_loss)])
 
 
   ## Create figure
   ##grDevices::pdf(file = "stauffer-figure1.pdf", width = 8, height = 2.5)
-  grDevices::pdf(file = "stauffer-figure1.pdf", width = 8 * 0.9, height = 2.5 * 0.8)
+  grDevices::pdf(file = PDF, width = 8 * 0.9, height = 2.5 * 0.8)
     par(mfrow = c(1, 3), mar = c(4, 4, 1, 1))
 
     # First subplot
-    hist(rainIreland$sqrt_rain,
-         breaks = c(0, 0.01, tail(breaks, -1)),
-         freq = FALSE,
-         xlab = "y; sqrt(Precipitation)", main = NA,
-         xlim = c(0, 8), ylim = c(0, 0.5))
+    col    <- rep(c("white", "gray80"), times = c(1, length(breaks) - 2))
+    border <- rep(c("white", "black"),  times = c(1, length(breaks) - 2))
+    h <- hist(sqrt(Shannon$rain),
+              breaks = breaks,
+              col = col,
+              border = border,
+              freq = FALSE,
+              xlab = "y; sqrt(Precipitation)", main = NA,
+              xlim = c(0, 8), ylim = c(0, 0.4))
+
+    # Adding observed frequency of zero
+    obs_zero <- mean(Shannon$rain == 0)
+    points(0, obs_zero, col = 1, pch = 19)
 
     lines(pm ~ py, col = 4, lwd = 2)
-    points(py[1L], pm[1L], col = 4, pch = 19)
+    points(py[1L], pm[1L], col = 4, pch = 1)
     lines(db ~ xb, col = 2, lwd = 2)
     points(xb[1L], db[1L], col = 2, pch = 1)
-    rug(rainIreland$sqrt_rain, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
+    rug(sqrt(Shannon$rain), col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
 
-    legend("center", c("TM", "CN"),
+    legend("right", c("TM", "CN"),
       lwd = 2, col = c(4, 2), bty = "n")
+    legend("topright", legend = c(
+                expression(paste("observed P(", y, "=", 0, ")")),
+                expression(paste("modelled P(", y, "=", 0, ")"))
+           ), pch = c(19, 1), col = "gray50", bty = "n")
 
     # Second subplot
-    plot(sqrt_rain ~ day, data = dtest, type = "h", col = rgb(0.1, 0.1, 0.1, alpha = 0.4),
-      xlab = "Day of the year", ylab = "y; sqrt(Precipitation)", ylim = c(0, 8),
+    plot(sqrt(rain) ~ day, data = dtest, type = "h", col = rgb(0.1, 0.1, 0.1, alpha = 0.4),
+      xlab = "Day of the year", ylab = "y; sqrt(Precipitation)", ylim = c(0, 8.5),
       xlim = c(1, 365), xaxs = "i", yaxs = "i")
 
     j <- order(dtest$day)
