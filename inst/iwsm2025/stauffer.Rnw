@@ -77,62 +77,94 @@ such as excess zeros and other irregularities.
 %Following Berger and Tutz~(2021), the transition probability $P$ for count data
 %is defined as follows:
 
-The transition probability $P$ for count data is defined as
+\subsection{Classic count model}\label{stauffer:subsec:counts}
+
+The transition probability $P(\cdot)$ for count data is defined as
 $$
-P(y_i > r | y_i \ge r, \mathbf{x}_i) = F(\eta_{ir}(\alpha)),~~r = 0, 1, \dots,
+P(y_i > r | y_i \ge r, \mathbf{x}_i) = F(\eta_{ir}(\alpha)),~~r = 0, 1, 2, \dots,
 $$
 where $F(\cdot)$ is a cumulative distribution function (e.g., logistic
-or probit) and $r$ represents the (pseudo-)counts, with an additive predictor
+or probit) and $r$ represents the counts, with an additive predictor
 $$
 \eta_{ir}(\alpha) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \beta).
 $$
 The parameters $\alpha = (\theta^\top, \beta^\top)$ include count-specific
-intercepts and (possibly) smooth functions $f_j(\cdot)$, which can be estimated
-using standard software for binomial response models (e.g., \verb|mgcv|, \verb|nnet|,
-\verb|glmnet|, \dots).
+intercepts and (possibly) smooth functions $f_j(\cdot)$.
+For i.i.d.\ observations, let $\pi_{ir}$ denote the probability that the count response equals $r$,
+i.e., $P(y_i=r | \mathbf{x}_i)$. These probabilities are computed recursively as
+$$
+\pi_{ir} = (1 - F(\eta_{ir}(\boldsymbol{\alpha}))) \prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha})).
+$$
+Parameter estimation considers the underlying Markov chain $Y_{i0}, Y_{i1}, \dots$,
+where $Y_{ir} = \mathbf{1}(y_i = r)$. The log-likelihood simplifies to
+$$
+\ell(\boldsymbol{\alpha}) = \sum_{i=1}^n \sum_{s=0}^{y_i} \Big[Y_{is} \log(1 - F(\eta_{ir})) + (1 - Y_{is}) \log(F(\eta_{ir}))\Big].
+$$
+This formulation arises from modeling the count response as a sequence of binary transitions, 
+where each step represents the probability of exceeding a given count level.
+Estimation is performed on an expanded dataset where binary responses
+$(Y_{i0}, \dots, Y_{iy_i})^\top = (0, \dots, 0, 1)$ are created, along with a new
+covariate $\theta_i = (0, 1, 2, \dots, y_i)^\top$ to capture
+count-specific effects $f_j(\mathbf{x}_i, \theta_i)$, or simple count-specific
+intercepts. All other covariates are duplicated accordingly.
+
+This corresponds to a binary model and can be estimated using standard software
+for binomial response models (e.g., \verb|mgcv|, \verb|nnet|, \verb|glmnet|, \dots).
+While the dataset size increases, efficient GAM-based estimation methods for
+large data (Wood et~al. 2014, 2017) mitigate computational costs. Alternatively, machine
+learning approaches such as neural networks or random forests could be used.
 
 
-To model any univariate continuous response $y_i \in \mathcal{R}$, we
+
+\subsection{Continuous response}
+
+
+To model any univariate continuous response $y_i \in \mathcal{R}$ with
+cumulative distribution function (CDF) $F(y)$, we
 employ a discretization technique inspired by histogram binning. The response $y$ is
-divided into $m - 1$ intervals using a set of monotonically increasing
-boundaries $\zeta_j$ with $j = [1, \dots, m]$, where each interval $[\zeta_l,
-\zeta_{l+1})$ for $l = 1, ..., m-1$ corresponds to a discrete pseudo-count $r$. Each observation $y_i$
-is assigned to its discrete representation $\tilde{y}_i$ based on the
-interval it falls into. The corresponding probability density function (PDF)
-can be approximated as
-$$
-\hat{f}(y_i) = \frac{P(\tilde{y}_i = l)}{\zeta_{l+1}-\zeta_l},~~y_i \in [\zeta_l + \zeta_{l + 1}).
-$$
-%%As the number of pseudo-bins increases ($m \rightarrow \infty$),  the
-%%approximated PDF converges to the true PDF.
-For a continuous response variable
-$y_i$ with CDF $F(y)$, the probability of falling  into bin $[\zeta_l,
-\zeta_{l+1})$ is approximated by  $P(\zeta_l \leq y_i < \zeta_{l+1}) =
-F(\zeta_{l+1}) - F(\zeta_l)$.  These are encoded as transformed counts
-$\tilde{y}_i$,  so that the transition model uses  $P(\tilde{y}_i = r) =
-P(\zeta_r \leq y_i < \zeta_{r+1})$  to approximate the discrete likelihood.  
+partitioned into $m-1$ intervals using a set of monotonically increasing
+boundaries $\zeta_j$ with $j = [1, \dots, m]$, where each interval $[\zeta_\ell,
+\zeta_{\ell+1})$ for $\ell = [1, ..., m-1]$ corresponds to a discrete pseudo-count $r$.
+
+Each observation $y_i$ is assigned to its discrete representation $\tilde{y}_i$
+based on the interval it falls into.
+The probability of falling into the $\ell$-th bin
+is approximated by $P(\zeta_\ell \leq y_i < \zeta_{\ell+1}) =
+F(\zeta_{\ell+1}) - F(\zeta_\ell)$. These probabilities are encoded as transformed counts
+$\tilde{y}_i$, so that the transition model uses  $P(\tilde{y}_i = r) =
+P(\zeta_r \leq y_i < \zeta_{r+1})$ to approximate the discrete likelihood.
+
 The transition model estimates the probability of transitions between counts
 $P(\tilde{y}_i > r \mid \tilde{y}_i \geq r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha}))$
 and recursively computes
 $$  
 P(\tilde{y}_i = r, \mathbf{x}_i) = P(\tilde{y}_i = r \mid \tilde{y}_i \geq r, \mathbf{x}_i) \prod_{s=0}^{r-1} P(\tilde{y}_i > s \mid \tilde{y}_i \geq s, \mathbf{x}_i).
-$$                                                                                            For any value $y_i \in [\zeta_l, \zeta_{l+1})$, the CDF can be approximated by
 $$
-\hat{F}(y_i) = \sum_{r=0}^{l-1} P(\tilde{y}_i = r) + \frac{y_i - \zeta_l}{\zeta_{l+1} - \zeta_l} P(\tilde{y}_i = l),
+For any value $y_i \in [\zeta_\ell, \zeta_{\ell+1})$, the CDF can be approximated by
+$$
+\hat{F}(y_i) = \sum_{r=0}^{\ell-1} P(\tilde{y}_i = r) + \frac{y_i - \zeta_\ell}{\zeta_{\ell+1} - \zeta_\ell} P(\tilde{y}_i = \ell),
 $$
 where the first term sums probabilities for bins below $\hat{y}_i$, and the
 second term performs linear interpolation within the current bin.
-The stepwise CDF approximation converges uniformly to the true CDF $F(y)$  
+The stepwise CDF approximation converges uniformly to the true CDF $F(y)$
 as $m \rightarrow \infty$.
+%as the number of (pseudo-)bins increase ($m \rightarrow \infty$).
 
+The corresponding probability density function (PDF) can be approximated as
+$$
+\hat{f}(y_i) = \frac{P(\tilde{y}_i = \ell)}{\zeta_{\ell+1}-\zeta_\ell},~~y_i \in [\zeta_\ell + \zeta_{\ell + 1}).
+$$
 
+Besides the CDF, the transition model allows for computing additional key
+characteristics such as the mean, mode, skewness, and kurtosis by weighting the
+bin midpoints with their corresponding probabilities.
 
 
 \section{Transition models for Irish precipitation}\label{stauffer:sec:application}
 
 For demonstration, climatological estimates for daily precipitation sums are
 presented, using data from Met\,{\'E}ireann, the Irish Meteorological Service.
-These observations exhibit an excess of zeros (days without precipitation) and
+Precipitation observations exhibit an excess of zeros (days without precipitation) and
 a strong positive skewness. To account for the nature of such data, previous
 studies have used a zero-left censored Gaussian distribution on
 square-root transformed observations (e.g., Stauffer et~al.,~2017).
@@ -140,11 +172,12 @@ While this approach works well, it necessitates the assumption of a parametric
 distribution, which is not required when using transition regression.
 
 For comparison, the square-root transformed precipitation climatology for one
-weather station (Shannon airport, 20\,km west-northwest of Limerick) is estimated with a
-generalized additive model for location, scale, and shape
-employing a left-censored Gaussian distribution
+weather station on the west coast of Ireland (Shannon airport, 20\,km
+west-northwest of Limerick) is estimated with a generalized additive model for
+location, scale, and shape employing a left-censored Gaussian distribution
 (CN; estimated with \verb|bamlss|), quantile
-regression (QR; using \verb|qgam|), and a left censored transition model (TM; with \verb|transitreg|, see Sec.\,\ref{stauffer:sec:software})
+regression (QR; using \verb|qgam|), and a left censored transition model
+(TM; with \verb|transitreg|, see Sec.\,\ref{stauffer:sec:software})
 with fourty-one breaks ($m = 41$).
 All models use cyclic smooth splines on the day of the year as only
 covariate. The out-of-sample fit and pinball loss can be seen in
@@ -164,7 +197,7 @@ with the other two methods.
     50\textit{th}, 90\textit{th} and 99\textit{th} percentile, along with
     respective pinball losses (PBL).
     Right: Estimated transition probabilities (TP,
-    black) and the corresponding cumulative distribution function (CDF, red) for July~16.}
+    dashed) and the corresponding cumulative distribution function (CDF) for July~16.}
     \label{stauffer:fig1}
 \end{figure}
 
@@ -174,10 +207,10 @@ large datasets, a spatio-temporal climatology is estimated using all available
 data from $1977$ to $2024$, from $557$ different weather stations across Ireland,
 resulting in a total number of $3.9$ million individual observations.
 
-The transition model ($m = 90$) includes an offset for the first bin (zeros;
-$\theta_0$), a spatial effect, a cyclic seasonal effect, an altitude effect,
-and interactions of these effects with $\theta$, resulting in the
-following model specification:
+The left-censored transition model ($m = 90$) includes an offset for the
+censoring point (zeros; $\theta_0$), a spatial effect, a cyclic seasonal
+effect, an altitude effect, and interactions of these effects with $\theta$,
+resulting in the following model specification:
 $$
 \begin{array}{ll}
 \tilde{y} \sim& \theta_0 + f(\theta) + f(\text{longitude},\text{latitude}) + f(\theta,\text{longitude},\text{latitude}) + \\
@@ -237,10 +270,18 @@ plot(m[319], cdf = TRUE, tp = TRUE)
      Censored Additive Regression Model.
      {\it Int. J. Climatol.}, {\bf 37}(7), 3264--3275,
      doi:\texttt{10.1002/joc.4913}
- \item[Walsh, S.] (2012)
-      A Summary of Climate Averages for Ireland, 1981-2010.
-      {\it Met\,{\'E}ireann, Climatol. Note}, {\bf 14}, 1--16, \newline
-      \texttt{https://www.met.ie/climate-ireland/SummaryClimAvgs.pdf}
+\item[Walsh, S.] (2012)
+     A Summary of Climate Averages for Ireland, 1981-2010.
+     {\it Met\,{\'E}ireann, Climatol. Note}, {\bf 14}, 1--16, \newline
+     \texttt{https://www.met.ie/climate-ireland/SummaryClimAvgs.pdf}
+\item[Wood, SN., Goude, Y., and Shaw, S.] (2014)
+     Generalized additive models for large data sets.
+     {\it J. R. Stat. Soc. C Appl. Stat.}, {\bf 64}(1), 139--155,
+     doi:\texttt{10.1111/rssc.12068}
+ \item[Wood, SN., Li, Z., Shaddick, G., and Augustin, NH.] (2017)
+     Generalized Additive Models for Gigadata: Modeling the U.K. Black Smoke Network Daily Data.
+     {\it J. Am. Stat. Assoc.}, {\bf 112}(519), 1199--1210,
+     doi:\texttt{10.1080/01621459.2016.1195744}
 \end{description}
 
 \end{document}
