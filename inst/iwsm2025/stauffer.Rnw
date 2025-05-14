@@ -279,7 +279,7 @@ plot(m[319], cdf = TRUE, tp = TRUE)
     Transition Models for Count Data: a Flexible Alternative to Fixed Distribution Models.
     {\it Stat Methods Appl}, {\bf 30}, 1259--1283,
         doi:\texttt{10.1007/s10260-021-00558-6}
-\item[Stauffer, R., Mayr, GJ., Messner, JW., Umlauf, N., and Zeileis A.] (2017)
+\item[Stauffer, R., Mayr, GJ., Messner, JW., Umlauf, N., and Zeileis A.] (2017)\newline
      Spatio-Temporal Precipitation Climatology Over Complex Terrain Using a
      Censored Additive Regression Model.
      {\it Int. J. Climatol.}, {\bf 37}(7), 3264--3275,
@@ -289,7 +289,7 @@ plot(m[319], cdf = TRUE, tp = TRUE)
      {\it Met\,{\'E}ireann, Climatol. Note}, {\bf 14}, 1--16, \newline
      \texttt{https://www.met.ie/climate-ireland/SummaryClimAvgs.pdf}
 \item[Wood, SN., Goude, Y., and Shaw, S.] (2014)
-     Generalized additive models for large data sets.
+     Generalized Additive Models for Large Data Sets.
      {\it J. R. Stat. Soc. C Appl. Stat.}, {\bf 64}(1), 139--155,
      doi:\texttt{10.1111/rssc.12068}
  \item[Wood, SN., Li, Z., Shaddick, G., and Augustin, NH.] (2017)
