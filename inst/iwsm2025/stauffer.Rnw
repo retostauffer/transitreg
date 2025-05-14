@@ -240,17 +240,30 @@ areas associated with the hilliest regions in Ireland (cf. Walsh~2012).
 
 \section{Software implementation}\label{stauffer:sec:software}
 
-The proposed method is implemented in the \emph{R}~package \verb|transitreg|,
-available at \texttt{https://www.github.com/retostauffer/transitreg}.
-Currently in alpha state, a CRAN release is planned for Summer 2025.
+The proposed method is implemented in the \emph{R}~package \verb|transitreg|.
+By default, estimation of the binary response model is carried out using
+\verb|bam| (\emph{R}-package \verb|mgcv|), but alternative engines are also available.
+\verb|transitreg| leverages shared-memory multiprocessing (via OpenMP) to
+enable fast computation.
+Currently, the software is in beta and available via
+GitHub (\texttt{https://github.com/retostauffer/transitreg}) as well as through the
+\emph{R}-universe. A CRAN release is planned for Summer 2025.
 
+The following code chunk estimates the left-censored transition model used in
+Figure~\ref{stauffer:fig2} (center and left panels), without cross-validation.
 
 <<eval = FALSE>>=
-install.packages("transitreg", repos = "https://retostauffer.r-universe.dev")
-library("transitreg"); data("Shannon") # Loading package and data
+# Installing package via R-universe
+install.packages("transitreg",
+     repos = "https://retostauffer.r-universe.dev")
+library("transitreg")
+# Load and prepare data set
+data("Shannon")
 Shannon$day <- as.integer(format(Shannon$date, "%j"))
+# Specifying model formula
 f <- sqrt(rain) ~ theta0 + ti(theta, k = 20) +
      ti(theta, day, bs = c("cr", "cc"), k = c(20, 20))
+# Estimating the transition model
 m <- transitreg(f, data = Shannon,
      breaks = seq(0, 12, by = 0.3), censored = "left")
 plot(m[319], cdf = TRUE, tp = TRUE)
@@ -280,7 +293,7 @@ plot(m[319], cdf = TRUE, tp = TRUE)
      doi:\texttt{10.1111/rssc.12068}
  \item[Wood, SN., Li, Z., Shaddick, G., and Augustin, NH.] (2017)
      Generalized Additive Models for Gigadata: Modeling the U.K. Black Smoke Network Daily Data.
-     {\it J. Am. Stat. Assoc.}, {\bf 112}(519), 1199--1210,
+     {\it J. Am. Stat. Assoc.}, {\bf 112}(519), 1199--1210,\newline
      doi:\texttt{10.1080/01621459.2016.1195744}
 \end{description}
 

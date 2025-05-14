@@ -160,7 +160,7 @@ if (!file.exists(PDF)) {
            ),
            bty = "n",
            pch = c(19, NA),
-           lwd = c(2, 1), col = c(4, 1), lty = c(1, 2))
+           lwd = c(2, 1), col = c(4, 4), lty = c(1, 2))
 
   dev.off()
 }
