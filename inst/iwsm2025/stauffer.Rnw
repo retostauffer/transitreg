@@ -144,10 +144,10 @@ For any value $y_i \in [\zeta_\ell, \zeta_{\ell+1})$, the CDF can be approximate
 $$
 \hat{F}(y_i) = \sum_{r=0}^{\ell-1} P(\tilde{y}_i = r) + \frac{y_i - \zeta_\ell}{\zeta_{\ell+1} - \zeta_\ell} P(\tilde{y}_i = \ell),
 $$
-where the first term sums probabilities for bins below $\hat{y}_i$, and the
-second term performs linear interpolation within the current bin.
+where the first term sums the probabilities for bins below the $\ell$-th bin,
+while the second term performs linear interpolation within the bin that $y_i$ falls into.
 The stepwise CDF approximation converges uniformly to the true CDF $F(y)$
-as $m \rightarrow \infty$.
+as the number of bins increases ($m \rightarrow \infty$).
 %as the number of (pseudo-)bins increase ($m \rightarrow \infty$).
 
 The corresponding probability density function (PDF) can be approximated as
@@ -155,9 +155,10 @@ $$
 \hat{f}(y_i) = \frac{P(\tilde{y}_i = \ell)}{\zeta_{\ell+1}-\zeta_\ell},~~y_i \in [\zeta_\ell + \zeta_{\ell + 1}).
 $$
 
-Besides the CDF, the transition model allows for computing additional key
+In addition to the CDF, the transition model allows for the computation of other key
 characteristics such as the mean, mode, skewness, and kurtosis by weighting the
 bin midpoints with their corresponding probabilities.
+
 
 
 \section{Transition models for Irish precipitation}\label{stauffer:sec:application}
@@ -192,7 +193,7 @@ with the other two methods.
     (out-of-sample) with fitted densities from a censored normal
     distribution (CN) and a transition model (TM). Center: Seasonal variation
     in daily square-root transformed precipitation sums across the year, showing
-    quantile estimates (out-of-sample) for CN, TM, and a
+    quantile estimates (out-of-sample) for CN, TM, and
     quantile regression (QR) at the 1\textit{st}, 10\textit{th},
     50\textit{th}, 90\textit{th} and 99\textit{th} percentile, along with
     respective pinball losses (PBL).
@@ -250,7 +251,7 @@ GitHub (\texttt{https://github.com/retostauffer/transitreg}) as well as through 
 \emph{R}-universe. A CRAN release is planned for Summer 2025.
 
 The following code chunk estimates the left-censored transition model used in
-Figure~\ref{stauffer:fig2} (center and left panels), without cross-validation.
+Figure~\ref{stauffer:fig2} (center and right panels), without cross-validation.
 
 <<eval = FALSE>>=
 # Installing package via R-universe
