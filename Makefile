@@ -7,16 +7,18 @@ VERSION := $(shell grep '^Version:' DESCRIPTION | awk '{print $$2}')
 document:
 	Rscript -e "devtools::document()"
 
+
+.PHONY: install build
+build: clean document
+	@echo Building current version: $(VERSION)
+	(cd ../ && R CMD build transitreg)
+install: build
+	@echo Installing current version: $(VERSION)
+	(cd ../ && R CMD INSTALL transitreg_$(VERSION).tar.gz)
+
 .PHONY: test
 test: clean install
 	Rscript -e "library('transitreg'); tinytest::test_all()"
-
-.PHONY: install
-install: clean document
-	@echo Installing current version: $(VERSION)
-	(cd ../ && \
-		R CMD build --no-build-vignettes transitreg && \
-		R CMD INSTALL transitreg_$(VERSION).tar.gz)
 
 .PHONY: coverage
 coverage: install
