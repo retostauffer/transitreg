@@ -81,14 +81,14 @@ such as excess zeros and other irregularities.
 
 The transition probability $P(\cdot)$ for count data is defined as
 $$
-P(y_i > r | y_i \ge r, \mathbf{x}_i) = F(\eta_{ir}(\alpha)),~~r = 0, 1, 2, \dots,
+P(y_i > r | y_i \ge r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha})),~~r = 0, 1, 2, \dots
 $$
 where $F(\cdot)$ is a cumulative distribution function (e.g., logistic
 or probit) and $r$ represents the counts, with an additive predictor
 $$
-\eta_{ir}(\alpha) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \beta).
+\eta_{ir}(\boldsymbol{\alpha}) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \beta).
 $$
-The parameters $\alpha = (\theta^\top, \beta^\top)$ include count-specific
+The parameters $\boldsymbol{\alpha} = (\theta^\top, \beta^\top)$ include count-specific
 intercepts and (possibly) smooth functions $f_j(\cdot)$.
 For i.i.d.\ observations, let $\pi_{ir}$ denote the probability that the count response equals $r$,
 i.e., $P(y_i=r | \mathbf{x}_i)$. These probabilities are computed recursively as
@@ -136,7 +136,7 @@ P(\zeta_r \leq y_i < \zeta_{r+1})$ to approximate the discrete likelihood.
 
 The transition model estimates the probability of transitions between counts
 $P(\tilde{y}_i > r \mid \tilde{y}_i \geq r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha}))$
-and recursively computes
+and recursively computes (cf. Berger and Tutz 2021, Eqn.~8)
 $$  
 P(\tilde{y}_i = r, \mathbf{x}_i) = P(\tilde{y}_i = r \mid \tilde{y}_i \geq r, \mathbf{x}_i) \prod_{s=0}^{r-1} P(\tilde{y}_i > s \mid \tilde{y}_i \geq s, \mathbf{x}_i).
 $$
@@ -228,6 +228,11 @@ expected values and probabilities on the western seaboard, with the highest extr
 (99\textit{th} percentile) occurring in the west, south-west, and south-east,
 areas associated with the hilliest regions in Ireland (cf. Walsh~2012).
 
+Based on this spatio-temporal transition model, the estimated average daily
+probability of rain during in Limerick the conference week (July 14--18) is
+$68.7\%$, with a $44.2\%$ chance of receiving more than $1\,\mathrm{mm}$ and an
+expected daily amount of $1.44\,\mathrm{mm}$.
+
 \begin{figure}[!ht]
     \includegraphics[width=\textwidth]{stauffer-figure2.pdf}
     \caption{Climatological precipitation estimates ($\sqrt{mm}\,\text{day}^{-1}$)
@@ -238,6 +243,12 @@ areas associated with the hilliest regions in Ireland (cf. Walsh~2012).
     }
     \label{stauffer:fig2}
 \end{figure}
+
+Based on this spatio-temporal transition model, the estimated average daily
+probability of rain in Limerick during the conference week (July 14--18) is $68.7\%$,
+with a $44.2\%$ chance of receiving more than $1\,\mathrm{mm}$ and an expected
+daily amount of $1.44\,\mathrm{mm}$.
+
 
 \section{Software implementation}\label{stauffer:sec:software}
 
