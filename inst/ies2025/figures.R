@@ -1,5 +1,5 @@
 if(!file.exists("ts_hist.png")) {
-  d <- readRDS("../ehydTirol_Tageschniederschlagssummen.rds")
+  d <- readRDS("ehydTirol_Tageschniederschlagssummen.rds")
   d <- subset(d, date >= (max(date) - 365*30))
   d$sqrt_pre <- sqrt(d$value)
   d$day <- as.POSIXlt(d$date)$yday
@@ -103,7 +103,7 @@ if(!file.exists("ts_hist.png")) {
 }
 
 if(!file.exists("premodel.png") & FALSE) {
-  d <- readRDS("../ehydTirol_Tageschniederschlagssummen.rds")
+  d <- readRDS("ehydTirol_Tageschniederschlagssummen.rds")
   d <- subset(d, date >= (max(date) - 365*30))
   d$sqrt_pre <- sqrt(d$value)
   d$day <- as.POSIXlt(d$date)$yday
