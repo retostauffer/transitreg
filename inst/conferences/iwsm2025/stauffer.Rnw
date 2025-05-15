@@ -148,7 +148,6 @@ where the first term sums the probabilities for bins below the $\ell$-th bin,
 while the second term performs linear interpolation within the bin that $y_i$ falls into.
 The stepwise CDF approximation converges uniformly to the true CDF $F(y)$
 as the number of bins increases ($m \rightarrow \infty$).
-%as the number of (pseudo-)bins increase ($m \rightarrow \infty$).
 
 The corresponding probability density function (PDF) can be approximated as
 $$
@@ -179,7 +178,7 @@ location, scale, and shape employing a left-censored Gaussian distribution
 (CN; estimated with \verb|bamlss|), quantile
 regression (QR; using \verb|qgam|), and a left censored transition model
 (TM; with \verb|transitreg|, see Sec.\,\ref{stauffer:sec:software})
-with fourty-one breaks ($m = 41$).
+with forty-one breaks ($m = 41$).
 All models use cyclic smooth splines on the day of the year as only
 covariate. The out-of-sample fit and pinball loss can be seen in
 Figure\,\ref{stauffer:fig1}, showing that the transition model is on par
@@ -228,11 +227,6 @@ expected values and probabilities on the western seaboard, with the highest extr
 (99\textit{th} percentile) occurring in the west, south-west, and south-east,
 areas associated with the hilliest regions in Ireland (cf. Walsh~2012).
 
-Based on this spatio-temporal transition model, the estimated average daily
-probability of rain during in Limerick the conference week (July 14--18) is
-$68.7\%$, with a $44.2\%$ chance of receiving more than $1\,\mathrm{mm}$ and an
-expected daily amount of $1.44\,\mathrm{mm}$.
-
 \begin{figure}[!ht]
     \includegraphics[width=\textwidth]{stauffer-figure2.pdf}
     \caption{Climatological precipitation estimates ($\sqrt{mm}\,\text{day}^{-1}$)
@@ -246,8 +240,8 @@ expected daily amount of $1.44\,\mathrm{mm}$.
 
 Based on this spatio-temporal transition model, the estimated average daily
 probability of rain in Limerick during the conference week (July 14--18) is $68.7\%$,
-with a $44.2\%$ chance of receiving more than $1\,\mathrm{mm}$ and an expected
-daily amount of $1.44\,\mathrm{mm}$.
+with a $44.2\%$ chance of receiving more than $1\,\mathrm{mm}$ per day with an expected
+daily amount of precipitation of $1.44\,\mathrm{mm}$.
 
 
 \section{Software implementation}\label{stauffer:sec:software}
@@ -257,9 +251,10 @@ By default, estimation of the binary response model is carried out using
 \verb|bam| (\emph{R}-package \verb|mgcv|), but alternative engines are also available.
 \verb|transitreg| leverages shared-memory multiprocessing (via OpenMP) to
 enable fast computation.
-Currently, the software is in beta and available via
+
+Currently, software version \verb|0.2-0| is in beta and available on both
 GitHub (\texttt{https://github.com/retostauffer/transitreg}) as well as through the
-\emph{R}-universe. A CRAN release is planned for Summer 2025.
+\emph{R}-universe (\texttt{https://retostauffer.r-universe.dev/}). A CRAN release is planned for Summer 2025.
 
 The following code chunk estimates the left-censored transition model used in
 Figure~\ref{stauffer:fig2} (center and right panels), without cross-validation.
