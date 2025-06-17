@@ -1,12 +1,18 @@
 
 
-# 
+# Extracting current package version
 VERSION := $(shell grep '^Version:' DESCRIPTION | awk '{print $$2}')
 
 .PHONY: document
 document:
 	Rscript -e "devtools::document()"
 
+.PHONY: clean
+clean:
+	-rm src/*.so
+	-rm src/*.o
+	-rm vignettes/*.html
+	-rm -r vignettes/*_files/
 
 .PHONY: install build
 build: clean document
@@ -15,6 +21,9 @@ build: clean document
 install: build
 	@echo Installing current version: $(VERSION)
 	(cd ../ && R CMD INSTALL transitreg_$(VERSION).tar.gz)
+check: build
+	@echo Checking current version: $(VERSION)
+	(cd ../ && R CMD check --as-cran transitreg_$(VERSION).tar.gz)
 
 .PHONY: test
 test: clean install
@@ -23,18 +32,6 @@ test: clean install
 .PHONY: coverage
 coverage: install
 	Rscript -e "covr::report(covr::package_coverage(line_exclusions = list('src/init.c'), function_exclusions = list('message\\\\s*\\\\(', 'plot.transitreg')), file = \"_coverage.html\")"
-
-.PHONY: check clean
-clean:
-	-rm src/*.so
-	-rm src/*.o
-	-rm vignettes/*.html
-	-rm -r vignettes/*_files/
-check: clean document
-	@echo Checking current version: $(VERSION)
-	(cd ../ && \
-		R CMD build --resave-data --no-build-vignettes transitreg && \
-		R CMD check --as-cran transitreg_$(VERSION).tar.gz)
 
 .PHONY: readme docs
 readme:

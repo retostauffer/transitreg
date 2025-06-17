@@ -9,14 +9,20 @@ pdf:
 	pdflatex stauffer.tex
 	make clean
 
+slides:
+	R CMD Sweave slides.Rnw
+	pdflatex slides.tex
+	pdflatex slides.tex
+	pdflatex slides.tex
+	make clean
 
 figure1:
 	Rscript make_figure1.R
 
 clean:
-	-rm stauffer.aux
-	-rm stauffer.log
-	-rm stauffer.tex
+	-rm *.aux
+	-rm *.log
+	-rm *.tex
 
 
 
