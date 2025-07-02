@@ -1,0 +1,935 @@
+%% Begin slides template file
+\documentclass[11pt,t,usepdftitle=false,aspectratio=169]{beamer}
+%% ------------------------------------------------------------------
+%% - aspectratio=43: Set paper aspect ratio to 4:3.
+%% - aspectratio=169: Set paper aspect ratio to 16:9.
+%% ------------------------------------------------------------------
+
+\usetheme[nototalframenumber,foot,logo]{uibk}
+%% ------------------------------------------------------------------
+%% - foot: Add a footer line for conference name and date.
+%% - logo: Add the university logo in the footer (only if 'foot' set).
+%% - bigfoot/sasquatch: Larger font size in footer.
+%% - nototalslidenumber: Hide the total number of slides (only if 'foot' set)
+%% - license: Add CC-BY license symbol to title slide (e.g., for conference uploads)
+%%   (TODO: At the moment no other licenses are supported.)
+%% - licenseall: Add CC-BY license symbol to all subsequent slides slides
+%% - url: use \url{} rather than \href{} on the title page
+%% - nosectiontitlepage: switches off the behaviour of inserting the
+%%   titlepage every time a \section is called. This makes it possible to
+%%   use more than one section + thanks page and a ToC off by default.
+%%   If the 'nosectiontitlepage' is set you can create UIBK title slides
+%%   using the command '\uibktitlepage{}' in your document to create
+%%   one or multiple title slides.
+%% ------------------------------------------------------------------
+
+%% ------------------------------------------------------------------
+%% The official corporate colors of the university are predefined and
+%% can be used for e.g., highlighting something. Simply use
+%% \color{uibkorange} or \begin{color}{uibkorange} ... \end{color}
+%% Defined colors are:
+%% - uibkblue, uibkbluel, uibkorange, uibkorangel, uibkgray, uibkgraym, uibkgrayl
+%% The frametitle color can be easily adjusted e.g., to black with
+%% \setbeamercolor{titlelike}{fg=black}
+%% ------------------------------------------------------------------
+
+%\setbeamercolor{verbcolor}{fg=uibkorange}
+%% ------------------------------------------------------------------
+%% Setting a highlight color for verbatim output such as from
+%% the commands \pkg, \email, \file, \dataset 
+%% ------------------------------------------------------------------
+
+\usepackage{dsfont}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{tikz}
+
+%% \usepackage{Sweave}
+
+\def \dsR {\text{$\mathds{R}$}}
+\def \xvec {\text{\boldmath$x$}}
+\def \mX {\text{\boldmath$X$}}
+\def \omegavec {\text{\boldmath$\omega$}}
+\def \yvec {\text{\boldmath$y$}}
+\def \mY {\text{\boldmath$Y$}}
+
+%% information for the title page ('short title' is the pdf-title that is shown in viewer's titlebar)
+\title[Transition Models]{Transition Models}
+\subtitle{for Precipitation Climatology Estimation}
+\URL{http://nikum.org}
+
+\author[Umlauf, Stauffer]{Nikolaus Umlauf, Reto Stauffer}
+%('short author' is the pdf-metadata Author)
+%% If multiple authors are required and the font size is too large you
+%% can overrule the font size of author and url by calling:
+%\setbeamerfont{author}{size*={10pt}{10pt},series=\mdseries}
+%\setbeamerfont{url}{size*={10pt}{10pt},series=\mdseries}
+%\URL{}
+%\subtitle{}
+
+\footertext{IES 2025, Bressanone-Brixen}
+\date{2025}
+
+\headerimage{3}
+%% ------------------------------------------------------------------
+%% The theme offers four different header images based on the
+%% corporate design of the university of innsbruck. Currently
+%% 1, 2, 3 and 4 is allowed as input to \headerimage{...}. Default
+%% or fallback is '1'.
+%% ------------------------------------------------------------------
+
+\begin{document}
+
+%% ALTERNATIVE TITLEPAGE
+%% The next block is how you add a titlepage with the 'nosectiontitlepage' option, which switches off
+%% the default behavior of creating a titlepage every time a \section{} is defined.
+%% Then you can use \section{} as it's originally intended, including a table of contents.
+% \usebackgroundtemplate{\includegraphics[width=\paperwidth,height=\paperheight]{titlebackground.pdf}}
+% \begin{frame}[plain]
+%     \titlepage
+% \end{frame}
+% \addtocounter{framenumber}{-1}
+% \usebackgroundtemplate{}
+
+%% Table of Contents, if wanted:
+%% this requires the 'nosectiontitlepage' option and setting \section{}'s as you want them to appear here.
+%% Subsections and subordinates are suppressed in the .sty at the moment, search
+%% for \setbeamertemplate{subsection} and replace the empty {} with whatever you want.
+%% Although it's probably too much for a presentation, maybe for a lecture.
+%% Please note: \maketitle allows you to render a uibk-style title page wherever needed
+%% in the document even if 'nosectiontitlepage' option is set (note: \maketitle will not
+%% create a new section and is therefore not included in \tableofcontents (if used).
+% \maketitle
+% \begin{frame}
+%     \vspace*{1cm plus 1fil}
+%     \tableofcontents
+%     \vspace*{0cm plus 1fil}
+% \end{frame}
+
+
+%% this sets the first PDF bookmark and triggers generation of the title page
+\section{Transition Models}
+
+
+\subsection{Introduction}
+
+
+\begin{frame}{A Journey in Probabilistic Modeling}
+\begin{itemize}
+\item Over the past 15 years, we have developed efficient algorithms and open-source software for (Bayesian) distributional regression, culminating in the CRAN package \pkg{bamlss}.
+\item Distributional regression provides a highly flexible framework for full probabilistic modeling of complex data.
+\item Applications span a wide range: univariate and multivariate responses, count data, censored and survival outcomes, joint models, and more.
+\item At UIBK, long-term research projects focus on count data modeling, e.g., for probabilistic forecasting of lightning strike counts.
+\end{itemize}
+\end{frame}
+
+
+\subsection{Model specification}
+
+
+\begin{frame}
+\frametitle{Model specification}
+Any parameter of a population distribution $\mathbf{\mathcal{D}}$ may be modeled by explanatory
+variables
+$$
+y \sim \mathbf{\mathcal{D}}\left(\theta_{1}(\mathbf{x}; \boldsymbol{\beta}_{1}), \,\, \dots \, , \,\,
+  \theta_{K}(\mathbf{x}; \boldsymbol{\beta}_{K})\right),
+$$
+\begin{center}
+\vspace*{-0.1cm}
+\setkeys{Gin}{width=0.7\textwidth}
+<<echo=FALSE, fig=TRUE, width=15, height=1.2>>=
+library("gamlss2")
+
+mypoly <- function() {
+  p <- cbind(c(x, rev(x)), c(y, rep(0, length(y))))
+  polygon(p, border = NA, col = "#FB9E19")
+  lines(y ~ x, lwd = 8)
+}
+x <- seq(0, 10, length = 200)
+
+par(mar = rep(0, 4), mfrow = c(1, 4))
+plot((y <- dnorm(x, mean = 5)) ~ x, type = "l", axes = FALSE, xlab = "", ylab = "",
+  lwd = 6)
+mypoly()
+plot((y <- dgamma(x, shape = 3, rate = 1.2)) ~ x, type = "l", axes = FALSE, xlab = "", ylab = "",
+  lwd = 6)
+mypoly()
+x <- seq(0, 0.99, length = 200)
+plot((y <- dBEZI(x, mu = 0.4, sigma = 6, nu = 0.6)) ~ x, type = "l", axes = FALSE, xlab = "", ylab = "",
+  lwd = 6)
+mypoly()
+#plot((y <- dBCPE(x, mu = 5, sigma = 0.3, nu = 0, tau = 7)) ~ x, type = "l", axes = FALSE,
+#  xlab = "", ylab = "", lwd = 6)
+#mypoly()
+x <- seq(1.5, 10.3, length = 200)
+plot((y <- dBCPE(x, mu = 5, sigma = 0.3, nu = 0.01, tau = 14)) ~ x, type = "l", axes = FALSE,
+  xlab = "", ylab = "", lwd = 6)
+mypoly()
+@
+\end{center}
+\vspace*{-0.1cm}
+with $\boldsymbol{\beta} = (\boldsymbol{\beta}_1^\top, \ldots, \boldsymbol{\beta}_K^\top)^\top$.
+
+\bigskip
+
+Each parameter is linked to a structured additive predictor
+$$
+h_{k}(\theta_{k}(\mathbf{x}; \boldsymbol{\beta}_k)) =
+  f_{1k}(\mathbf{x}; \boldsymbol{\beta}_{1k}) + \ldots + f_{J_kk}(\mathbf{x}; \boldsymbol{\beta}_{J_kk}); \,\,\, j = 1, \dots, J_k; \,\, k = 1, \dots, K.
+$$
+\vspace*{-0.5cm}
+\begin{itemize}
+\item $h_k( \cdot )$: Link functions for each distribution parameter.
+\item $f_{jk}( \cdot )$: Model terms of one or more variables.
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}
+\frametitle{Model Terms $f_{jk}( \cdot )$}
+\vspace*{-2.5ex}
+\begin{center}
+\setkeys{Gin}{width=0.27\textwidth}
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=4.5, height=4.2>>=
+par(mar = c(4.1, 4.1, 4.1, 1.1))
+set.seed(333)
+n <- 100
+f <- bamlss:::simfun("double")
+idata <- data.frame("z" = seq(0, 1, length = n))
+idata$y <- bamlss::scale2(with(idata, 0.6 + f(z) + rnorm(n, sd = 1)), 0, 1)
+ib <- gamlss2(y ~ s(z, bs = "ps"), data = idata)
+plot(ib, ylab = "f(x)", xlab = "x",
+  main = "Nonlinear Effects")
+@
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=4.5, height=4.2>>=
+par(mar = c(0.1, 0.1, 4.1, 0.1))
+z <- 2 * volcano
+x <- 10 * (1:nrow(z))
+y <- 10 * (1:ncol(z))
+xy <- expand.grid(x, y)
+xy$z <- as.numeric(z)
+bamlss::plot3d(xy, type = "mba", symmetric = FALSE, xlab = "x1", ylab = "x2", zlab = "f(x1, x2)",
+  main = "Two-Dimensional Surfaces")
+@
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=4.5, height=4.2>>=
+text2 <- function(x, y = NULL, ...) {
+  if(is.null(y))
+    y <- x
+  xy <- par("usr")
+  xr <- range(xy[1:2])
+  yr <- range(xy[3:4])
+  x <- xy[1] + x * diff(xr)
+  y <- xy[3] + y * diff(yr)
+  text(x, y, ...)
+}
+
+if(!file.exists("lasso.rda")) {
+  ## Simulated fusion Lasso example.
+  bmu <- c(0,0,0,0.5,0.5,0.5,1,1,1)
+  bsigma <- c(0,0,0,-0.7,-0.7,0,0,0.5,0.5)
+  id <- factor(sort(rep(1:length(bmu), length.out = 300)))
+     
+  ## Response.
+  set.seed(111)
+  y <- bmu[id] + rnorm(length(id), sd = exp(-1 + bsigma[id]))
+
+  f <- y ~ la(id,type=4) | la(id,type=4)
+
+  b1 <- gamlss2(f)
+
+  save(b1, file = "lasso.rda")
+} else {
+  load("lasso.rda")
+}
+par(mar = c(4.1, 4.3, 4.1, 6.1))
+plot_lasso(b1, which = "coefficients", terms = 1, main = FALSE, zoom = c(7, 5), lwd = 2)
+mtext("LASSO & Factor Clustering", side = 3, line = 1.5, cex = 1.2, font = 2)
+@
+
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, pdf=FALSE, png=TRUE, res=200, width=4.5, height=4.2>>=
+par(mar = c(2.1, 0.1, 4.1, 0.1))
+library("spdep")
+library("sp")
+m <- readRDS("~/data/maps/gadm36_AUT_3_sp.rds")
+co <- coordinates(m)
+m@data$lon <- co[, 1]
+m@data$lat <- co[, 2]
+## m <- subset(m, lon > -10 & lat > 35.7)
+
+set.seed(123)
+m@data$y <- sin(bamlss::scale2(co[, 1], -3, 3)) + cos(bamlss::scale2(co[, 2], -3, 3)) + rnorm(nrow(co), sd = 0.3)
+bamlss::plotmap(m, select = "y", color = colorspace::diverge_hcl, legend = FALSE, lwd = 0.1,
+  main = "Spatially Correlated Effects f(x) = f(s)")
+m0 <- readRDS("~/data/maps/gadm36_AUT_0_sp.rds")
+plot(m0, add = TRUE, lwd = 1)
+plot(readRDS("~/data/maps/gadm36_AUT_2_sp.rds"), add = TRUE, lwd = 0.5)
+@
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=4.5, height=4.2>>=
+par(mar = c(4.1, 4.1, 4.1, 0.1))
+set.seed(111)
+id <- factor(rep(1:8, length = 100))
+m <- rnorm(8, sd = 0.6)
+y <- m[id] + rnorm(length(id), sd = 0.6)
+b <- gamlss2(y ~ s(id, bs = "re"))
+plot(b, ylab = "f(id)", xlab = "id", spar = FALSE)
+mtext("Random Intercepts f(x) = f(id)", side = 3, line = 1.5, cex = 1.2, font = 2)
+@
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=4.5, height=4.2>>=
+par(mar = c(0.1, 1.1, 3.6, 0.1))
+plot_jpeg = function(path, add=FALSE)
+{
+  require('jpeg')
+  jpg = readJPEG(path, native=T) # read the file
+  res = dim(jpg)[2:1] # get the resolution, [x, y]
+  if (!add) # initialize an empty plot area if add==FALSE
+    plot(1,1,xlim=c(1,res[1]),ylim=c(1,res[2]),asp=1,type='n',xaxs='i',yaxs='i',xaxt='n',yaxt='n',xlab='',ylab='',bty='n')
+  rasterImage(jpg,1,1,res[1],res[2])
+}
+plot_jpeg('figures/nnet.jpg') 
+mtext("Neural Networks", side = 3, line = 1, cex = 1.2, font = 2)
+@
+\end{center}
+\end{frame}
+
+
+\subsection{Count Models}
+
+
+\begin{frame}{Count Models}
+Simulated example: $y \sim \text{NO}(\mu = f(x), \log(\sigma) = f(x))$, transformed to counts.\\[1ex]
+\begin{center}
+\setkeys{Gin}{width=0.52\textwidth}
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=5, height=4>>=
+library("gamlss2")
+library("transitreg")
+source("functions.R")
+
+set.seed(123)
+d <- dgp_NO(n = 5000, het = TRUE)
+d$counts <- as.integer(d$counts)
+
+if(!file.exists("example1.rda")) {
+   b_PO <- gamlss2(counts ~ s(x) | s(x), data = d, family = PO)
+   b_NBI <- gamlss2(counts ~ s(x) | s(x), data = d, family = NBI)
+   b_SICHEL <- gamlss2(counts ~ s(x) | s(x) | s(x), data = d, family = SICHEL)
+   b_GPO <- gamlss2(counts ~ s(x) | s(x), data = d, family = GPO)
+   b_DPO <- gamlss2(counts ~ s(x) | s(x), data = d, family = DPO)
+   b_tr <- transitreg(counts ~ te(theta, x, k = 10), data = d)
+   save(b_PO, b_NBI, b_SICHEL, b_GPO, b_DPO, b_tr, file = "example1.rda")
+} else {
+  load("example1.rda")
+}
+
+if(file.exists("qu1.rda")) {
+  q_PO <- quantile(b_PO, prob = c(0.1, 0.5, 0.9))
+  q_NBI <- quantile(b_NBI, prob = c(0.1, 0.5, 0.9))
+  q_SICHEL <- quantile(b_SICHEL, prob = c(0.1, 0.5, 0.9))
+  q_GPO <- quantile(b_GPO, prob = c(0.1, 0.5, 0.9))
+  q_DPO <- quantile(b_DPO, prob = c(0.1, 0.5, 0.9))
+  q_tr <- predict(b_tr, type = "quantile", prob = c(0.01, 0.1, 0.5, 0.9, 0.99))
+  q_DPO2 <- quantile(b_DPO, prob = c(0.01, 0.1, 0.5, 0.9, 0.99))
+  save(q_PO, q_NBI, q_SICHEL, q_GPO, q_DPO, q_tr, q_DPO2, file = "qu1.rda")
+} else {
+  load("qu1.rda")
+}
+
+ylim <- range(c(as.matrix(q_PO), as.matrix(q_NBI),
+  as.matrix(q_SICHEL), as.matrix(q_GPO), as.matrix(q_DPO),
+  d$counts))
+
+par(mar = c(4, 4, 0.1, 0.1))
+plot(counts ~ x, data = d, ylim = ylim,
+  col = rgb(0.1, 0.1, 0.1, alpha = 0.2), pch = 16,
+  xlab = "x", ylab = "y")
+@
+\end{center}
+\end{frame}
+
+
+\begin{frame}{Count Models}
+Estimated model: $y \sim \text{PO}(\log(\mu) = f(x))$.\\[1ex]
+\begin{center}
+\setkeys{Gin}{width=0.52\textwidth}
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=5, height=4>>=
+par(mar = c(4, 4, 0.1, 0.1))
+plot(counts ~ x, data = d, ylim = ylim,
+  col = rgb(0.1, 0.1, 0.1, alpha = 0.2), pch = 16,
+  xlab = "x", ylab = "y")
+
+i <- order(d$x)
+
+matplot(d$x[i], q_PO[i, ], type = "l", lty = 1, lwd = 3,
+  col = c(4, 2, 4), add = TRUE)
+@
+\end{center}
+\end{frame}
+
+
+\begin{frame}{Count Models}
+Estimated model: $y \sim \text{NBI}(\log(\mu) = f(x), \log(\sigma) = f(x))$.\\[1ex]
+\begin{center}
+\setkeys{Gin}{width=0.52\textwidth}
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=5, height=4>>=
+par(mar = c(4, 4, 0.1, 0.1))
+plot(counts ~ x, data = d, ylim = ylim,
+  col = rgb(0.1, 0.1, 0.1, alpha = 0.2), pch = 16,
+  xlab = "x", ylab = "y")
+
+i <- order(d$x)
+
+matplot(d$x[i], q_NBI[i, ], type = "l", lty = 1, lwd = 3,
+  col = c(4, 2, 4), add = TRUE)
+@
+\end{center}
+\end{frame}
+
+
+\begin{frame}{Count Models}
+Estimated model: $y \sim \text{SICHEL}(\log(\mu) = f(x), \log(\sigma) = f(x), \nu = f(x))$.\\[1ex]
+\begin{center}
+\setkeys{Gin}{width=0.52\textwidth}
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=5, height=4>>=
+par(mar = c(4, 4, 0.1, 0.1))
+plot(counts ~ x, data = d, ylim = ylim,
+  col = rgb(0.1, 0.1, 0.1, alpha = 0.2), pch = 16,
+  xlab = "x", ylab = "y")
+
+i <- order(d$x)
+
+matplot(d$x[i], q_SICHEL[i, ], type = "l", lty = 1, lwd = 3,
+  col = c(4, 2, 4), add = TRUE)
+@
+\end{center}
+\end{frame}
+
+\begin{frame}{Count Models}
+Estimated model: $y \sim \text{GPO}(\log(\mu) = f(x), \log(\sigma) = f(x))$.\\[1ex]
+\begin{center}
+\setkeys{Gin}{width=0.52\textwidth}
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=5, height=4>>=
+par(mar = c(4, 4, 0.1, 0.1))
+plot(counts ~ x, data = d, ylim = ylim,
+  col = rgb(0.1, 0.1, 0.1, alpha = 0.2), pch = 16,
+  xlab = "x", ylab = "y")
+
+i <- order(d$x)
+
+matplot(d$x[i], q_GPO[i, ], type = "l", lty = 1, lwd = 3,
+  col = c(4, 2, 4), add = TRUE)
+@
+\end{center}
+\end{frame}
+
+
+\begin{frame}{Count Models}
+Estimated model: $y \sim \text{DPO}(\log(\mu) = f(x), \log(\sigma) = f(x))$.\\[1ex]
+\begin{center}
+\setkeys{Gin}{width=0.52\textwidth}
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=5, height=4>>=
+par(mar = c(4, 4, 0.1, 0.1))
+plot(counts ~ x, data = d, ylim = ylim,
+  col = rgb(0.1, 0.1, 0.1, alpha = 0.2), pch = 16,
+  xlab = "x", ylab = "y")
+
+i <- order(d$x)
+
+matplot(d$x[i], q_DPO[i, ], type = "l", lty = 1, lwd = 3,
+  col = c(4, 2, 4), add = TRUE)
+@
+\end{center}
+\end{frame}
+
+
+\subsection{Transition Models}
+
+
+\begin{frame}{Transition Models}
+The transition probability $P(\cdot)$ for count data is defined as
+$$
+P(y_i > r | y_i \ge r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha})),~~r = 0, 1, 2, \dots 
+$$
+where $F(\cdot)$ is a CDF (e.g., logistic
+or probit) and $r$ represents the counts, with an additive predictor
+$$
+\eta_{ir}(\boldsymbol{\alpha}) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \boldsymbol{\beta}).
+$$
+The parameters $\boldsymbol{\alpha} = (\theta^\top, \beta^\top)$ include count-specific
+intercepts and (possibly) smooth functions $f_j(\cdot)$.
+For i.i.d.\ observations, let $\pi_{ir}$ denote the probability that the count response equals $r$,
+i.e., $P(y_i=r | \mathbf{x}_i)$. These probabilities are computed recursively as
+$$
+\pi_{ir} = (1 - F(\eta_{ir}(\boldsymbol{\alpha}))) \prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha})).
+$$
+\end{frame}
+
+
+\begin{frame}{Transition Models}  
+Parameter estimation considers the underlying Markov chain $Y_{i0}, Y_{i1}, \dots$,
+where
+$$
+Y_{ir} = 1 - I(y_i = r).
+$$
+
+Simplifies to binary model log-likelihood
+$$
+\ell(\boldsymbol{\alpha}) = \sum_{i=1}^n \sum_{s=0}^{y_i} \Big[Y_{is} \log(F(\eta_{ir})) + (1 - Y_{is}) \log(1 - F(\eta_{ir}))\Big].
+$$
+
+$(Y_{i0}, \dots, Y_{iy_i})^\top = (1, \dots, 1, 0)$ are created, along with a new
+covariate $\theta_i = (0, 1, 2, \dots, y_i)^\top$ to capture
+count-specific effects $f_j(\mathbf{x}_i, \theta_i)$, or simple count-specific
+intercepts.
+
+\medskip
+
+All other covariates are duplicated accordingly.
+\end{frame}
+
+
+\begin{frame}[fragile]{Example}
+In R:
+
+\medskip
+
+<<echo=FALSE>>=
+df <- data.frame(myresponse = c(5.3, 0, 2.1),
+  x = c(-1.2, 3.2, -0.5),
+  y = c(765, 731, 353),
+  z = as.factor(c("foo", "bar", "foo")))
+     
+## Building model.frame for testing
+mf <- model.frame(myresponse ~ x + y + z, df)
+     
+## Breaks
+bk <- seq(0, 8, by = 1)
+     
+## Simple case
+df <- transitreg:::transitreg_tmf(mf, "myresponse", bk)
+df <- df[, c("index", "myresponse", "Y", "theta", "x", "y", "z")]
+@
+
+<<>>=
+print(head(df, 10))
+@
+
+\medskip
+
+<<eval=FALSE>>=
+b <- glm(Y ~ as.factor(theta) + x + y + z, data = df, family = binomial)
+@
+\end{frame}
+
+
+\begin{frame}{Count Models}
+\vspace*{-2ex}
+\begin{center}
+\setkeys{Gin}{width=1\textwidth}
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=10.5, height=5>>=
+par(mar = c(4, 4, 4, 1), mfrow = c(1, 2))
+
+plot(counts ~ x, data = d, ylim = ylim,
+  col = rgb(0.1, 0.1, 0.1, alpha = 0.2), pch = 16,
+  xlab = "x", ylab = "y", main = "DPO count model")
+
+i <- order(d$x)
+
+matplot(d$x[i], q_DPO2[i, ], type = "l", lty = 1, lwd = 3,
+  col = c(4, 4, 2, 4, 4), add = TRUE)
+
+plot(counts ~ x, data = d, ylim = ylim,
+  col = rgb(0.1, 0.1, 0.1, alpha = 0.2), pch = 16,
+  xlab = "x", ylab = "y", main = "Transition model")
+
+i <- order(d$x)
+
+matplot(d$x[i], q_tr[i, ] - 0.5, type = "l", lty = 1, lwd = 3,
+  col = c(4, 4, 2, 4, 4), add = TRUE)
+@
+\end{center}
+\end{frame}
+
+
+\subsection{Extension for Continuous Responses}
+
+
+\begin{frame}{Extension for Continuous Responses}
+Simulated example: $y \sim \text{NO}(\mu = f(x), \log(\sigma) = f(x))$.\\[1ex]
+\begin{center}
+\setkeys{Gin}{width=0.6\textwidth}
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=8, height=5.8>>=
+bk <- transitreg:::make_breaks(y = unique(d$num), breaks = 16, censored = "uncensored")$breaks
+bk <- bk[-length(bk)]
+delta <- diff(bk)[1]
+
+ylim <- range(d$num, bk + delta/2)
+
+par(mar = c(4, 4, 0.1, 4))
+plot(num ~ x, data = d, ylim = ylim,
+  col = rgb(0.1, 0.1, 0.1, alpha = 0.2), pch = 16,
+  xlab = "x", ylab = "y")
+@
+\end{center}
+\end{frame}
+
+
+\begin{frame}{Extension for Continuous Responses}
+\textbf{Idea}: Define intervals and generate pseudo-counts. $\phantom{f(x)}$\\[1ex]
+\begin{center}
+\setkeys{Gin}{width=0.6\textwidth}
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=8, height=5.8>>=
+par(mar = c(4, 4, 0.1, 4))
+plot(num ~ x, data = d, ylim = ylim,
+  xlab = "x", ylab = "y", type = "n")
+
+for(i in c(1:length(bk))[1:length(bk) %% 2 < 1]) {
+  rect(-4, bk[i], 4, bk[i] + delta, col = adjustcolor("lightgray", alpha = 0.2), border = NA)
+}
+
+points(d$x, d$num, pch = 16, col = rgb(0.1, 0.1, 0.1, alpha = 0.2))
+
+abline(h = bk[-1], col = adjustcolor(2, 0.5), lwd = 0.5)
+
+box()
+axis(1)
+axis(2)
+axis(4, at = bk + delta/2, labels = 0:(length(bk) - 1))
+
+mtext("Pseudo-Counts", side = 4, line = 2.5)
+@
+\end{center}
+\end{frame}
+
+
+\begin{frame}[fragile]{Extension for Continuous Responses}
+Discretization approach inspired by histogram binning.
+
+\medskip
+
+Divide response $y_i \in \mathbb{R}$, $i = 1, \ldots, n$, into $m - 1$ intervals using
+$$
+\zeta_1, \zeta_2, \dots, \zeta_m,
+$$
+where each interval $[\zeta_r, \zeta_{r+1})$ corresponds to a discrete count $r$.
+
+\medskip
+
+Each observation $y_i$ is assigned a pseudo count $\tilde{y}_i$.
+
+\medskip
+
+For a continuous response variable $y_i$ with CDF $F(y)$, discretization process
+approximates the probabilities of $y_i$ falling into each interval as
+$$
+P(\zeta_r \leq y_i < \zeta_{r+1}) = F(\zeta_{r+1}) - F(\zeta_r).
+$$
+\end{frame}
+
+\begin{frame}[fragile]{Extension for Continuous Responses}
+Probabilities are encoded as transformed counts $\tilde{y}_i$,
+so that the transition model uses
+$$
+P(\tilde{y}_i = r) = P(\zeta_r \leq y_i < \zeta_{r+1})$$
+to approximate the discrete likelihood.
+
+\medskip
+
+The transition model estimates the probability of transitions between counts
+$$
+P(\tilde{y}_i > r \mid \tilde{y}_i \geq r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha}))
+$$
+and recursively computes
+$$  
+P(\tilde{y}_i = r, \mathbf{x}_i) = P(\tilde{y}_i = r \mid \tilde{y}_i \geq r, \mathbf{x}_i) \prod_{s=0}^{r-1} P(\tilde{y}_i > s \mid \tilde{y}_i \geq s, \mathbf{x}_i).
+$$
+\end{frame}
+
+
+\begin{frame}[fragile]{Extension for Continuous Responses}
+\begin{itemize}
+\item Let $r$ denote the unique index such that $y_i \in [\zeta_r, \zeta_{r+1})$.
+  
+\item For any value $y_i \in [\zeta_r, \zeta_{r+1})$, the CDF can be approximated by
+  $$
+  \hat{F}(y_i) = \sum_{s=0}^{r-1} P(\tilde{y}_i = s) + \frac{y_i - \zeta_r}{\zeta_{r+1} - \zeta_r} P(\tilde{y}_i = r).
+  $$
+
+\item The PDF can be approximated as
+$$
+\hat{f}(y_i) = \frac{P(\tilde{y}_i = r)}{\zeta_{r+1}-\zeta_r}.
+$$
+
+\item The mean and variance are approximated using midpoints $c_r = \frac{\zeta_r + \zeta_{r+1}}{2}$
+  $$
+  E[Y] = \sum_{r} c_r \, P(\tilde{y} = r), \quad
+  \text{Var}(Y) = \sum_{r} c_r^2 \, P(\tilde{y} = r) - \left( \sum_{r} c_r \, P(\tilde{y} = r) \right)^2.
+  $$
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}[fragile]{Extension for Continuous Responses}
+\begin{itemize}
+\item Similarly: $\text{Skewness} = \frac{E[(Y - E[Y])^3]}{\text{Var}(Y)^{3/2}},
+  \quad \text{Kurtosis} = \frac{E[(Y - E[Y])^4]}{\text{Var}(Y)^2}$.
+
+\item The $\tau$-quantile $\hat{Q}(\tau)$ is obtained by finding the
+  smallest index $r$ such that  
+  $$
+  \sum_{s=0}^{r} P(\tilde{y} = s) \geq \tau,
+  $$
+  using linear interpolation within the interval
+  $$
+  \hat{Q}(\tau) = \zeta_r + \frac{\tau - \sum_{s=0}^{r-1} P(\tilde{y} = s)}{P(\tilde{y} = r)} \cdot (\zeta_{r+1} - \zeta_r).
+  $$
+
+\item The mode $\hat{M}$ is approximated as
+  $$
+  \hat{M} = c_{r^\ast}, \quad \text{where } \quad r^\ast = \arg\max_r\, P(\tilde{y} = r).
+  $$
+\end{itemize}
+\end{frame}
+
+
+\subsection{Software}
+
+
+\begin{frame}[fragile]{Software}
+An implementation is provided in the R package \pkg{transitreg}.
+
+\begin{center}
+\url{https://github.com/retostauffer/transitreg}
+\end{center}
+
+\medskip
+
+Install with:
+
+\medskip
+
+<<eval=FALSE>>=
+install.packages("transitreg",
+  repos = c("https://gamlss-dev.R-universe.dev",
+            "https://cloud.R-project.org"))
+@
+\end{frame}
+
+
+\subsection{Application}
+
+
+\begin{frame}[fragile]{Application: Precipitation Climatology Estimation}
+<<eval=FALSE>>=
+b <- transitreg(sqrt_pre ~ s(theta), data = df, breaks = 30, censored = "left")
+@
+
+\begin{center}
+\setkeys{Gin}{width=0.6\textwidth}
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=6, height=4>>=
+par(mar = c(4, 4, 0.1, 4))
+library("transitreg")
+library("gamlss2")
+library("gamlss.cens")
+
+d <- readRDS("ehydTirol_Tageschniederschlagssummen.rds")
+d <- subset(d, date >= (max(date) - 365*30))
+d$sqrt_pre <- sqrt(d$value)
+d$day <- as.POSIXlt(d$date)$yday
+
+stations <- unique(d$name)
+
+df <- subset(d, name == "Kirchberg in Tirol")
+
+set.seed(123)
+i <- sample(1:2, size = nrow(df), prob = c(0.8, 0.4), replace = TRUE)
+dtrain <- subset(df, i < 2)
+dtest <- subset(df, i > 1)
+
+breaks <- seq(0, 10, by = 0.05)
+breaks2 <- seq(0, 10, by = 0.3)
+
+m <- transitreg(sqrt_pre ~ theta0 + s(theta,k=20), data = df,
+  breaks = breaks, censored = "left")
+
+xx <- c(0, ((head(breaks, -1) + tail(breaks, -1L)) / 2)[-1])
+nd <- data.frame("sqrt_rain" = xx)
+
+py <- seq(0, 10, by = 0.01)
+pm <- as.vector(predict(m, newdata = nd[1, , drop = F], y = py, type = "pdf"))
+
+col    <- rep(c("white", "gray80"), times = c(1, length(breaks2) - 2))
+border <- rep(c("white", "black"),  times = c(1, length(breaks2) - 2))
+h <- hist(df$sqrt_pre,
+          breaks = breaks2,
+          col = col,
+          border = border,
+          freq = FALSE,
+          xlab = "y; sqrt(Precipitation)", main = NA,
+          xlim = c(0, 8), ylim = c(0, max(pm) + 0.05))
+
+# Adding observed frequency of zero
+obs_zero <- mean(!(df$sqrt_pre > 0))
+points(0, obs_zero, col = 1, pch = 19)
+
+lines(pm ~ py, col = 4, lwd = 2)
+points(py[1L], pm[1L], col = 4, pch = 1)
+
+rug(df$sqrt_pre, col = rgb(0.1, 0.1, 0.1, alpha = 0.4))
+
+legend("center", legend = c(
+     expression(paste("observed P(", y, "=", 0, ")")),
+     expression(paste("modelled P(", y, "=", 0, ")"))
+  ), pch = c(19, 1), col = "gray50", bty = "n")
+@
+\end{center}
+\end{frame}
+
+
+\begin{frame}[fragile]{Application: Precipitation Climatology Estimation}
+Model formula.
+
+<<>>=
+f <- sqrt_pre ~ theta0 + s(theta, k = 20) + s(day, bs = "cc", k = 20) +
+  te(theta, day, bs = c("cr", "cc"), k = 10)
+@
+
+\medskip
+
+Estimate model.
+
+<<>>=
+breaks <- seq(0, 10, by = 0.05)
+b <- transitreg(f, data = dtrain, breaks = breaks, censored = "left")
+@
+
+\medskip
+
+Predict quantiles.
+
+<<>>=
+p <- predict(b, newdata = dtest, prob = c(0.01, 0.1, 0.5, 0.9, 0.99))
+@
+
+\medskip
+
+Compare with \pkg{qgam}.
+
+<<message=FALSE, results=hide>>=
+library("qgam")
+qu <- c(0.01, 0.1, 0.5, 0.9, 0.99)
+m <- mqgam(sqrt_pre ~ s(day, k = 20, bs = "cc"), data = dtrain, qu = qu)
+@
+
+\end{frame}
+
+
+\begin{frame}[fragile]{Application: Precipitation Climatology Estimation}
+Estimated climatology.
+\begin{center}
+\setkeys{Gin}{width=0.6\textwidth}
+<<echo=FALSE, eval=TRUE, fig=TRUE, results=hide, width=6, height=4>>=
+gen.cens("NO", type = "left")
+
+dtrain$Y <- Surv(dtrain$sqrt_pre, 1 * (dtrain$sqrt_pre > 0), type = "left")
+
+g <- gamlss2(Y ~ s(day, k = 20, bs = "cc") | s(day, k = 20, bs = "cc"),
+  data = dtrain, family = NOlc)
+
+pg <- quantile(g, probs = qu, newdata = dtest)
+
+pm <- do.call("cbind",
+  lapply(qu, function(j) {
+    qdo(m, j, predict, newdata = dtest)
+}))
+
+err_b <- err_m <- err_g <- NULL
+for(j in 1:5) {
+  err_b <- c(err_b, qgam::pinLoss(dtest$sqrt_pre, p[, j], qu[j]))
+  err_m <- c(err_m, qgam::pinLoss(dtest$sqrt_pre, pm[, j], qu[j]))
+  err_g <- c(err_g, qgam::pinLoss(dtest$sqrt_pre, pg[, j], qu[j]))
+}
+err_b <- sum(err_b)
+err_m <- sum(err_m)
+err_g <- sum(err_g)
+
+par(mar = c(4, 4, 0.1, 4))
+plot(sqrt_pre ~ day, data = dtest, type = "h", col = rgb(0.1, 0.1, 0.1, alpha = 0.4),
+  xlab = "Day of the year", ylab = "sqrt(Precipitation)", ylim = c(0, 11))
+i <- order(dtest$day)
+matplot(dtest$day[i], pg[i, ], type = "l", lty = 1, col = 3, add = TRUE, lwd = 1.5)
+matplot(dtest$day[i], pm[i, ], type = "l", lty = 1, col = 4, add = TRUE, lwd = 1.5)
+matplot(dtest$day[i], p[i, ], type = "l", lty = 1, col = 2, add = TRUE, lwd = 1.5)
+
+err <- c("QR" = err_m, "TM" = err_b, "CN" = err_g)
+col <- c(4, 2, 3)
+i <- order(err)
+err <- err[i]
+col <- col[i]
+
+legend("topleft", paste(paste(names(err), "PBL ="), round(err)),
+  lwd = 2, col = col, bty = "n")
+@
+\end{center}
+\end{frame}
+
+
+\begin{frame}[fragile]{Application: Precipitation Climatology Estimation}
+Estimated climatology.
+\begin{center}
+\includegraphics[width=0.8\textwidth]{predictions1.png}
+\end{center}
+\end{frame}
+
+
+\begin{frame}[fragile]{Application: Precipitation Climatology Estimation}
+Estimated climatology.
+\begin{center}
+\includegraphics[width=0.8\textwidth]{predictions2.png}
+\end{center}
+\end{frame}
+
+
+\subsection{References}
+
+
+\begin{frame}
+\frametitle{References}
+  \begin{thebibliography}{4}
+  \scriptsize
+  \setbeamertemplate{bibliography item}[triangle]
+
+  \bibitem[Berger and Tutz (2021)]{berger2021}
+    Berger, M. and Tutz, G. (2021). \\
+    \emph{Transition Models for Count Data: A Flexible Alternative to Fixed Distribution Models}. \\
+    Statistical Methods and Applications, 30, 1259--1283. \\
+    \doi{10.1007/s10260-021-00558-6}
+
+  \bibitem[Stauffer et al. (2017)]{stauffer2017}
+    Stauffer, R., Mayr, G.J., Messner, J.W., Umlauf, N., and Zeileis, A. (2017). \\
+    \emph{Spatio-Temporal Precipitation Climatology Over Complex Terrain Using a Censored Additive Regression Model}. \\
+    International Journal of Climatology, 37(7), 3264--3275. \\
+    \doi{10.1002/joc.4913}
+
+%  \bibitem[Stauffer (2025)]{transitreg2025}
+%    Stauffer, R. (2025). \\
+%    \emph{\pkg{transitreg}: Flexible Estimation and Visualization of Transition Models}.\\
+%    \url{https://github.com/retostauffer/transitreg}
+
+  \bibitem[Wood et al. (2014)]{wood2014}
+    Wood, S.N., Goude, Y., and Shaw, S. (2014). \\
+    \emph{Generalized Additive Models for Large Data Sets}. \\
+    Journal of the Royal Statistical Society: Series C, 64(1), 139--155. \\
+    \doi{10.1111/rssc.12068}
+
+  \bibitem[Wood et al. (2017)]{wood2017}
+    Wood, S.N., Li, Z., Shaddick, G., and Augustin, N.H. (2017). \\
+    \emph{Generalized Additive Models for Gigadata: Modeling the U.K. Black Smoke Network Daily Data}. \\
+    Journal of the American Statistical Association, 112(519), 1199--1210. \\
+    \doi{10.1080/01621459.2016.1195744}
+
+  \end{thebibliography}
+\end{frame}
+
+
+\end{document}
+
