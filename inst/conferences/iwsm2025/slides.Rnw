@@ -55,13 +55,12 @@
 \begin{frame}[fragile]
     \frametitle{Introduction}
 
-    \textbf{Count data regression}\newline
-    \medskip
-    \begin{itemize}
-        \item Estimate the parameters of a specific distribution
-    \end{itemize}
+    \textbf{Classical count data regression} \\
+    \smallskip
+    Estimate the parameters of a specific distribution.
     \pause
 
+    \medskip
     Frequently used models are e.g.,
     \begin{itemize}
         \item Poisson models,
@@ -70,141 +69,141 @@
         \item or hurdle models$^{*}$,
     \end{itemize}
 
-    whereof some are designated to account for an excess of zero observations
-    ($^{*}$).
-
-    TODO(R): Reference Kleiber Zeileis 2008, Hilbe 2014 oder so.
+    \medskip
+    $^{*}$whereof some are designated to account for an excess of zeros
+    (Zeileis \& Kleiber 2008, 2024).
 \end{frame}
 
 
 %% ----------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Introduction}
+    \frametitle{Transition regression}
 
-    \textbf{Transition models for count data}
-    \medskip
-    Modeling the porbability $P(\dot)$ of observation $y_i$ transitioning
-    into hither counts $r$.
+    \textbf{Transition models for count data} \\
+    \smallskip
+    Modeling the probability $P(\dot)$ of observation $y_i$ transitioning\\
+    into higher counts $r$ (Berger \& Tutz 2021).
+    \pause
 $$
-P(y_i > r | y_i \ge r, f(\dot)) \in [0, 1]
+    P(y_i > r | y_i \ge r, {\large \bullet}) \in [0, 1]
 $$
-    where $f(\dot)$ is a (yet unknown) function.
+    where ${\large \bullet}$ is a (yet unknown) function.
 
-    \medskip
-    Such models are also known as `continuation ratio models'
+    \bigskip
+    Similar models are also known as `continuation ratio models'
     or `ordered logistic models' in the logit context.
 
 \end{frame}
 
 
-%% ----------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Introduction}
+%% %% ----------------------------------------
+%% \begin{frame}[fragile]
+%%     \frametitle{Introduction}
+%% 
+%% %% https://search.r-project.org/CRAN/refmans/VGAM/html/cratio.html
+%% %% Ordinal Regression with Continuation Ratios
+%% %% VGAM::cratio
+%% %%
+%% %% Logit-link to move from m = 1 to m = 2,
+%% %% Logit-link to move from m = 2 to m = 3
+%% %% ---> two incercepts, same slope to ensure mononotinic increase
+%% 
+%%     \textbf{Continuation ratio model}\\
+%%     \medskip
+%%     Modeling the porbability $P(\dot)$ of observation $y_i$ transitioning
+%%     into higher counts $r$ conditional on explanatory variables $\mathbf{x}$.
+%% $$
+%%     P(y_i > r | y_i \ge r, \mathbf{x}_i) \in [0, 1]
+%% $$
+%% 
+%% \end{frame}
 
-%% https://search.r-project.org/CRAN/refmans/VGAM/html/cratio.html
-%% Ordinal Regression with Continuation Ratios
-%% VGAM::cratio
-%%
-%% Logit-link to move from m = 1 to m = 2,
-%% Logit-link to move from m = 2 to m = 3
-%% ---> two incercepts, same slope to ensure mononotinic increase
-
-    \textbf{Continuation ratio model}
-    \medskip
-    Modeling the porbability $P(\dot)$ of observation $y_i$ transitioning
-    into higher counts $r$ conditional on explanatory variables $\mathbf{x}$.
-$$
-    P(y_i > r | y_i \ge r, \mathbf{x}_i) \in [0, 1]
-$$
-
-\end{frame}
-
-
-%% ----------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Introduction}
-
-    \textbf{Transition regression models for count data}
-    \medskip
-    As proposed by Berger \& Tutz (2021)
-$$
-P(y_i > r | y_i \ge r, f(\dot)) \in [0, 1]
-$$
-    where $f(\dot)$ is a (yet unknown) function.
-
-    \medskip
-    Such models are also known as `continuation ratio models'.
-
-\end{frame}
 
 %% ----------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Introduction}
+    \frametitle{Transition regression}
 
-    \textbf{Transition regression}\newline
-    \medskip
+    \textbf{Core idea}
     \begin{itemize}
-        \item
         \item Estimate the probability of transitioning between intervals (counts)
-    \end{itemize}
-
-    \pause
-    \begin{itemize}
-        \item High flexibility as no distribution assumption is required
-        \item TODO(R): Check 
-        \item See Berger and Tutz (2021)
+        \item No need for prior knowledge about the response distribution
+        \item Allow to account for excesses in any count(s)
+        \item Be highly flexible in both it's parameters and the response distribution
+        \item Allow to retrieve mean, median, mode, \dots
     \end{itemize}
 
 \end{frame}
 
-%% ----------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Introduction}
-
-    \textbf{Transition regression}\newline
-    \medskip
-    \begin{itemize}
-        \item High flexibility as no distribution assumption is required
-        \item See Berger and Tutz (2021)
-    \end{itemize}
-
-\end{frame}
-
-\begin{frame}[fragile]
-    \frametitle{Introduction}
-
-<<marginal_dist_plot, echo=FALSE, fig=TRUE, width=8, height=6>>=
+<<marginal_dist_data, echo=FALSE>>=
 suppressPackageStartupMessages(library("colorspace"))
 suppressPackageStartupMessages(library("transitreg"))
 suppressPackageStartupMessages(library("distributions3"))
 
-## Simulating data
-set.seed(1234)
-x  <- c(rep(0L, 150), rnbinom(5000, size = 4, prob = 0.3))
-bk <- seq.int(0L, max(x))
+RDAFILE <- "_slides_marginal_models.rda"
+if (!file.exists(RDAFILE)) {
+    ## Simulating data
+    set.seed(1234)
+    xnb <- rnbinom(5000, size = 4, prob = 0.3)
+    x   <- c(rep(0L, 150), xnb)
+    xzero <- 150 / length(x)
+    bk <- seq.int(0L, max(x))
 
+    ## Poisson model
+    m1 <- glm(x ~ 1, data = data.frame(x = x), family = "poisson")
+    m1_lambda <- predict(m1, newdata = data.frame(x = 0L), type = "response")[[1]]
+    m1_dens   <- dpois(bk, lambda = m1_lambda)
+
+    ## Negbin model
+    suppressPackageStartupMessages(library("countreg"))
+    m2 <- nbreg(x ~ 1, data = data.frame(x = x))
+    m2_params <- as.list(predict(m2, newdata = data.frame(x = 1), type = "parameter"))
+    m2_dens   <- dnbinom(bk, mu = m2_params$mu, size = m2_params$theta)
+
+    ## Zero-inflated
+    m3 <- zeroinfl(x ~ 1 | 1, data = data.frame(x = x), dist = "negbin", link = "logit")
+    m3_params <- predict(m3, newdata = data.frame(x = 1), type = "parameter")
+    m3_params <- setNames(as.list(m3_params), colnames(m3_params))
+    m3_dens   <- dnbinom(bk, mu = m3_params$mu, size = m3_params$theta)
+
+    save(x, xzero, bk,
+         m1, m1_lambda, m1_dens,
+         m2, m2_params, m2_dens,
+         m3, m3_params, m3_dens, file = RDAFILE)
+} else {
+    load(RDAFILE)
+}
+@
+
+%% ----------------------------------------
+\begin{frame}[fragile]
+    \frametitle{Transition regression}
+
+    \textbf{Simple example: marginal distribution}\\
+    Let us assume a random count variable
+    $Y \sim \text{NB}^{3\%}_0(\text{size} = 4, \text{prob} = 0.3)$.
+
+    \begin{figure}
+        \center
+<<simple_example, echo = FALSE, fig = TRUE, width = 7, height = 3>>=
+#ggplot() + geom_histogram(aes(x = x), breaks = bk) + theme_minimal()
+par(mar = c(2.5, 3, 1, 0))
+h <- hist(x, breaks = bk, main = NULL, xlab = NULL, freq = FALSE)
+
+rect(xleft = h$breaks[1], xright = h$breaks[2],
+     ybottom = xzero, ytop = h$density[1], col = "lightblue")
+text(h$mids[1], xzero, adj = c(-0.2, 0.35), srt = 90, "excess")
+@
+    \end{figure}
+
+\end{frame}
+
+%% ----------------------------------------
+\begin{frame}[fragile]
+    \frametitle{Introduction}
+
+<<marginal_dist_plot, echo=FALSE, fig=TRUE, width=8, height=6>>=
 ## Color definition
-colors <- c(poisson    = "black",
-            negbin     = "red",
-            zeroinf    = "blue",
-            transitreg = "steelblue")
-
-## Poisson model
-m1 <- glm(x ~ 1, data = data.frame(x = x), family = "poisson")
-m1_lambda <- predict(m1, newdata = data.frame(x = 0L), type = "response")[[1]]
-m1_dens   <- dpois(bk, lambda = m1_lambda)
-
-## Negbin model
-suppressPackageStartupMessages(library("countreg"))
-m2 <- nbreg(x ~ 1, data = data.frame(x = x))
-m2_params <- as.list(predict(m2, newdata = data.frame(x = 1), type = "parameter"))
-m2_dens   <- dnbinom(bk, mu = m2_params$mu, size = m2_params$theta)
-
-## Zero-inflated
-m3 <- zeroinfl(x ~ 1 | 1, data = data.frame(x = x), dist = "negbin", link = "logit")
-m3_params <- predict(m3, newdata = data.frame(x = 1), type = "parameter")
-m3_params <- setNames(as.list(m3_params), colnames(m3_params))
-m3_dens   <- dnbinom(bk, mu = m3_params$mu, size = m3_params$theta)
+colors <- c(poisson = "black", negbin = "red", zeroinf = "blue", transitreg = "steelblue")
 
 ## Transitreg
 mtr <- transitreg(x ~ theta0 + theta + s(theta),
@@ -239,17 +238,55 @@ legend("topright",
 \begin{frame}[fragile]
     \frametitle{Introduction}
 
-<<marginal_rootogram_plot, echo=FALSE, fig=TRUE, width=8, height=5>>=
+<<marginal_rootogram_plot, echo = FALSE, include = FALSE>>=
 library("topmodels")
-r1  <- rootogram(m1,  breaks = bk - 0.001, plot = FALSE)
-r2  <- rootogram(m2,  breaks = bk - 0.001, plot = FALSE)
-r3  <- rootogram(m3,  breaks = bk - 0.001, plot = FALSE)
-rtr <- rootogram(mtr, breaks = bk - 0.001, plot = FALSE)
-tmp <- paste(c("Poisson", "negbin", "zero-infl negbin", "transitreg"),
-             sprintf("(logLik = %.2f)", sapply(list(m1, m2, m3, mtr), logLik)))
-plot(c(r1, r2, r3, rtr), col = adjust_transparency(colors, 0.5),
-     main = tmp)
+
+# Expected marginal plots
+MFILES <- sprintf("_images/marginal-%d.pdf", 1:4)
+if (!all(file.exists(MFILES))) {
+    r1  <- rootogram(m1,  breaks = bk - 0.001, plot = FALSE)
+    r2  <- rootogram(m2,  breaks = bk - 0.001, plot = FALSE)
+    r3  <- rootogram(m3,  breaks = bk - 0.001, plot = FALSE)
+    rtr <- rootogram(mtr, breaks = bk - 0.001, plot = FALSE)
+
+    IGN <- function(x, n) -logLik(x) / n
+    tmp <- paste(c("Poisson", "negbin", "zero-infl negbin", "transitreg"),
+                 sprintf("(IGN = %.3f)", sapply(list(m1, m2, m3, mtr), IGN, n = length(x))))
+                 #sprintf("(logLik = %.2f)", sapply(list(m1, m2, m3, mtr), logLik)))
+
+    library("ggplot2")
+    p1 <- autoplot(r1,  main = tmp[1L], xlab = "x", fill = "gray85") +
+        xlab(NULL) + theme(plot.margin = unit(c(.05, .1, 0, .2), "in"))
+    p2 <- autoplot(r2,  main = tmp[2L], xlab = "x", fill = "gray85") +
+        xlab(NULL) + theme(plot.margin = unit(c(.05, .1, 0, .2), "in"))
+    p3 <- autoplot(r3,  main = tmp[3L], xlab = "x", fill = "gray85") +
+        xlab(NULL) + theme(plot.margin = unit(c(.05, .1, 0, .2), "in"))
+    p4 <- autoplot(rtr, main = tmp[4L], xlab = "x", fill = "gray85") +
+        xlab(NULL) + theme(plot.margin = unit(c(.05, .1, 0, .2), "in"))
+
+    size <- list(w = 3.5, h = 1.5)
+    ggsave(p1, file = MFILES[1L], width = size$w, height = size$h)
+    ggsave(p2, file = MFILES[2L], width = size$w, height = size$h)
+    ggsave(p3, file = MFILES[3L], width = size$w, height = size$h)
+    ggsave(p4, file = MFILES[4L], width = size$w, height = size$h)
+}
 @
+
+
+
+    \vspace{-1em}
+    $y \sim \text{Po}(x)$
+    \vspace{-1em}
+
+    \begin{figure}[width = \textwidth]
+        \centering
+        \begin{tabular}{cc}
+        \visible<1->{\includegraphics[width=0.49\textwidth]{_images/marginal-1.pdf}} &
+        \visible<2->{\includegraphics[width=0.49\textwidth]{_images/marginal-2.pdf}} \\
+        \visible<3->{\includegraphics[width=0.49\textwidth]{_images/marginal-3.pdf}} &
+        \visible<4->{\includegraphics[width=0.49\textwidth]{_images/marginal-4.pdf}} \\
+        \end{tabular}
+    \end{figure}
 
 \end{frame}
 
@@ -493,6 +530,66 @@ daily amount of precipitation of $1.44\,\mathrm{mm}$.
 \subtitle{}
 \section{Thanks}
 
+%% From Proceedings
+%% \item[Stauffer, R., Mayr, GJ., Messner, JW., Umlauf, N., and Zeileis A.] (2017)\newline
+%%      Spatio-Temporal Precipitation Climatology Over Complex Terrain Using a
+%%      Censored Additive Regression Model.
+%%      {\it Int. J. Climatol.}, {\bf 37}(7), 3264--3275,
+%%      doi:\texttt{10.1002/joc.4913}
+%% \item[Walsh, S.] (2012)
+%%      A Summary of Climate Averages for Ireland, 1981-2010.
+%%      {\it Met\,{\'E}ireann, Climatol. Note}, {\bf 14}, 1--16, \newline
+%%      \texttt{https://www.met.ie/climate-ireland/SummaryClimAvgs.pdf}
+%% \item[Wood, SN., Goude, Y., and Shaw, S.] (2014)
+%%      Generalized Additive Models for Large Data Sets.
+%%      {\it J. R. Stat. Soc. C Appl. Stat.}, {\bf 64}(1), 139--155,
+%%      doi:\texttt{10.1111/rssc.12068}
+%%  \item[Wood, SN., Li, Z., Shaddick, G., and Augustin, NH.] (2017)
+%%      Generalized Additive Models for Gigadata: Modeling the U.K. Black Smoke Network Daily Data.
+%%      {\it J. Am. Stat. Assoc.}, {\bf 112}(519), 1199--1210,\newline
+%%      doi:\texttt{10.1080/01621459.2016.1195744}
+
+\begin{frame}[fragile, allowframebreaks]{References}
+    \begin{footnotesize}
+
+    Umlauf N, Stauffer R (2025).
+        \dquote{transitreg: Flexible Transition Models for Probabilistic Learning.}
+        \emph{R}~package version \verb|0.2-0|.
+        \url{https://retostauffer.r-universe.dev/transitreg},
+        \url{https://github.com/retostauffer/transitreg}
+
+    \smallskip
+    %% Original inspiration
+    Berger M, Tutz G (2021).
+        \dquote{Transition Models for Count Data: a Flexible Alternative to Fixed Distribution Models.},
+        \emph{Statistical Methods \& Applications}, \textbf{30}, 1259--1283.
+        \doi{10.1007/s10260-021-00558-6}
+
+
+    \bigskip
+    %% Rootograms
+    Kleiber C, Zeileis A (2016).
+        \dquote{Visualizing Count Data Regressions Using Rootograms.}
+        \emph{The American Statistician}, \textbf{70}(3), 296--303.
+        \doi{10.1080/00031305.2016.1173590}
+    \smallskip
+
+    %% Countreg
+    Zeileis A, Kleiber C, Jackman S (2008).
+        \dquote{Regression Models for Count Data in \emph{R}.}
+        \emph{Journal of Statistical Software}, \textbf{27}(8), 1--25.
+        \doi{10.18637/jss.v027.i08}
+    \smallskip
+
+    %% Countreg software
+    Zeileis A, Kleiber C (2024).
+        \dquote{countreg: Count Data Regression.}
+        \emph{R}~package version \verb|0.3-0|.
+        \url{https://R-Forge.R-project.org/projects/countreg/}
+
+
+    \end{footnotesize}
+\end{frame}
 
 %% appendix of 'extra' slides
 \appendix
