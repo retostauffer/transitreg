@@ -18,3 +18,5 @@
 
 ^inst/misc$
 ^inst/conferences$
+
+^R/tree.R
