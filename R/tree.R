@@ -1,3 +1,5 @@
+## Main ref: https://onlinelibrary.wiley.com/doi/abs/10.1002/sim.6729
+
 ## Hazard function from binned y.
 hazard_estimates <- function(y_bin, m) {
   counts <- tabulate(y_bin, nbins = m)    ## Counts in each bin 1 to m.
