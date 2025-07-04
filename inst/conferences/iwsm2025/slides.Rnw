@@ -143,29 +143,29 @@ RDAFILE <- "_slides_marginal_models.rda"
 if (!file.exists(RDAFILE)) {
     ## Simulating data
     set.seed(1234)
-    xnb <- rnbinom(5000, size = 4, prob = 0.3)
-    x   <- c(rep(0L, 150), xnb)
-    xzero <- 150 / length(x)
-    bk <- seq.int(0L, max(x))
+    ynb <- rnbinom(5000, size = 4, prob = 0.3)
+    y   <- c(rep(0L, 150), ynb)
+    yzero <- 150 / length(y)
+    bk <- seq.int(0L, max(y))
 
     ## Poisson model
-    m1 <- glm(x ~ 1, data = data.frame(x = x), family = "poisson")
+    m1 <- glm(y ~ 1, data = data.frame(y = y), family = "poisson")
     m1_lambda <- predict(m1, newdata = data.frame(x = 0L), type = "response")[[1]]
     m1_dens   <- dpois(bk, lambda = m1_lambda)
 
     ## Negbin model
     suppressPackageStartupMessages(library("countreg"))
-    m2 <- nbreg(x ~ 1, data = data.frame(x = x))
-    m2_params <- as.list(predict(m2, newdata = data.frame(x = 1), type = "parameter"))
+    m2 <- nbreg(y ~ 1, data = data.frame(x = x))
+    m2_params <- as.list(predict(m2, newdata = data.frame(y = 1), type = "parameter"))
     m2_dens   <- dnbinom(bk, mu = m2_params$mu, size = m2_params$theta)
 
     ## Zero-inflated
-    m3 <- zeroinfl(x ~ 1 | 1, data = data.frame(x = x), dist = "negbin", link = "logit")
-    m3_params <- predict(m3, newdata = data.frame(x = 1), type = "parameter")
+    m3 <- zeroinfl(y ~ 1 | 1, data = data.frame(y = y), dist = "negbin", link = "logit")
+    m3_params <- predict(m3, newdata = data.frame(y = 1), type = "parameter")
     m3_params <- setNames(as.list(m3_params), colnames(m3_params))
     m3_dens   <- dnbinom(bk, mu = m3_params$mu, size = m3_params$theta)
 
-    save(x, xzero, bk,
+    save(y, yzero, bk,
          m1, m1_lambda, m1_dens,
          m2, m2_params, m2_dens,
          m3, m3_params, m3_dens, file = RDAFILE)
@@ -187,51 +187,51 @@ if (!file.exists(RDAFILE)) {
 <<simple_example, echo = FALSE, fig = TRUE, width = 7, height = 3>>=
 #ggplot() + geom_histogram(aes(x = x), breaks = bk) + theme_minimal()
 par(mar = c(2.5, 3, 1, 0))
-h <- hist(x, breaks = bk, main = NULL, xlab = NULL, freq = FALSE)
+h <- hist(y, breaks = bk, main = NULL, xlab = NULL, freq = FALSE)
 
 rect(xleft = h$breaks[1], xright = h$breaks[2],
-     ybottom = xzero, ytop = h$density[1], col = "lightblue")
-text(h$mids[1], xzero, adj = c(-0.2, 0.35), srt = 90, "excess")
+     ybottom = yzero, ytop = h$density[1], col = "lightblue")
+text(h$mids[1], yzero, adj = c(-0.2, 0.35), srt = 90, "excess")
 @
     \end{figure}
 
 \end{frame}
 
-%% ----------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Introduction}
-
-<<marginal_dist_plot, echo=FALSE, fig=TRUE, width=8, height=6>>=
-## Color definition
-colors <- c(poisson = "black", negbin = "red", zeroinf = "blue", transitreg = "steelblue")
-
-## Transitreg
-mtr <- transitreg(x ~ theta0 + theta + s(theta),
-                  data = data.frame(x = x))
-mtr_dens <- pdf(mtr[1], x = bk)
-
-hist(x, breaks = bk, freq = FALSE, right = FALSE, include.lowest = TRUE,
-     ylim = c(0, 0.13))
-lines(bk + 0.5, m1_dens, col = colors[[1]], lwd = 3)
-lines(bk + 0.5, m2_dens, col = colors[[2]], lwd = 3)
-lines(bk + 0.5, m3_dens, col = colors[[3]], lwd = 3)
-points(0.5, m3_params$pi, pch = 19, col = colors[[3]])
-
-# Adding transitreg density
-#lines(bk[-1], mtr_dens[-1], type = "s", col = 5, lwd = 3)
-#lines(1 + (head(bk, -1) + tail(bk, -1)) * 0.5, mtr_dens[-1], type = "l", col = 5, lwd = 3)
-#points(0.5, mtr_dens[1], pch = 19, col = 5)
-points(bk + 0.5, mtr_dens, pch = 19, col = colors[[4]])
-
-legend("topright",
-       legend = c("Poisson", "negbin", "zero-infl negbin", "transitreg"),
-       lwd = 3,
-       lty = c(1, 1, 1, NA),
-       pch = c(NA, NA, NA, 19),
-       col = colors)
-@
-
-\end{frame}
+%% %% ----------------------------------------
+%% \begin{frame}[fragile]
+%%     \frametitle{Introduction}
+%% 
+%% <<marginal_dist_plot, echo=FALSE, fig=TRUE, width=8, height=6>>=
+%% ## Color definition
+%% colors <- c(poisson = "black", negbin = "red", zeroinf = "blue", transitreg = "steelblue")
+%% 
+%% ## Transitreg
+%% mtr <- transitreg(x ~ theta0 + theta + s(theta),
+%%                   data = data.frame(x = x))
+%% mtr_dens <- pdf(mtr[1], x = bk)
+%% 
+%% hist(x, breaks = bk, freq = FALSE, right = FALSE, include.lowest = TRUE,
+%%      ylim = c(0, 0.13))
+%% lines(bk + 0.5, m1_dens, col = colors[[1]], lwd = 3)
+%% lines(bk + 0.5, m2_dens, col = colors[[2]], lwd = 3)
+%% lines(bk + 0.5, m3_dens, col = colors[[3]], lwd = 3)
+%% points(0.5, m3_params$pi, pch = 19, col = colors[[3]])
+%% 
+%% # Adding transitreg density
+%% #lines(bk[-1], mtr_dens[-1], type = "s", col = 5, lwd = 3)
+%% #lines(1 + (head(bk, -1) + tail(bk, -1)) * 0.5, mtr_dens[-1], type = "l", col = 5, lwd = 3)
+%% #points(0.5, mtr_dens[1], pch = 19, col = 5)
+%% points(bk + 0.5, mtr_dens, pch = 19, col = colors[[4]])
+%% 
+%% legend("topright",
+%%        legend = c("Poisson", "negbin", "zero-infl negbin", "transitreg"),
+%%        lwd = 3,
+%%        lty = c(1, 1, 1, NA),
+%%        pch = c(NA, NA, NA, 19),
+%%        col = colors)
+%% @
+%% 
+%% \end{frame}
 
 
 %% ----------------------------------------
@@ -275,7 +275,8 @@ if (!all(file.exists(MFILES))) {
 
 
     \vspace{-1em}
-    $y \sim \text{Po}(x)$
+    \only<1>{\verb#glm(x ~ 1, family = "poisson")#}
+    \only<2>{\verb#countreg::nbreg(x ~ 1)#}
     \vspace{-1em}
 
     \begin{figure}[width = \textwidth]
