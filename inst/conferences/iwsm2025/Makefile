@@ -7,7 +7,7 @@ pdf:
 	pdflatex stauffer.tex
 	pdflatex stauffer.tex
 	pdflatex stauffer.tex
-	make clean
+	#make clean
 
 slides:
 	R CMD Sweave slides.Rnw

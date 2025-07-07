@@ -253,28 +253,30 @@ By default, estimation of the binary response model is carried out using
 enable fast computation.
 
 Currently, software version \verb|0.2-0| is in beta and available on both
-GitHub (\texttt{https://github.com/retostauffer/transitreg}) as well as through the
-\emph{R}-universe (\texttt{https://retostauffer.r-universe.dev/}). A CRAN release is planned for Summer 2025.
+GitHub
+(\texttt{https://github.com/retostauffer/transitreg}) as well as through the
+\emph{R}-universe
+(\texttt{https://retostauffer.r-universe.dev/}). A CRAN release is planned for Summer 2025.
 
 The following code chunk estimates the left-censored transition model used in
 Figure~\ref{stauffer:fig2} (center and right panels), without cross-validation.
 
-<<eval = FALSE>>=
-# Installing package via R-universe
-install.packages("transitreg",
-     repos = "https://retostauffer.r-universe.dev")
-library("transitreg")
-# Load and prepare data set
-data("Shannon")
-Shannon$day <- as.integer(format(Shannon$date, "%j"))
-# Specifying model formula
-f <- sqrt(rain) ~ theta0 + ti(theta, k = 20) +
-     ti(theta, day, bs = c("cr", "cc"), k = c(20, 20))
-# Estimating the transition model
-m <- transitreg(f, data = Shannon,
-     breaks = seq(0, 12, by = 0.3), censored = "left")
-plot(m[319], cdf = TRUE, tp = TRUE)
-@
+\begin{verbatim}
+R> # Installing package via R-universe
+R> install.packages("transitreg",
++      repos = "https://retostauffer.r-universe.dev")
+R> library("transitreg")
+R> # Load and prepare data set
+R> data("Shannon")
+R> Shannon$day <- as.integer(format(Shannon$date, "%j"))
+R> # Specifying model formula
+R> f <- sqrt(rain) ~ theta0 + ti(theta, k = 20) +
++       ti(theta, day, bs = c("cr", "cc"), k = c(20, 20))
+R> # Estimating the transition model
+R> m <- transitreg(f, data = Shannon,
++       breaks = seq(0, 12, by = 0.3), censored = "left")
+R> plot(m[319], cdf = TRUE, tp = TRUE)
+\end{verbatim}
 
 
 
