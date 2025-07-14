@@ -9,6 +9,7 @@
 
 \definecolor{steelblue}{HTML}{025493}
 \definecolor{tomato}{HTML}{ff6347}
+\usepackage{multicol}
 
 %% ------------------------------------------------------------------
 %% The official corporate colors of the university are predefined and
@@ -592,23 +593,54 @@ dev.off()
     \frametitle{Extension for continuous response}
     \pause
 
-<<shannon_rain_motivation, echo = FALSE, fig = TRUE, width = 8, height = 4>>=
-data("Shannon")
-hist(sqrt(Shannon$rain))
+    \vspace{-1em}
 
+<<shannon_rain_motivation, echo = FALSE, results = hide>>=
+grDevices::pdf(file = file.path("_images", "shannon-rain.pdf"), width = 3.5, height = 3)
+    par(mar = c(3.5, 3.5, 2, 0.5))
+    data("Shannon")
+    bk <- seq(0, 7.5, by = 0.25)
+    hist(sqrt(Shannon$rain), freq = FALSE,
+         breaks = bk,
+         col = "lightblue",
+         main = "Shannon airport rainfall",
+         xlab = NA, ylab = NA)
+    mtext(side = 2, line = 2.5, "density")
+    mtext(side = 1, line = 2.2, "sqrt(daily rainfall sum)")
+dev.off()
+
+grDevices::pdf(file = file.path("_images", "shannon-pseudo.pdf"), width = 3.5, height = 3)
+    par(mar = c(3.5, 3.5, 2, 0.5))
+    tab <- table(cut(sqrt(Shannon$rain), breaks = bk, right = FALSE, include.lowest = TRUE))
+    tab <- tab / sum(tab)
+    b <- barplot(tab, xaxt = "n",
+                 main = "Pseudo-counts")
+    axis(side = 1, at = b[, 1], labels = seq.int(0L, length(bk) - 2), lwd = 0)
+
+dev.off()
 @
 
+    \begin{multicols}{2}
+        \visible<2->{\includegraphics[width = 0.48\textwidth]{_images/shannon-rain}}
+    \columnbreak
+        \visible<3->{\includegraphics[width = 0.48\textwidth]{_images/shannon-pseudo}}
+    \end{multicols}
+
+    \vspace{-0.5em}
+    \visible<3->{
+        For this example: $31$\,pseudo-counts using \texttt{seq(0, 75, by = 0.25)}.
+    }
 
 \end{frame}
 
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
     \frametitle{Extension for continuous response}
-    \pause
 
     To model any univariate continuous response $y_i \in \mathcal{R}$ with
     cumulative distribution function (CDF) $F(y)$, we
     employ a discretization technique inspired by histogram binning.
+    \medskip
 
     The response $y$ is
     partitioned into $m-1$ intervals using a set of monotonically increasing
@@ -621,6 +653,8 @@ hist(sqrt(Shannon$rain))
     \frametitle{Extension for continuous response}
     Each observation $y_i$ is assigned to its discrete representation $\tilde{y}_i$
     based on the interval it falls into.
+    \medskip
+
     The probability of falling into the $\ell$-th bin
     is approximated by $P(\zeta_\ell \leq y_i < \zeta_{\ell+1}) =
     F(\zeta_{\ell+1}) - F(\zeta_\ell)$. These probabilities are encoded as transformed counts
@@ -660,66 +694,100 @@ hist(sqrt(Shannon$rain))
 \end{frame}
 
 
+%%%  %% ------------------------------------------------------------------
+%%%  \begin{frame}[fragile]
+%%%      \frametitle{Extension for continuous response}
+%%%      In addition to the CDF, the transition model allows for the computation of other key
+%%%      characteristics such as the mean, mode, skewness, and kurtosis by weighting the
+%%%      bin midpoints with their corresponding probabilities.
+%%%  
+%%%  \end{frame}
+%%%  
+%%%  
+%%%  %% ------------------------------------------------------------------
+%%%  \begin{frame}[fragile]
+%%%      \frametitle{Application}
+%%%  \vspace{-1em}
+%%%  \begin{verbatim}
+%%%  # Installing package via R-universe
+%%%  install.packages("transitreg",
+%%%                   repos = "https://retostauffer.r-universe.dev")
+%%%  
+%%%  # Load and prepare data set
+%%%  library("transitreg")
+%%%  data("Shannon")
+%%%  Shannon$day <- as.integer(format(Shannon$date, "%j"))
+%%%  # Specifying model formula
+%%%  f <- sqrt(rain) ~ theta0 + ti(theta, k = 20) +
+%%%       ti(theta, day, bs = c("cr", "cc"), k = c(20, 20))
+%%%  # Estimating the transition model
+%%%  m <- transitreg(f, data = Shannon,
+%%%       breaks = seq(0, 12, by = 0.3), censored = "left")
+%%%  @
+%%%  \end{verbatim}
+%%%  \end{frame}
+%%%  
+%%%  %% ------------------------------------------------------------------
+%%%  \begin{frame}[fragile]
+%%%      \frametitle{Application}
+%%%  
+%%%      \includegraphics[width=\textwidth]{stauffer-figure1}
+%%%  
+%%%  \end{frame}
+%%%  
+%%%  %% ------------------------------------------------------------------
+%%%  \begin{frame}[fragile]
+%%%      \frametitle{ApplicationI}
+%%%  
+%%%      To demonstrate the applicability of transition models for continuous data on
+%%%      large datasets, a spatio-temporal climatology is estimated using all available
+%%%      data from $1977$ to $2024$, from $557$ different weather stations across Ireland,
+%%%      resulting in a total number of $3.9$ million individual observations.
+%%%  
+%%%  \end{frame}
+%%%  
+%%%  %% ------------------------------------------------------------------
+%%%  \begin{frame}[fragile]
+%%%      \frametitle{ApplicationI}
+%%%  
+%%%  Left-censored transition model ($m = 90$) includes an offset for the
+%%%  censoring point (zeros; $\theta_0$), a spatial effect, a cyclic seasonal
+%%%  effect, an altitude effect, and interactions of these effects with $\theta$,
+%%%  resulting in the following model specification:
+%%%  $$
+%%%  \begin{array}{ll}
+%%%  \tilde{y} \sim& \theta_0 + f(\theta) + f(\text{longitude},\text{latitude}) + f(\theta,\text{longitude},\text{latitude}) + \\
+%%%      & f(\text{day}) + f(\theta,\text{day}) + f(\text{altitude}) + f(\theta,\text{altitude})
+%%%  \end{array}
+%%%  $$
+%%%  
+%%%  \end{frame}
+
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Extension for continuous response}
-    In addition to the CDF, the transition model allows for the computation of other key
-    characteristics such as the mean, mode, skewness, and kurtosis by weighting the
-    bin midpoints with their corresponding probabilities.
+    \frametitle{Application}
+
+    \textbf{Rainfall Ireland}
+    \begin{itemize}
+        \item Daily rainfall amounts from Met~\'Eireann
+        \item All available data 1977-2024 from 557 stations
+        \item Over 3.9\,million individual observations
+    \end{itemize}
+
+    \textbf{Goal:} Estimating spatio-temporal rainfall climatology.
+
+    \textbf{Covariates:} Day of the year and geographical location.
+
+    \textbf{Model:} Estimate square-root transformed daily precipitation
+    amount using $m=90$ (non-uniform) pseudo-bins and left-censored distribution.
 
 \end{frame}
 
 
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Application I}
-\vspace{-1em}
-\begin{verbatim}
-# Installing package via R-universe
-install.packages("transitreg",
-                 repos = "https://retostauffer.r-universe.dev")
+    \frametitle{Application}
 
-# Load and prepare data set
-library("transitreg")
-data("Shannon")
-Shannon$day <- as.integer(format(Shannon$date, "%j"))
-# Specifying model formula
-f <- sqrt(rain) ~ theta0 + ti(theta, k = 20) +
-     ti(theta, day, bs = c("cr", "cc"), k = c(20, 20))
-# Estimating the transition model
-m <- transitreg(f, data = Shannon,
-     breaks = seq(0, 12, by = 0.3), censored = "left")
-@
-\end{verbatim}
-\end{frame}
-
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Application I}
-
-    \includegraphics[width=\textwidth]{stauffer-figure1}
-
-\end{frame}
-
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Application II}
-
-    To demonstrate the applicability of transition models for continuous data on
-    large datasets, a spatio-temporal climatology is estimated using all available
-    data from $1977$ to $2024$, from $557$ different weather stations across Ireland,
-    resulting in a total number of $3.9$ million individual observations.
-
-\end{frame}
-
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Application II}
-
-Left-censored transition model ($m = 90$) includes an offset for the
-censoring point (zeros; $\theta_0$), a spatial effect, a cyclic seasonal
-effect, an altitude effect, and interactions of these effects with $\theta$,
-resulting in the following model specification:
 $$
 \begin{array}{ll}
 \tilde{y} \sim& \theta_0 + f(\theta) + f(\text{longitude},\text{latitude}) + f(\theta,\text{longitude},\text{latitude}) + \\
@@ -727,18 +795,33 @@ $$
 \end{array}
 $$
 
+
+\end{frame}
+
+
+
+%% ------------------------------------------------------------------
+\begin{frame}[fragile]
+    \frametitle{Application}
+
+\begin{verbatim}
+library("transitreg")
+
+f <- sqrt(rain) ~ theta0 + ti(theta, k = 12) +
+               ti(lon, lat) + ti(theta, lon, lat, k = c(8, 8, 8)) +
+               ti(day, bs = "cc") + ti(theta, day, bs = c("cr", "cc"), k = c(8, 10)) +
+               ti(alt, bs = "cr", k = 8) + ti(theta, alt, k = c(8, 8)) +
+               ti(year, k = 8)
+
+bk  <- c(0, seq(0.2, 10, by = 0.2), seq(10.25, 20, by = 0.25))
+mod <- transitreg(f, data = data, breaks = bk, censored = "left")
+\end{verbatim}
+
 \end{frame}
 
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Application II}
-
-
-\end{frame}
-
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Application II}
+    \frametitle{Application}
 
     \includegraphics[width=\textwidth]{stauffer-figure2}
 
@@ -747,7 +830,7 @@ $$
 
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Application II}
+    \frametitle{Application}
 
 Based on this spatio-temporal transition model, the estimated average daily
 probability of rain in Limerick during the conference week (July 14--18) is $68.7\%$,
