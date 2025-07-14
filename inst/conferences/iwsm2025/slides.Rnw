@@ -7,6 +7,9 @@
 
 \usetheme[nototalframenumber,foot,logo,license,licenseall]{uibk}
 
+\definecolor{steelblue}{HTML}{025493}
+\definecolor{tomato}{HTML}{ff6347}
+
 %% ------------------------------------------------------------------
 %% The official corporate colors of the university are predefined and
 %% can be used for e.g., highlighting something. Simply use
@@ -261,13 +264,13 @@ if (!all(file.exists(MFILES))) {
                  sprintf("(IGN = %.3f)", sapply(list(m1, m2, m3, mtr), IGN, n = length(y))))
 
     library("ggplot2")
-    p1 <- autoplot(r1,  main = tmp[1L], xlab = "x", fill = "gray85") +
+    p1 <- autoplot(r1,  main = tmp[1L], xlab = "x", fill = "gray85", expected_col = "steelblue") +
         xlab(NULL) + theme(plot.margin = unit(c(.05, .1, 0, .2), "in"))
-    p2 <- autoplot(r2,  main = tmp[2L], xlab = "x", fill = "gray85") +
+    p2 <- autoplot(r2,  main = tmp[2L], xlab = "x", fill = "gray85", expected_col = "steelblue") +
         xlab(NULL) + theme(plot.margin = unit(c(.05, .1, 0, .2), "in"))
-    p3 <- autoplot(r3,  main = tmp[3L], xlab = "x", fill = "gray85") +
+    p3 <- autoplot(r3,  main = tmp[3L], xlab = "x", fill = "gray85", expected_col = "steelblue") +
         xlab(NULL) + theme(plot.margin = unit(c(.05, .1, 0, .2), "in"))
-    p4 <- autoplot(rtr, main = tmp[4L], xlab = "x", fill = "gray85") +
+    p4 <- autoplot(rtr, main = tmp[4L], xlab = "x", fill = "gray85", expected_col = 2) +
         xlab(NULL) + theme(plot.margin = unit(c(.05, .1, 0, .2), "in"))
 
     size <- list(w = 3.5, h = 1.5)
@@ -278,6 +281,7 @@ if (!all(file.exists(MFILES))) {
 }
 @
 
+    \vspace{-1cm}
     \begin{figure}[width = \textwidth]
         \centering
         \begin{tabular}{cc}
@@ -288,57 +292,12 @@ if (!all(file.exists(MFILES))) {
         \end{tabular}
     \end{figure}
 
-\end{frame}
-
-
-%% second slide
-\begin{frame}[fragile]
-    \frametitle{Methodology}
-
-<<convert_cdf_to_pdf_simple, echo=FALSE, fig=TRUE, width=8, height=5.5>>=
-cdf <- ppois(0:8, lambda = 1)
-b <- barplot(cdf, ylim = c(0, 1))
-tp <- transitreg::convert_tp(cdf, from = "cdf", to = "tp")
-lines(b[, 1], tp, type = "b", pch = 19, col = "tomato", lwd = 2)
-text(b[, 1], cdf, sprintf("%.2f", cdf), srt = 90, adj = c(1.3, 0.5))
-
-text(b[1, 1], tp[1], sprintf("1 - %.2f = %.2f", cdf[1], tp[1]),
-     srt = 90, adj = c(-0.1, 0.5), col = "tomato", font = 2)
-for (i in 2:length(b)) {
-    tmp <- tp[i] * (1 - cdf[i])
-    text(b[i, 1], tp[i], sprintf("%.2f (1 - %.2f) = %.2f", tp[i - 1], cdf[i], tp[i]),
-         srt = 90, adj = c(-0.1, 0.5), col = "tomato", font = 2)
-
-}
-@
-\end{frame}
-
-%% second slide
-\begin{frame}[fragile]
-    \frametitle{Methodology}
-
-<<convert_cdf_to_pdf_on_example, echo=FALSE, fig=TRUE, width=8, height=5.5>>=
-# Doing it again just for the sake of completeness
-load(RDAFILE)
-h <- hist(y, breaks = bk, plot = FALSE)
-cdf <- cumsum(h$density)[1:8]
-b <- barplot(cdf, ylim = c(0, 1))
-tp <- transitreg::convert_tp(cdf, from = "cdf", to = "tp")
-
-lines(b[, 1], tp, type = "b", pch = 19, col = "tomato", lwd = 2)
-text(b[, 1], cdf, sprintf("%.2f", cdf), srt = 90, adj = c(1.3, 0.5))
-
-text(b[1, 1], tp[1], sprintf("1 - %.2f = %.2f", cdf[1], tp[1]),
-     srt = 90, adj = c(1.1, 0.5), col = "tomato", font = 2)
-for (i in 2:length(b)) {
-    tmp <- tp[i] * (1 - cdf[i])
-    text(b[i, 1], tp[i], sprintf("%.2f (1 - %.2f) = %.2f", tp[i - 1], cdf[i], tp[i]),
-         srt = 90, adj = c(1.1, 0.5), col = "tomato", font = 2)
-
-}
-@
+    \begin{footnotesize}
+    Ignorance (IGN): $-\text{logLik}(\text{model}) / n$; the lower, the better.
+    \end{footnotesize}
 
 \end{frame}
+
 
 
 
@@ -359,15 +318,97 @@ or probit) and $r$ represents the counts, with an additive predictor
 $$
 \eta_{ir}(\boldsymbol{\alpha}) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \beta).
 $$
+%%The parameters $\boldsymbol{\alpha} = (\theta^\top, \beta^\top)$ include count-specific
+%%intercepts and (possibly) smooth functions $f_j(\cdot)$.
+%%For i.i.d.\ observations, let $\pi_{ir}$ denote the probability that the count response equals $r$,
+%%i.e., $P(y_i=r | \mathbf{x}_i)$. These probabilities are computed recursively as
+%%%%$$
+%%%%\pi_{ir} = (1 - F(\eta_{ir}(\boldsymbol{\alpha}))) \prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha})).
+%%%%$$
+%%$$
+%%    \pi_{ir} = {\only<2->{\textcolor{steelblue}}{(1 - F(\eta_{ir}(\boldsymbol{\alpha})))}}
+%%               {\only<2->{\textcolor{tomato}}{\prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha}))}}.
+%%$$
+
+\end{frame}
+
+%% ------------------------------------------------------------------
+\begin{frame}[fragile]
+    \frametitle{Methodology}
+
 The parameters $\boldsymbol{\alpha} = (\theta^\top, \beta^\top)$ include count-specific
 intercepts and (possibly) smooth functions $f_j(\cdot)$.
 For i.i.d.\ observations, let $\pi_{ir}$ denote the probability that the count response equals $r$,
 i.e., $P(y_i=r | \mathbf{x}_i)$. These probabilities are computed recursively as
+%%$$
+%%\pi_{ir} = (1 - F(\eta_{ir}(\boldsymbol{\alpha}))) \prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha})).
+%%$$
 $$
-\pi_{ir} = (1 - F(\eta_{ir}(\boldsymbol{\alpha}))) \prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha})).
+    \pi_{ir} = {\only<2->{\textcolor{steelblue}}{(1 - F(\eta_{ir}(\boldsymbol{\alpha})))}}
+               {\only<2->{\textcolor{tomato}}{\prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha}))}}.
 $$
+\pause
+
+<<tp_table, echo = FALSE, results = hide>>=
+tmp <- load(RDAFILE) # sicher ist sicher
+h   <- hist(y, breaks = bk, plot = FALSE)
+cdf <- cumsum(h$density)
+pdf <- h$density
+tp <- convert_tp(cdf, from = "cdf", to = "tp")
+@
+
+    \begin{table}
+        \centering
+        \begin{tabular}{c | c | l | c}
+            $r$ & $F(\eta_{ir}(\alpha))$ & $\pi_{ir}$ & $\text{CDF}_{ir}$ \\
+            \hline
+            0 & \Sexpr{sprintf("%.3f", tp[1])} &
+                \visible<2->{\textcolor{steelblue}{(1 - \Sexpr{sprintf("%.3f", tp[1])})} = \Sexpr{sprintf("%.3f", pdf[1])}} &
+                \visible<2->{\Sexpr{sprintf("%.3f", cdf[1])}} \\
+            1 & \Sexpr{sprintf("%.3f", tp[2])} &
+                \visible<3->{\textcolor{steelblue}{(1 - \Sexpr{sprintf("%.3f", tp[2])})} $\cdot$ \textcolor{tomato}{\Sexpr{sprintf("%.3f", tp[1])}} = \Sexpr{sprintf("%.3f", pdf[2])}} &
+                \visible<3->{\Sexpr{sprintf("%.3f", sum(cdf[1:2]))}} \\
+            2 & \Sexpr{sprintf("%.3f", tp[3])} &
+                \visible<4->{\textcolor{steelblue}{(1 - \Sexpr{sprintf("%.3f", tp[3])})} $\cdot$ \textcolor{tomato}{\Sexpr{sprintf("%.3f", tp[1])} $\cdot$ \Sexpr{sprintf("%.3f", tp[2])}}  = \Sexpr{sprintf("%.3f", pdf[3])}} &
+                \visible<4->{\Sexpr{sprintf("%.3f", sum(cdf[1:3]))}} \\
+            3 & \Sexpr{sprintf("%.3f", tp[4])} & \visible<4->{\dots} & \visible<4->{\dots} \\
+        \end{tabular}
+    \end{table}
 
 \end{frame}
+
+
+
+%% ------------------------------------------------------------------
+\begin{frame}[fragile]
+    \frametitle{Methodology}
+
+
+\begin{center}
+<<cdf_pdf_tp_plot, echo=FALSE, fig=TRUE, width=8, height=5>>=
+par(mar = c(3.1, 3.1, 3, 0.5), xpd = TRUE)
+py <- seq_along(tp) - 1
+plot(NA, xlim = c(-0.35, length(tp) - 1 + 0.35), ylim = c(0, 1),
+     yaxs = "i", xaxs = "i", ylab = NA, xlab = "y [counts]")
+
+rect(py - 0.3, 0, py + 0.3, cdf, col = "gray80", border = NA)
+rect(py - 0.3, 0, py + 0.3, pdf, col = "gray30", border = NA)
+lines(py, tp, col = "tomato", type = "o", pch = 19, lwd = 2)
+legend("top", ncol = 3, bty = "n",
+       inset = c(0, -0.15), xpd = TRUE,
+       fill   = c(NA, "gray80", "gray30"),
+       border = c(NA, 1, 1),
+       pch    = c(19, 0, 0),
+       lty    = c(1, NA, NA),
+       lwd    = c(2, NA, NA),
+       col    = c("tomato", NA, NA),
+       legend = c("F()", "CDF", "PDF"))
+@
+\end{center}
+
+\end{frame}
+
+
 
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
@@ -409,29 +450,54 @@ d <- subset(d, y < 25)
 
 #######################
 suppressPackageStartupMessages(library("gamlss2"))
-q_x  <- seq(0, 10, by = 0.02)
 
-b_PO <- gamlss2(y ~ s(x) | s(x), data = d, family = PO, verbose = F)
-p_PO <- quantile(b_PO, prob = c(0.1, 0.5, 0.9), newdata = data.frame(x = q_x))
-i_PO <- -as.numeric(logLik(b_PO)) / nrow(d)
+RDAGAMLSS2 <- "_slides_gamlss2_models.rda"
+if (!file.exists(RDAGAMLSS2)) {
+    q_x  <- seq(0, 10, by = 0.02)
 
-b_NB <- gamlss2(y ~ s(x) | s(x), data = d, family = NBI)
-p_NB <- quantile(b_NB, prob = c(0.1, 0.5, 0.9), newdata = data.frame(x = q_x))
-i_NB <- -as.numeric(logLik(b_NB)) / nrow(d)
+    b_PO <- gamlss2(y ~ s(x) | s(x), data = d, family = PO, verbose = F)
+    p_PO <- quantile(b_PO, prob = c(0.1, 0.5, 0.9), newdata = data.frame(x = q_x))
+    i_PO <- -as.numeric(logLik(b_PO)) / nrow(d)
 
-b_TR <- transitreg(y ~ theta0 + te(theta, x, k = 15), data = d)
-p_TR <- predict(b_TR, type = "quantile", prob = c(0.1, 0.5, 0.9), newdata = data.frame(x = q_x)) - 0.5 # That -0.5 is a quick fix as I (falsly) still interpolate even if we have count data response
-i_TR <- -as.numeric(logLik(b_TR)) / nrow(d)
+    b_NB <- gamlss2(y ~ s(x) | s(x), data = d, family = NBI)
+    p_NB <- quantile(b_NB, prob = c(0.1, 0.5, 0.9), newdata = data.frame(x = q_x))
+    i_NB <- -as.numeric(logLik(b_NB)) / nrow(d)
+
+    b_ZA <- gamlss2(y ~ s(x) | s(x) | s(x), data = d, family = ZANBI)
+    p_ZA <- quantile(b_ZA, prob = c(0.1, 0.5, 0.9), newdata = data.frame(x = q_x))
+    i_ZA <- -as.numeric(logLik(b_ZA)) / nrow(d)
+
+    b_TR <- transitreg(y ~ theta0 + te(theta, x, k = 15), data = d)
+    p_TR <- predict(b_TR, type = "quantile", prob = c(0.1, 0.5, 0.9), newdata = data.frame(x = q_x)) - 0.5 # That -0.5 is a quick fix as I (falsly) still interpolate even if we have count data response
+    i_TR <- -as.numeric(logLik(b_TR)) / nrow(d)
+
+    save(q_x,
+         b_PO, p_PO, i_PO,
+         b_NB, p_NB, i_NB,
+         b_ZA, p_ZA, i_ZA,
+         b_TR, p_TR, i_TR,
+         file = RDAGAMLSS2)
+} else {
+    load(RDAGAMLSS2)
+}
 
 
+# Visualization
 colors <- c("steelblue", 2)
+
+grDevices::pdf(file = file.path("_images", "conditional-empty.pdf"), width = 6, height = 4)
+    par(mar = c(3.4, 3.3, .5, .5))
+    plot(y ~ x, data = d, col = adjust_transparency(1, 0.1), xlab = NA, ylab = NA, cex = 0.6)
+    mtext(side = 1, line = 2, "x")
+    mtext(side = 2, line = 2.5, "y")
+dev.off()
 
 grDevices::pdf(file = file.path("_images", "conditional-PO.pdf"), width = 6, height = 4)
     par(mar = c(3.4, 3.3, .5, .5))
     plot(y ~ x, data = d, col = adjust_transparency(1, 0.1), xlab = NA, ylab = NA, cex = 0.6)
-    lines(q_x, p_PO[, 1], col = colors[1L], lwd = 3)
-    lines(q_x, p_PO[, 2], col = colors[2L], lwd = 3)
-    lines(q_x, p_PO[, 3], col = colors[1L], lwd = 3)
+    lines(q_x, p_PO[, 1], col = colors[1L], lwd = 3, type = "s")
+    lines(q_x, p_PO[, 2], col = colors[2L], lwd = 3, type = "s")
+    lines(q_x, p_PO[, 3], col = colors[1L], lwd = 3, type = "s")
     text(x = 0, y = p_PO[1, ], labels = colnames(p_PO), cex = 0.71,
          srt = 90, adj = c(0.5, -0.7), col = c(colors[1], colors[2], colors[1]))
     mtext(side = 1, line = 2, "x")
@@ -442,9 +508,9 @@ dev.off()
 grDevices::pdf(file = file.path("_images", "conditional-NB.pdf"), width = 6, height = 4)
     par(mar = c(3.4, 3.3, .5, .5))
     plot(y ~ x, data = d, col = adjust_transparency(1, 0.1), xlab = NA, ylab = NA, cex = 0.6)
-    lines(q_x, p_NB[, 1], col = colors[1L], lwd = 3)
-    lines(q_x, p_NB[, 2], col = colors[2L], lwd = 3)
-    lines(q_x, p_NB[, 3], col = colors[1L], lwd = 3)
+    lines(q_x, p_NB[, 1], col = colors[1L], lwd = 3, type = "s")
+    lines(q_x, p_NB[, 2], col = colors[2L], lwd = 3, type = "s")
+    lines(q_x, p_NB[, 3], col = colors[1L], lwd = 3, type = "s")
     text(x = 0, y = p_NB[1, ], labels = colnames(p_NB), cex = 0.71,
          srt = 90, adj = c(0.5, -0.7), col = c(colors[1], colors[2], colors[1]))
     mtext(side = 1, line = 2, "x")
@@ -452,12 +518,30 @@ grDevices::pdf(file = file.path("_images", "conditional-NB.pdf"), width = 6, hei
     text(10, max(d$y), sprintf("IGN = %.3f", i_NB), adj = c(1, 1))
 dev.off()
 
+grDevices::pdf(file = file.path("_images", "conditional-ZA.pdf"), width = 6, height = 4)
+    par(mar = c(3.4, 3.3, .5, .5))
+    plot(y ~ x, data = d, col = adjust_transparency(1, 0.1), xlab = NA, ylab = NA, cex = 0.6)
+    lines(q_x, p_ZA[, 1], col = colors[1L], lwd = 3, type = "s")
+    lines(q_x, p_ZA[, 2], col = colors[2L], lwd = 3, type = "s")
+    lines(q_x, p_ZA[, 3], col = colors[1L], lwd = 3, type = "s")
+    text(x = 0, y = p_ZA[1, ], labels = colnames(p_ZA), cex = 0.71,
+         srt = 90, adj = c(0.5, -0.7), col = c(colors[1], colors[2], colors[1]))
+    mtext(side = 1, line = 2, "x")
+    mtext(side = 2, line = 2.5, "y")
+    text(10, max(d$y), sprintf("IGN = %.3f", i_ZA), adj = c(1, 1))
+dev.off()
+
 grDevices::pdf(file = file.path("_images", "conditional-TR.pdf"), width = 6, height = 4)
     par(mar = c(3.4, 3.3, .5, .5))
     plot(y ~ x, data = d, col = adjust_transparency(1, 0.1), xlab = NA, ylab = NA, cex = 0.6)
-    lines(q_x, p_TR[, 1], col = colors[1L], lwd = 3)
-    lines(q_x, p_TR[, 2], col = colors[2L], lwd = 3)
-    lines(q_x, p_TR[, 3], col = colors[1L], lwd = 3)
+    # Reference: ZANBI
+    lines(q_x, p_ZA[, 1], col = "gray75", lwd = 3, type = "s")
+    lines(q_x, p_ZA[, 2], col = "gray75", lwd = 3, type = "s")
+    lines(q_x, p_ZA[, 3], col = "gray75", lwd = 3, type = "s")
+    # Transitreg
+    lines(q_x, p_TR[, 1], col = colors[1L], lwd = 3, type = "s")
+    lines(q_x, p_TR[, 2], col = colors[2L], lwd = 3, type = "s")
+    lines(q_x, p_TR[, 3], col = colors[1L], lwd = 3, type = "s")
     text(x = 0, y = p_TR[1, ], labels = colnames(p_TR), cex = 0.71,
          srt = 90, adj = c(0.5, -0.7), col = c(colors[1], colors[2], colors[1]))
     mtext(side = 1, line = 2, "x")
@@ -469,19 +553,31 @@ dev.off()
 
 
     \only<1>{
+        Conditional model (simulated data).
+        \begin{center}
+            \includegraphics[width=0.65\textwidth]{_images/conditional-empty.pdf}
+        \end{center}
+    }
+    \only<2>{
         Estimated model: ~~~ $y \sim \text{PO}(\log(\mu) = f(x))$.\\[1ex]
         \begin{center}
             \includegraphics[width=0.65\textwidth]{_images/conditional-PO.pdf}
         \end{center}
     }
-    \only<2>{
+    \only<3>{
         Estimated model: ~~~ $y \sim \text{NBI}(\log(\mu) = f(x), \log(\sigma) = f(x))$.\\[1ex]
         \begin{center}
             \includegraphics[width=0.65\textwidth]{_images/conditional-NB.pdf}
         \end{center}
     }
-    \only<3>{
-        Estimated model: ~~~ $y \sim \text{TP}(\theta_0 + \text{te}(theta, x, k = 10))$.\\[1ex]
+    \only<4>{
+        Estimated model: ~~~ $y \sim \text{ZANBI}(\log(\mu) = f(x), \log(\sigma) = f(x), \text{logit}(\nu) = f(x))$.\\[1ex]
+        \begin{center}
+            \includegraphics[width=0.65\textwidth]{_images/conditional-ZA.pdf}
+        \end{center}
+    }
+    \only<5>{
+        Estimated model: ~~~ $y \sim \text{D}(\theta_0 + \text{te}(theta, x, k = 10))$.\\[1ex]
 
         \begin{center}
             \includegraphics[width=0.65\textwidth]{_images/conditional-TR.pdf}
