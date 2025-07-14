@@ -577,7 +577,7 @@ dev.off()
         \end{center}
     }
     \only<5>{
-        Estimated model: ~~~ $y \sim \text{D}(\theta_0 + \text{te}(theta, x, k = 10))$.\\[1ex]
+        Transitreg model: ~~~ $y \sim \theta_0 + \text{te}(\theta, x, k = 10)$.\\[1ex]
 
         \begin{center}
             \includegraphics[width=0.65\textwidth]{_images/conditional-TR.pdf}
