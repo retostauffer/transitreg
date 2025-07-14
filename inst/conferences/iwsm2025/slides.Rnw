@@ -586,6 +586,21 @@ dev.off()
 
 \end{frame}
 
+
+%% ------------------------------------------------------------------
+\begin{frame}[fragile]
+    \frametitle{Extension for continuous response}
+    \pause
+
+<<shannon_rain_motivation, echo = FALSE, fig = TRUE, width = 8, height = 4>>=
+data("Shannon")
+hist(sqrt(Shannon$rain))
+
+@
+
+
+\end{frame}
+
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
     \frametitle{Extension for continuous response}
