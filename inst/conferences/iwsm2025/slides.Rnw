@@ -480,7 +480,6 @@ or probit) and $r$ represents the counts, with an additive predictor
 $$
 \eta_{ir}(\boldsymbol{\alpha}) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \beta).
 $$
-\pause
 The parameters $\boldsymbol{\alpha} = (\theta^\top, \beta^\top)$ include count-specific
 intercepts $\theta_r$ and (possibly) smooth functions $f_j(\cdot)$.
 For i.i.d.\ observations, let $\pi_{ir}$ denote the probability that the count response equals $r$,
@@ -641,7 +640,7 @@ dev.off()
 
 
 %% ----------------------------------------------
-\begin{frame}[fragile]{Extension for Continuous Responses}
+\begin{frame}[fragile]{Extension for continuous responses}
 Discretization approach inspired by histogram binning.
 
 \medskip
@@ -667,7 +666,7 @@ $$
 
 
 %% ----------------------------------------------
-\begin{frame}[fragile]{Extension for Continuous Responses}
+\begin{frame}[fragile]{Extension for continuous responses}
     Probabilities are encoded as transformed counts $\tilde{y}_i$,
     so that the transition model uses
     $$
@@ -687,7 +686,7 @@ $$
 \end{frame}
 
 
-\begin{frame}[fragile]{Extension for Continuous Responses}
+\begin{frame}[fragile]{Extension for continuous responses}
 \begin{itemize}
 \item Let $r$ denote the unique index such that $y_i \in [\zeta_r, \zeta_{r+1})$.
 
@@ -930,6 +929,10 @@ mod <- transitreg(f, data = data, breaks = bk, censored = "left")
 \begin{frame}[fragile]
     \frametitle{Application}
 
+
+    \begin{center}
+        \includegraphics[width = .9\textwidth]{shannon-estim}
+    \end{center}
 
 Climatological estimates for Limerick during conference week (July 14--18):
 \medskip
