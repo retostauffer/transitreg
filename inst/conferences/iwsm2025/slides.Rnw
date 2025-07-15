@@ -839,13 +839,13 @@ $$
 
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Application}
+    \frametitle{Will there be rain?}
 
     \textbf{Rainfall Ireland}
     \begin{itemize}
         \item Daily rainfall amounts from Met~\'Eireann
-        \item All available data 1977-2024 from 557 stations
-        \item Over 3.9\,million individual observations
+        \item All available data 1977--2024 from 557 stations
+        \item $\sim$3.9\,million individual observations
     \end{itemize}
 
     \smallskip
@@ -857,7 +857,7 @@ $$
     \pause
     \smallskip
     \textbf{Model:} Estimate square-root transformed daily precipitation
-    amount using $m=90$ (non-uniform) pseudo-bins and left-censored distribution.
+    amount using $m=90$ pseudo-bins and left-censored distribution.
 
 $$
 \begin{array}{ll}
@@ -872,11 +872,22 @@ $$
 
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Application}
+    \frametitle{Will there be rain?}
 
-In \emph{R}:
-
+\vspace{-0.5em}
+Model in pseudo-code:
+    \begin{footnotesize}
+$$
+\begin{array}{ll}
+\tilde{y} \sim& \theta_0 + f(\theta) + f(\text{longitude},\text{latitude}) + f(\theta,\text{longitude},\text{latitude}) + \\
+    & f(\text{day}) + f(\theta,\text{day}) + f(\text{altitude}) + f(\theta,\text{altitude})
+\end{array}
+$$
+    \end{footnotesize}
+\pause
+Model in \pkg{R}:
 <<eval = FALSE>>=
+## Package available via https://retostauffer.r-universe.dev
 library("transitreg")
 @
 \smallskip
@@ -890,7 +901,7 @@ f <- sqrt(rain) ~ theta0 + ti(theta, k = 12) +
 @
 \smallskip
 <<eval = FALSE>>=
-## Breaks for binning
+## Breaks for pseudo-binning (non-uniformly distributed)
 bk  <- c(0, seq(0.2, 10, by = 0.2), seq(10.25, 20, by = 0.25))
 @
 \smallskip
@@ -918,7 +929,7 @@ mod <- transitreg(f, data = data, breaks = bk, censored = "left")
 
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Application}
+    \frametitle{Will there be rain?}
 
     \includegraphics[width=\textwidth]{stauffer-figure2}
 
@@ -927,20 +938,20 @@ mod <- transitreg(f, data = data, breaks = bk, censored = "left")
 
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Application}
+    \frametitle{Will there be rain?}
 
-
+    \vspace{-1em}
     \begin{center}
-        \includegraphics[width = .9\textwidth]{shannon-estim}
+        \includegraphics[width = 1\textwidth]{shannon-estim}
     \end{center}
 
-Climatological estimates for Limerick during conference week (July 14--18):
-\medskip
-
+\pause
+    Climatological estimates for Limerick for today (July 17\textit{th}):
+\smallskip
 \begin{itemize}
     \item A $68.7\%$ probability of getting rain,
-    \item a $44.2\%$ chance of receiving more than $1\,\text{mm}\,\text{day}^{-1}$,
-    \item with an expected amount of $1.44\,\text{mm}\,\text{day}^{-1}$.
+    \item a $44.2\%$ chance of receiving more than $1\,\text{mm}$,
+    \item with an expected daily amount of $1.44\,\text{mm}$.
 \end{itemize}
 
 \end{frame}
@@ -949,12 +960,22 @@ Climatological estimates for Limerick during conference week (July 14--18):
 \begin{frame}[fragile]
     \frametitle{Summary}
 
+
+    \textbf{Summary}
     \begin{itemize}
-        \item Extension of transition models to continuous response
-        \item Allows to account for excess of zeros or other values
-        \item Allows for censoring
-        \item Mean, Mode, \dots
-        \item It's the best
+        \item Extended transition models to continuous response
+        \item Performs en-par with e.g., ZANBI without assumptions on the distribution
+        \item Allows to retrieve mean, median, mode, variance, quantiles, \dots
+        \item Proven to work well with big data sets
+    \end{itemize}
+
+    \bigskip
+    \textbf{Software} \\
+    Beta-release available; feel free to test and contribute:
+    \begin{itemize}
+        \item On GitHub: \url{https://github.com/retostauffer/transitreg}
+        \item Install via: \url{https://retostauffer.r-universe.dev/builds}
+        \item Toy-example in the proceeding
     \end{itemize}
 
 \end{frame}
