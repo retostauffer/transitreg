@@ -27,6 +27,7 @@
 %% the commands \pkg, \email, \file, \dataset 
 %% ------------------------------------------------------------------
 
+%% \usepackage{Sweave}
 
 %% information for the title page ('short title' is the pdf-title that is shown in viewer's titlebar)
 \title[Transition Regression for Continuous Data]{Transition Regression for Continuous Data}
@@ -57,7 +58,7 @@
 
 %% ----------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Introduction}
+    \frametitle{Count data models}
 
     \textbf{Classical count data regression} \\
     \smallskip
@@ -78,65 +79,6 @@
     (Zeileis \& Kleiber 2008, 2024).
 \end{frame}
 
-
-%% ----------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Transition regression}
-
-    \textbf{Transition models for count data} \\
-    \smallskip
-    Modeling the probability $P(\dot)$ of observation $y_i$ transitioning\\
-    into higher counts $r$ (Berger \& Tutz 2021).
-$$
-    P(y_i > r | y_i \ge r, {\large \bullet}) \in [0, 1]
-$$
-    where ${\large \bullet}$ is a (yet unknown) function.
-
-    \pause
-    \bigskip
-    Similar models are also known as `continuation ratio models'
-    or `ordered logistic models' in the logit context.
-
-\end{frame}
-
-
-%% %% ----------------------------------------
-%% \begin{frame}[fragile]
-%%     \frametitle{Introduction}
-%% 
-%% %% https://search.r-project.org/CRAN/refmans/VGAM/html/cratio.html
-%% %% Ordinal Regression with Continuation Ratios
-%% %% VGAM::cratio
-%% %%
-%% %% Logit-link to move from m = 1 to m = 2,
-%% %% Logit-link to move from m = 2 to m = 3
-%% %% ---> two incercepts, same slope to ensure mononotinic increase
-%% 
-%%     \textbf{Continuation ratio model}\\
-%%     \medskip
-%%     Modeling the porbability $P(\dot)$ of observation $y_i$ transitioning
-%%     into higher counts $r$ conditional on explanatory variables $\mathbf{x}$.
-%% $$
-%%     P(y_i > r | y_i \ge r, \mathbf{x}_i) \in [0, 1]
-%% $$
-%% 
-%% \end{frame}
-
-
-%% ----------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Transition regression}
-
-    \textbf{Core idea}
-    \begin{itemize}
-        \item Estimate the probability of transitioning between intervals (counts)
-        \item No need for prior knowledge about the response distribution
-        \item Account for excesses in any count(s) (e.g., excess of zeros)
-        \item Be highly flexible in both it's parameters and the response distribution
-        \item Allow to retrieve quantiles, mean, median, mode, \dots
-    \end{itemize}
-
-\end{frame}
 
 <<marginal_dist_data, echo=FALSE>>=
 suppressPackageStartupMessages(library("colorspace"))
@@ -302,137 +244,10 @@ if (!file.exists(RDAFILE)) {
 
 
 
-%% ==================================================================
-\subsection{Methodology}
-
-
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Methodology}
-
-The transition probability $P(\cdot)$ for count data is defined as
-$$
-P(y_i > r | y_i \ge r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha})),~~r = 0, 1, 2, \dots 
-$$
-where $F(\cdot)$ is a cumulative distribution function (e.g., logistic
-or probit) and $r$ represents the counts, with an additive predictor
-$$
-\eta_{ir}(\boldsymbol{\alpha}) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \beta).
-$$
-The parameters $\boldsymbol{\alpha} = (\theta^\top, \beta^\top)$ include count-specific
-intercepts and (possibly) smooth functions $f_j(\cdot)$.
-For i.i.d.\ observations, let $\pi_{ir}$ denote the probability that the count response equals $r$,
-i.e., $P(y_i=r | \mathbf{x}_i)$. These probabilities are computed recursively as
-%%$$
-%%\pi_{ir} = (1 - F(\eta_{ir}(\boldsymbol{\alpha}))) \prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha})).
-%%$$
-$$
-    \pi_{ir} = {\only<2->{\textcolor{steelblue}}{(1 - F(\eta_{ir}(\boldsymbol{\alpha})))}}
-               {\only<2->{\textcolor{tomato}}{\prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha}))}}.
-$$
-
-\end{frame}
-
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Methodology}
-
-The parameters $\boldsymbol{\alpha} = (\theta^\top, \beta^\top)$ include count-specific
-intercepts and (possibly) smooth functions $f_j(\cdot)$.
-For i.i.d.\ observations, let $\pi_{ir}$ denote the probability that the count response equals $r$,
-i.e., $P(y_i=r | \mathbf{x}_i)$. These probabilities are computed recursively as
-%%$$
-%%\pi_{ir} = (1 - F(\eta_{ir}(\boldsymbol{\alpha}))) \prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha})).
-%%$$
-$$
-    \pi_{ir} = {\only<2->{\textcolor{steelblue}}{(1 - F(\eta_{ir}(\boldsymbol{\alpha})))}}
-               {\only<2->{\textcolor{tomato}}{\prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha}))}}.
-$$
-\pause
-
-<<tp_table, echo = FALSE, results = hide>>=
-tmp <- load(RDAFILE) # sicher ist sicher
-h   <- hist(y, breaks = bk, plot = FALSE)
-cdf <- cumsum(h$density)
-pdf <- h$density
-tp <- convert_tp(cdf, from = "cdf", to = "tp")
-@
-
-    \begin{table}
-        \centering
-        \begin{tabular}{c | c | l | c}
-            $r$ & $F(\eta_{ir}(\alpha))$ & $\pi_{ir}$ & $\text{CDF}_{ir}$ \\
-            \hline
-            0 & \Sexpr{sprintf("%.3f", tp[1])} &
-                \visible<2->{\textcolor{steelblue}{(1 - \Sexpr{sprintf("%.3f", tp[1])})} = \Sexpr{sprintf("%.3f", pdf[1])}} &
-                \visible<2->{\Sexpr{sprintf("%.3f", cdf[1])}} \\
-            1 & \Sexpr{sprintf("%.3f", tp[2])} &
-                \visible<3->{\textcolor{steelblue}{(1 - \Sexpr{sprintf("%.3f", tp[2])})} $\cdot$ \textcolor{tomato}{\Sexpr{sprintf("%.3f", tp[1])}} = \Sexpr{sprintf("%.3f", pdf[2])}} &
-                \visible<3->{\Sexpr{sprintf("%.3f", sum(cdf[1:2]))}} \\
-            2 & \Sexpr{sprintf("%.3f", tp[3])} &
-                \visible<4->{\textcolor{steelblue}{(1 - \Sexpr{sprintf("%.3f", tp[3])})} $\cdot$ \textcolor{tomato}{\Sexpr{sprintf("%.3f", tp[1])} $\cdot$ \Sexpr{sprintf("%.3f", tp[2])}}  = \Sexpr{sprintf("%.3f", pdf[3])}} &
-                \visible<4->{\Sexpr{sprintf("%.3f", sum(cdf[1:3]))}} \\
-            3 & \Sexpr{sprintf("%.3f", tp[4])} & \visible<4->{\dots} & \visible<4->{\dots} \\
-        \end{tabular}
-    \end{table}
-
-\end{frame}
-
-
-
-%%  calculation %% %% ------------------------------------------------------------------
-%%  calculation %% \begin{frame}[fragile]
-%%  calculation %%     \frametitle{Methodology}
-%%  calculation %% 
-%%  calculation %% 
-%%  calculation %% \begin{center}
-%%  calculation %% <<cdf_pdf_tp_plot, echo=FALSE, fig=TRUE, width=8, height=5>>=
-%%  calculation %% par(mar = c(3.1, 3.1, 3, 0.5), xpd = TRUE)
-%%  calculation %% py <- seq_along(tp) - 1
-%%  calculation %% plot(NA, xlim = c(-0.35, length(tp) - 1 + 0.35), ylim = c(0, 1),
-%%  calculation %%      yaxs = "i", xaxs = "i", ylab = NA, xlab = "y [counts]")
-%%  calculation %% 
-%%  calculation %% rect(py - 0.3, 0, py + 0.3, cdf, col = "gray80", border = NA)
-%%  calculation %% rect(py - 0.3, 0, py + 0.3, pdf, col = "gray30", border = NA)
-%%  calculation %% lines(py, tp, col = "tomato", type = "o", pch = 19, lwd = 2)
-%%  calculation %% legend("top", ncol = 3, bty = "n",
-%%  calculation %%        inset = c(0, -0.15), xpd = TRUE,
-%%  calculation %%        fill   = c(NA, "gray80", "gray30"),
-%%  calculation %%        border = c(NA, 1, 1),
-%%  calculation %%        pch    = c(19, 0, 0),
-%%  calculation %%        lty    = c(1, NA, NA),
-%%  calculation %%        lwd    = c(2, NA, NA),
-%%  calculation %%        col    = c("tomato", NA, NA),
-%%  calculation %%        legend = c("F()", "CDF", "PDF"))
-%%  calculation %% @
-%%  calculation %% \end{center}
-%%  calculation %% 
-%%  calculation %% \end{frame}
-%%  calculation %% 
-%%  calculation %% 
-%%  calculation %% 
-%%  calculation %% %% ------------------------------------------------------------------
-%%  calculation %% \begin{frame}[fragile]
-%%  calculation %%     \frametitle{Methodology}
-%%  calculation %% 
-%%  calculation %% Parameter estimation considers the underlying Markov chain $Y_{i0}, Y_{i1}, \dots$,
-%%  calculation %% where $Y_{ir} = \mathbf{1}(y_i = r)$. The log-likelihood simplifies to
-%%  calculation %% $$
-%%  calculation %% \ell(\boldsymbol{\alpha}) = \sum_{i=1}^n \sum_{s=0}^{y_i} \Big[Y_{is} \log(1 - F(\eta_{ir})) + (1 - Y_{is}) \log(F(\eta_{ir}))\Big].
-%%  calculation %% $$
-%%  calculation %% 
-%%  calculation %% $(Y_{i0}, \dots, Y_{iy_i})^\top = (0, \dots, 0, 1)$ are created, along with a new
-%%  calculation %% covariate $\theta_i = (0, 1, 2, \dots, y_i)^\top$ to capture
-%%  calculation %% count-specific effects $f_j(\mathbf{x}_i, \theta_i)$, or simple count-specific
-%%  calculation %% intercepts. All other covariates are duplicated accordingly.
-%%  calculation %% 
-%%  calculation %% \end{frame}
-
-
 
 %% =====================================================
 \begin{frame}[fragile]
-    \frametitle{Methodology}
+    \frametitle{Count data models}
 
 
 <<estimate_gamlss2_models, echo = FALSE, results = hide>>=
@@ -554,7 +369,8 @@ dev.off()
 
 
     \only<1>{
-        Conditional model (simulated data).
+        Simulated example: $y \sim \text{NBI}(\mu = f(x), \sigma = f(x))$ plus
+        $15\%$ extra $0$s.
         \begin{center}
             \includegraphics[width=0.65\textwidth]{_images/conditional-empty.pdf}
         \end{center}
@@ -577,9 +393,171 @@ dev.off()
             \includegraphics[width=0.65\textwidth]{_images/conditional-ZA.pdf}
         \end{center}
     }
-    \only<5>{
-        Transitreg model: ~~~ $y \sim \theta_0 + \text{te}(\theta, x, k = 10)$.\\[1ex]
+    %%%\only<5>{
+    %%%    Transitreg model: ~~~ $y \sim \theta_0 + \text{te}(\theta, x, k = 10)$.\\[1ex]
 
+    %%%    \begin{center}
+    %%%        \includegraphics[width=0.65\textwidth]{_images/conditional-TR.pdf}
+    %%%    \end{center}
+    %%%}
+
+\end{frame}
+
+%% ----------------------------------------
+\begin{frame}[fragile]
+    \frametitle{Transition regression}
+
+    \textbf{Transition models for count data} \\
+    \smallskip
+    Modeling the probability $P(\dot)$ of observation $y_i$ transitioning\\
+    into higher counts $r$ (Berger \& Tutz 2021).
+$$
+    P(y_i > r | y_i \ge r, {\large \bullet}) \in [0, 1]
+$$
+    where ${\large \bullet}$ is a (yet unknown) function.
+
+    \pause
+    \bigskip
+    Similar models are also known as `continuation ratio models'
+    or `ordered logistic models' in the logit context.
+
+\end{frame}
+
+
+%% %% ----------------------------------------
+%% \begin{frame}[fragile]
+%%     \frametitle{Introduction}
+%% 
+%% %% https://search.r-project.org/CRAN/refmans/VGAM/html/cratio.html
+%% %% Ordinal Regression with Continuation Ratios
+%% %% VGAM::cratio
+%% %%
+%% %% Logit-link to move from m = 1 to m = 2,
+%% %% Logit-link to move from m = 2 to m = 3
+%% %% ---> two incercepts, same slope to ensure mononotinic increase
+%% 
+%%     \textbf{Continuation ratio model}\\
+%%     \medskip
+%%     Modeling the porbability $P(\dot)$ of observation $y_i$ transitioning
+%%     into higher counts $r$ conditional on explanatory variables $\mathbf{x}$.
+%% $$
+%%     P(y_i > r | y_i \ge r, \mathbf{x}_i) \in [0, 1]
+%% $$
+%% 
+%% \end{frame}
+
+
+%% ----------------------------------------
+\begin{frame}[fragile]
+    \frametitle{Transition regression}
+
+    \textbf{Core idea}
+    \begin{itemize}
+        \item Estimate the probability of transitioning between intervals (counts)
+        \item No need for prior knowledge about the response distribution
+        \item Account for excesses in any count(s) (e.g., excess of zeros)
+        \item Be highly flexible in both it's parameters and the response distribution
+        \item Allow to retrieve quantiles, mean, median, mode, \dots
+    \end{itemize}
+
+\end{frame}
+
+
+%% ==================================================================
+\subsection{Methodology}
+
+
+%% ------------------------------------------------------------------
+\begin{frame}[fragile]
+    \frametitle{Transition regression}
+
+The transition probability $P(\cdot)$ for count data is defined as
+$$
+P(y_i > r | y_i \ge r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha})),~~r = 0, 1, 2, \dots 
+$$
+where $F(\cdot)$ is a CDF (e.g., logistic
+or probit) and $r$ represents the counts, with an additive predictor
+$$
+\eta_{ir}(\boldsymbol{\alpha}) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \beta).
+$$
+\pause
+The parameters $\boldsymbol{\alpha} = (\theta^\top, \beta^\top)$ include count-specific
+intercepts $\theta_r$ and (possibly) smooth functions $f_j(\cdot)$.
+For i.i.d.\ observations, let $\pi_{ir}$ denote the probability that the count response equals $r$,
+i.e., $P(y_i=r | \mathbf{x}_i)$. These probabilities are computed recursively as
+$$
+\pi_{ir} = (1 - F(\eta_{ir}(\boldsymbol{\alpha}))) \prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha})).
+$$
+\end{frame}
+
+
+%% -------------------------------------------
+\begin{frame}{Transition models}
+    Parameter estimation considers the underlying Markov chain
+    $Y_{i0}$, $Y_{i1}$, $\dots$, where
+    $$
+    Y_{ir} = 1 - I(y_i = r) ~~ \in ~~ \{0, 1\}.
+    $$
+
+    Simplifies to binary model log-likelihood
+    $$
+    \ell(\boldsymbol{\alpha}) = \sum_{i=1}^n \sum_{s=0}^{y_i} \Big[Y_{is} \log(F(\eta_{ir})) + (1 - Y_{is}) \log(1 - F(\eta_{ir}))\Big].
+    $$
+
+    $(Y_{i0}, \dots, Y_{iy_i})^\top = (1, \dots, 1, 0)$ are created, along with a new
+    covariate $\theta_i = (0, 1, 2, \dots, y_i)^\top$ to capture
+    count-specific effects $f_j(\mathbf{x}_i, \theta_i)$, or simple count-specific
+    intercepts.
+
+    \medskip
+    All other covariates are duplicated accordingly.
+\end{frame}
+
+
+%% -------------------------------------------
+\begin{frame}[fragile]{Transition models}
+
+<<transitreg_df_example_prep, echo = FALSE, results = hide>>=
+tmp <- "index orig_response Y  theta theta0 x
+1   3  1  0  1 8.861246
+1   3  1  1  0 8.861246
+1   3  1  2  0 8.861246
+1   3  0  3  0 8.861246
+2   2  1  0  1 7.609823
+2   2  0  1  0 7.609823
+3   2  1  0  1 1.494579
+3   2  0  1  0 1.494579
+"
+df <- read.table(text = tmp, header = TRUE)
+df <- subset(df, select = c(index, orig_response, theta, Y, x))
+@
+
+
+The data set to model the transition probabilities therefore looks
+as follows:
+
+\medskip
+<<echo = TRUE>>=
+print(df)
+@
+
+\pause
+\bigskip
+After the inflation any standard binary regression method can be used, e.g.:
+
+<<eval = FALSE>>=
+b <- glm(Y ~ as.factor(theta) + x, data = df, family = binomial)
+@
+\end{frame}
+
+
+
+%% -------------------------------------------
+\begin{frame}{Transition models}
+
+    Transitreg model: ~~~ $y \sim \theta_0 + \text{te}(\theta, x, k = 10)$.\\[1ex]
+
+    \visible<2->{
         \begin{center}
             \includegraphics[width=0.65\textwidth]{_images/conditional-TR.pdf}
         \end{center}
@@ -588,10 +566,36 @@ dev.off()
 \end{frame}
 
 
+
+
+
+
+%%  %% ------------------------------------------------------------------
+%%  \begin{frame}[fragile]
+%%      \frametitle{Extension for continuous response}
+%%  
+%%  
+%%      \textbf{Data}
+%%      \begin{itemize}
+%%          \item Precipitation amount at Shannon airport (Ireland)
+%%          \item Recorded in $\text{mm}\,\text{day}^{-1}$
+%%          \item $30$\,k records between 1945 and 2025
+%%      \end{itemize}
+%%  
+%%      \bigskip
+%%      \textbf{Motivation}
+%%      \begin{itemize}
+%%          \item Strong excess of zeros ($\sim35\%$)
+%%          \item Censored response with unknown distribution
+%%          \item Sometimes classified (e.g., $(0-1]$ =
+%%              light rain, $(1-3]$ = moderate, \dots)
+%%      \end{itemize}
+%%  
+%%  \end{frame}
+
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
     \frametitle{Extension for continuous response}
-    \pause
 
     \vspace{-1em}
 
@@ -620,78 +624,149 @@ grDevices::pdf(file = file.path("_images", "shannon-pseudo.pdf"), width = 3.5, h
 dev.off()
 @
 
+    \textbf{Idea:} Define intervals and generate pseudo-counts.
+
     \begin{multicols}{2}
         \visible<2->{\includegraphics[width = 0.48\textwidth]{_images/shannon-rain}}
     \columnbreak
         \visible<3->{\includegraphics[width = 0.48\textwidth]{_images/shannon-pseudo}}
     \end{multicols}
 
-    \vspace{-0.5em}
-    \visible<3->{
-        For this example: $31$\,pseudo-counts using \texttt{seq(0, 75, by = 0.25)}.
-    }
+    %%\vspace{-0.5em}
+    %%\visible<2->{
+    %%    For this example: $31$\,pseudo-counts using \texttt{seq(0, 75, by = 0.25)}.
+    %%}
 
 \end{frame}
 
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Extension for continuous response}
 
-    To model any univariate continuous response $y_i \in \mathcal{R}$ with
-    cumulative distribution function (CDF) $F(y)$, we
-    employ a discretization technique inspired by histogram binning.
+%% ----------------------------------------------
+\begin{frame}[fragile]{Extension for Continuous Responses}
+Discretization approach inspired by histogram binning.
+
+\medskip
+
+Divide response $y_i \in \mathbb{R}$, $i = 1, \ldots, n$, into $m - 1$ intervals using
+$$
+\zeta_1, \zeta_2, \dots, \zeta_m,
+$$
+where each interval $[\zeta_r, \zeta_{r+1})$ corresponds to a discrete count $r$.
+
+\medskip
+
+Each observation $y_i$ is assigned a pseudo count $\tilde{y}_i$.
+
+\medskip
+
+For a continuous response variable $y_i$ with CDF $F(y)$, discretization process
+approximates the probabilities of $y_i$ falling into each interval as
+$$
+P(\zeta_r \leq y_i < \zeta_{r+1}) = F(\zeta_{r+1}) - F(\zeta_r).
+$$
+\end{frame}
+
+
+%% ----------------------------------------------
+\begin{frame}[fragile]{Extension for Continuous Responses}
+    Probabilities are encoded as transformed counts $\tilde{y}_i$,
+    so that the transition model uses
+    $$
+    P(\tilde{y}_i = r) = P(\zeta_r \leq y_i < \zeta_{r+1})$$
+    to approximate the discrete likelihood.
+
     \medskip
-
-    The response $y$ is
-    partitioned into $m-1$ intervals using a set of monotonically increasing
-    boundaries $\zeta_j$ with $j = [1, \dots, m]$, where each interval $[\zeta_\ell,
-    \zeta_{\ell+1})$ for $\ell = [1, ..., m-1]$ corresponds to a discrete pseudo-count $r$.
-\end{frame}
-
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Extension for continuous response}
-    Each observation $y_i$ is assigned to its discrete representation $\tilde{y}_i$
-    based on the interval it falls into.
-    \medskip
-
-    The probability of falling into the $\ell$-th bin
-    is approximated by $P(\zeta_\ell \leq y_i < \zeta_{\ell+1}) =
-    F(\zeta_{\ell+1}) - F(\zeta_\ell)$. These probabilities are encoded as transformed counts
-    $\tilde{y}_i$, so that the transition model uses  $P(\tilde{y}_i = r) =
-    P(\zeta_r \leq y_i < \zeta_{r+1})$ to approximate the discrete likelihood.
-\end{frame}
-
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Extension for continuous response}
 
     The transition model estimates the probability of transitions between counts
-    $P(\tilde{y}_i > r \mid \tilde{y}_i \geq r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha}))$
-    and recursively computes (cf. Berger and Tutz 2021, Eqn.~8)
-    $$..
+    $$
+    P(\tilde{y}_i > r \mid \tilde{y}_i \geq r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha}))
+    $$
+    and recursively computes
+    $$
     P(\tilde{y}_i = r, \mathbf{x}_i) = P(\tilde{y}_i = r \mid \tilde{y}_i \geq r, \mathbf{x}_i) \prod_{s=0}^{r-1} P(\tilde{y}_i > s \mid \tilde{y}_i \geq s, \mathbf{x}_i).
     $$
-    For any value $y_i \in [\zeta_\ell, \zeta_{\ell+1})$, the CDF can be approximated by
-    $$
-    \hat{F}(y_i) = \sum_{r=0}^{\ell-1} P(\tilde{y}_i = r) + \frac{y_i - \zeta_\ell}{\zeta_{\ell+1} - \zeta_\ell} P(\tilde{y}_i = \ell),
-    $$
-    where the first term sums the probabilities for bins below the $\ell$-th bin,
-    while the second term performs linear interpolation within the bin that $y_i$ falls into.
-    The stepwise CDF approximation converges uniformly to the true CDF $F(y)$
-    as the number of bins increases ($m \rightarrow \infty$).
 \end{frame}
 
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Extension for continuous response}
 
-    The corresponding probability density function (PDF) can be approximated as
-    $$
-    \hat{f}(y_i) = \frac{P(\tilde{y}_i = \ell)}{\zeta_{\ell+1}-\zeta_\ell},~~y_i \in [\zeta_\ell + \zeta_{\ell + 1}).
-    $$
+\begin{frame}[fragile]{Extension for Continuous Responses}
+\begin{itemize}
+\item Let $r$ denote the unique index such that $y_i \in [\zeta_r, \zeta_{r+1})$.
 
+\item For any value $y_i \in [\zeta_r, \zeta_{r+1})$, the CDF can be approximated by
+  $$
+  \hat{F}(y_i) = \sum_{s=0}^{r-1} P(\tilde{y}_i = s) + \frac{y_i - \zeta_r}{\zeta_{r+1} - \zeta_r} P(\tilde{y}_i = r).
+  $$
+
+\item The PDF can be approximated as
+$$
+\hat{f}(y_i) = \frac{P(\tilde{y}_i = r)}{\zeta_{r+1}-\zeta_r}.
+$$
+\item The mean and variance are approximated using midpoints $c_r = \frac{\zeta_r + \zeta_{r+1}}{2}$
+  $$
+  E[Y] = \sum_{r} c_r \, P(\tilde{y} = r), \quad
+  \text{Var}(Y) = \sum_{r} c_r^2 \, P(\tilde{y} = r) - \left( \sum_{r} c_r \, P(\tilde{y} = r) \right)^2.
+  $$
+\end{itemize}
 \end{frame}
+
+%% %% ------------------------------------------------------------------
+%% \begin{frame}[fragile]
+%%     \frametitle{Extension for continuous response}
+%% 
+%%     To model any univariate continuous response $y_i \in \mathcal{R}$ with
+%%     cumulative distribution function (CDF) $F(y)$, we
+%%     employ a discretization technique inspired by histogram binning.
+%%     \medskip
+%% 
+%%     The response $y$ is
+%%     partitioned into $m-1$ intervals using a set of monotonically increasing
+%%     boundaries $\zeta_j$ with $j = [1, \dots, m]$, where each interval $[\zeta_\ell,
+%%     \zeta_{\ell+1})$ for $\ell = [1, ..., m-1]$ corresponds to a discrete pseudo-count $r$.
+%% \end{frame}
+%% 
+%% %% ------------------------------------------------------------------
+%% \begin{frame}[fragile]
+%%     \frametitle{Extension for continuous response}
+%%     Each observation $y_i$ is assigned to its discrete representation $\tilde{y}_i$
+%%     based on the interval it falls into.
+%%     \medskip
+%% 
+%%     The probability of falling into the $\ell$-th bin
+%%     is approximated by $P(\zeta_\ell \leq y_i < \zeta_{\ell+1}) =
+%%     F(\zeta_{\ell+1}) - F(\zeta_\ell)$. These probabilities are encoded as transformed counts
+%%     $\tilde{y}_i$, so that the transition model uses  $P(\tilde{y}_i = r) =
+%%     P(\zeta_r \leq y_i < \zeta_{r+1})$ to approximate the discrete likelihood.
+%% \end{frame}
+%% 
+%% %% ------------------------------------------------------------------
+%% \begin{frame}[fragile]
+%%     \frametitle{Extension for continuous response}
+%% 
+%%     The transition model estimates the probability of transitions between counts
+%%     $P(\tilde{y}_i > r \mid \tilde{y}_i \geq r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha}))$
+%%     and recursively computes (cf. Berger and Tutz 2021, Eqn.~8)
+%%     $$..
+%%     P(\tilde{y}_i = r, \mathbf{x}_i) = P(\tilde{y}_i = r \mid \tilde{y}_i \geq r, \mathbf{x}_i) \prod_{s=0}^{r-1} P(\tilde{y}_i > s \mid \tilde{y}_i \geq s, \mathbf{x}_i).
+%%     $$
+%%     For any value $y_i \in [\zeta_\ell, \zeta_{\ell+1})$, the CDF can be approximated by
+%%     $$
+%%     \hat{F}(y_i) = \sum_{r=0}^{\ell-1} P(\tilde{y}_i = r) + \frac{y_i - \zeta_\ell}{\zeta_{\ell+1} - \zeta_\ell} P(\tilde{y}_i = \ell),
+%%     $$
+%%     where the first term sums the probabilities for bins below the $\ell$-th bin,
+%%     while the second term performs linear interpolation within the bin that $y_i$ falls into.
+%%     The stepwise CDF approximation converges uniformly to the true CDF $F(y)$
+%%     as the number of bins increases ($m \rightarrow \infty$).
+%% \end{frame}
+%% 
+%% %% ------------------------------------------------------------------
+%% \begin{frame}[fragile]
+%%     \frametitle{Extension for continuous response}
+%% 
+%%     The corresponding probability density function (PDF) can be approximated as
+%%     $$
+%%     \hat{f}(y_i) = \frac{P(\tilde{y}_i = \ell)}{\zeta_{\ell+1}-\zeta_\ell},~~y_i \in [\zeta_\ell + \zeta_{\ell + 1}).
+%%     $$
+%% 
+%% \end{frame}
 
 
 %%%  %% ------------------------------------------------------------------
@@ -774,19 +849,16 @@ dev.off()
         \item Over 3.9\,million individual observations
     \end{itemize}
 
+    \smallskip
     \textbf{Goal:} Estimating spatio-temporal rainfall climatology.
 
+    \smallskip
     \textbf{Covariates:} Day of the year and geographical location.
 
+    \pause
+    \smallskip
     \textbf{Model:} Estimate square-root transformed daily precipitation
     amount using $m=90$ (non-uniform) pseudo-bins and left-censored distribution.
-
-\end{frame}
-
-
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Application}
 
 $$
 \begin{array}{ll}
@@ -795,7 +867,6 @@ $$
 \end{array}
 $$
 
-
 \end{frame}
 
 
@@ -804,18 +875,45 @@ $$
 \begin{frame}[fragile]
     \frametitle{Application}
 
-\begin{verbatim}
+In \emph{R}:
+
+<<eval = FALSE>>=
 library("transitreg")
-
+@
+\smallskip
+<<eval = FALSE>>=
+## Model formula
 f <- sqrt(rain) ~ theta0 + ti(theta, k = 12) +
-               ti(lon, lat) + ti(theta, lon, lat, k = c(8, 8, 8)) +
-               ti(day, bs = "cc") + ti(theta, day, bs = c("cr", "cc"), k = c(8, 10)) +
-               ti(alt, bs = "cr", k = 8) + ti(theta, alt, k = c(8, 8)) +
-               ti(year, k = 8)
-
+         ti(lon, lat) + ti(theta, lon, lat, k = c(8, 8, 8)) +
+         ti(day, bs = "cc") + ti(theta, day, bs = c("cr", "cc"), k = c(8, 10)) +
+         ti(alt, bs = "cr", k = 8) + ti(theta, alt, k = c(8, 8)) +
+         ti(year, k = 8)
+@
+\smallskip
+<<eval = FALSE>>=
+## Breaks for binning
 bk  <- c(0, seq(0.2, 10, by = 0.2), seq(10.25, 20, by = 0.25))
+@
+\smallskip
+<<eval = FALSE>>=
+## Estimating model
 mod <- transitreg(f, data = data, breaks = bk, censored = "left")
-\end{verbatim}
+@
+
+%%\begin{footnotesize}
+%%\begin{verbatim}
+%%library("transitreg")
+%%
+%%f <- sqrt(rain) ~ theta0 + ti(theta, k = 12) +
+%%               ti(lon, lat) + ti(theta, lon, lat, k = c(8, 8, 8)) +
+%%               ti(day, bs = "cc") + ti(theta, day, bs = c("cr", "cc"), k = c(8, 10)) +
+%%               ti(alt, bs = "cr", k = 8) + ti(theta, alt, k = c(8, 8)) +
+%%               ti(year, k = 8)
+%%
+%%bk  <- c(0, seq(0.2, 10, by = 0.2), seq(10.25, 20, by = 0.25))
+%%mod <- transitreg(f, data = data, breaks = bk, censored = "left")
+%%\end{verbatim}
+%%    \end{footnotesize}
 
 \end{frame}
 
@@ -832,10 +930,15 @@ mod <- transitreg(f, data = data, breaks = bk, censored = "left")
 \begin{frame}[fragile]
     \frametitle{Application}
 
-Based on this spatio-temporal transition model, the estimated average daily
-probability of rain in Limerick during the conference week (July 14--18) is $68.7\%$,
-with a $44.2\%$ chance of receiving more than $1\,\mathrm{mm}$ per day with an expected
-daily amount of precipitation of $1.44\,\mathrm{mm}$.
+
+Climatological estimates for Limerick during conference week (July 14--18):
+\medskip
+
+\begin{itemize}
+    \item A $68.7\%$ probability of getting rain,
+    \item a $44.2\%$ chance of receiving more than $1\,\text{mm}\,\text{day}^{-1}$,
+    \item with an expected amount of $1.44\,\text{mm}\,\text{day}^{-1}$.
+\end{itemize}
 
 \end{frame}
 
@@ -919,20 +1022,20 @@ daily amount of precipitation of $1.44\,\mathrm{mm}$.
     \end{footnotesize}
 \end{frame}
 
-%% appendix of 'extra' slides
-\appendix
-
-\begin{frame}
-\frametitle{Appendix 1}
-    This slide does not increase the total number of slides and can hold additional information
-    that you may be asked about after the end of the presentation.
-\end{frame}
-
-\begin{frame}
-\frametitle{Appendix 2}
-    This slide does not increase the total number of slides and can hold additional information
-    that you may be asked about after the end of the presentation.
-\end{frame}
+%%%% appendix of 'extra' slides
+%%\appendix
+%%
+%%\begin{frame}
+%%\frametitle{Appendix 1}
+%%    This slide does not increase the total number of slides and can hold additional information
+%%    that you may be asked about after the end of the presentation.
+%%\end{frame}
+%%
+%%\begin{frame}
+%%\frametitle{Appendix 2}
+%%    This slide does not increase the total number of slides and can hold additional information
+%%    that you may be asked about after the end of the presentation.
+%%\end{frame}
 
 \end{document}
 
