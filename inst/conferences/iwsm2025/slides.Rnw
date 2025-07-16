@@ -946,9 +946,9 @@ mod <- transitreg(f, data = data, breaks = bk, censored = "left")
     Climatological estimates for Shannon airport for today (July 17\textit{th}):
 \smallskip
 \begin{itemize}
-    \item $68.7\%$ probability of getting rain,
-    \item $44.2\%$ chance of more than $1\,\text{mm}$,
-    \item expected daily amount: $1.44\,\text{mm}$.
+    \item $69.7\%$ probability of getting rain,
+    \item $46.0\%$ chance of more than $1\,\text{mm}$ ($0.4\%$ for $>31\,\text{mm}$),
+    \item expected daily amount: $1.61\,\text{mm}$ (mode: $2.25\,\text{mm}$).
 \end{itemize}
 
 \end{frame}
