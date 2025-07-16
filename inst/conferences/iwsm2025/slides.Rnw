@@ -542,7 +542,7 @@ print(df)
 
 \pause
 \bigskip
-After the inflation any standard binary regression method can be used, e.g.:
+After the inflation, any standard binary regression method can be used (e.g.,):
 
 <<eval = FALSE>>=
 b <- glm(Y ~ as.factor(theta) + x, data = df, family = binomial)
@@ -554,7 +554,8 @@ b <- glm(Y ~ as.factor(theta) + x, data = df, family = binomial)
 %% -------------------------------------------
 \begin{frame}{Transition models}
 
-    Transitreg model: ~~~ $y \sim \theta_0 + \text{te}(\theta, x, k = 10)$.\\[1ex]
+    %Transitreg model: ~~~ $y \sim \theta_0 + f(\theta, x)$.\\[1ex]
+    Transitreg model: ~~~ \texttt{transitreg(y \textasciitilde{} theta0 + te(theta, x, k = 15), ...)}\\
 
     \visible<2->{
         \begin{center}
@@ -641,24 +642,20 @@ dev.off()
 
 %% ----------------------------------------------
 \begin{frame}[fragile]{Extension for continuous responses}
-Discretization approach inspired by histogram binning.
 
-\medskip
-
-Divide response $y_i \in \mathbb{R}$, $i = 1, \ldots, n$, into $m - 1$ intervals using
+Inspired by histogram binning, the response $y_i \in \mathbb{R}$, $i = 1, \ldots, n$
+is divided into $m - 1$ (potentially non-uniformly spaced) intervals using
 $$
 \zeta_1, \zeta_2, \dots, \zeta_m,
 $$
 where each interval $[\zeta_r, \zeta_{r+1})$ corresponds to a discrete count $r$.
 
-\medskip
+\bigskip
 
 Each observation $y_i$ is assigned a pseudo count $\tilde{y}_i$.
+For a continuous response with CDF $F(y)$, the discretization
+approximates the probability of $y_i$ falling into each interval as
 
-\medskip
-
-For a continuous response variable $y_i$ with CDF $F(y)$, discretization process
-approximates the probabilities of $y_i$ falling into each interval as
 $$
 P(\zeta_r \leq y_i < \zeta_{r+1}) = F(\zeta_{r+1}) - F(\zeta_r).
 $$
@@ -668,14 +665,14 @@ $$
 %% ----------------------------------------------
 \begin{frame}[fragile]{Extension for continuous responses}
     Probabilities are encoded as transformed counts $\tilde{y}_i$,
-    so that the transition model uses
+    so the transition model uses
     $$
     P(\tilde{y}_i = r) = P(\zeta_r \leq y_i < \zeta_{r+1})$$
     to approximate the discrete likelihood.
 
     \medskip
 
-    The transition model estimates the probability of transitions between counts
+    The model estimates the probability of transitions between counts
     $$
     P(\tilde{y}_i > r \mid \tilde{y}_i \geq r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha}))
     $$
@@ -840,6 +837,7 @@ $$
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
     \frametitle{Will there be rain?}
+    \pause
 
     \textbf{Rainfall Ireland}
     \begin{itemize}
@@ -848,23 +846,22 @@ $$
         \item $\sim$3.9\,million individual observations
     \end{itemize}
 
-    \smallskip
+    \medskip
     \textbf{Goal:} Estimating spatio-temporal rainfall climatology.
 
-    \smallskip
+    \medskip
     \textbf{Covariates:} Day of the year and geographical location.
 
-    \pause
-    \smallskip
+    \medskip
     \textbf{Model:} Estimate square-root transformed daily precipitation
-    amount using $m=90$ pseudo-bins and left-censored distribution.
+    amount using $m=90$ pseudo-bins with left-censoring (censored at $0$).
 
-$$
-\begin{array}{ll}
-\tilde{y} \sim& \theta_0 + f(\theta) + f(\text{longitude},\text{latitude}) + f(\theta,\text{longitude},\text{latitude}) + \\
-    & f(\text{day}) + f(\theta,\text{day}) + f(\text{altitude}) + f(\theta,\text{altitude})
-\end{array}
-$$
+%%%%%%$$
+%%%%%%\begin{array}{ll}
+%%%%%%\tilde{y} \sim& \theta_0 + f(\theta) + f(\text{longitude},\text{latitude}) + f(\theta,\text{longitude},\text{latitude}) + \\
+%%%%%%    & f(\text{day}) + f(\theta,\text{day}) + f(\text{altitude}) + f(\theta,\text{altitude})
+%%%%%%\end{array}
+%%%%%%$$
 
 \end{frame}
 
@@ -946,12 +943,12 @@ mod <- transitreg(f, data = data, breaks = bk, censored = "left")
     \end{center}
 
 \pause
-    Climatological estimates for Limerick for today (July 17\textit{th}):
+    Climatological estimates for Shannon airport for today (July 17\textit{th}):
 \smallskip
 \begin{itemize}
-    \item A $68.7\%$ probability of getting rain,
-    \item a $44.2\%$ chance of receiving more than $1\,\text{mm}$,
-    \item with an expected daily amount of $1.44\,\text{mm}$.
+    \item $68.7\%$ probability of getting rain,
+    \item $44.2\%$ chance of more than $1\,\text{mm}$,
+    \item expected daily amount: $1.44\,\text{mm}$.
 \end{itemize}
 
 \end{frame}
@@ -963,19 +960,20 @@ mod <- transitreg(f, data = data, breaks = bk, censored = "left")
 
     \textbf{Summary}
     \begin{itemize}
-        \item Extended transition models to continuous response
-        \item Performs en-par with e.g., ZANBI without assumptions on the distribution
+        \item Extended transition models to continuous responses
+        \item Performs en-par with, e.g., ZANBI, without distributional assumptions
         \item Allows to retrieve mean, median, mode, variance, quantiles, \dots
-        \item Proven to work well with big data sets
+        \item Proven to work well with large data sets
     \end{itemize}
 
     \bigskip
     \textbf{Software} \\
-    Beta-release available; feel free to test and contribute:
+    \smallskip
+    Beta-release available -- feel free to test and contribute:
     \begin{itemize}
         \item On GitHub: \url{https://github.com/retostauffer/transitreg}
-        \item Install via: \url{https://retostauffer.r-universe.dev/builds}
-        \item Toy-example in the proceeding
+        \item Install via: \url{https://retostauffer.r-universe.dev}
+        \item Executable toy-example in the proceeding
     \end{itemize}
 
 \end{frame}
