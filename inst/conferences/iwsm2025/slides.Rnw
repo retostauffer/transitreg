@@ -75,7 +75,7 @@
     \end{itemize}
 
     \medskip
-    $^{*}$whereof some are designated to account for an excess of zeros
+    $^{*}$whereof some are designated to account for an excess of zeros\\
     (Zeileis \& Kleiber 2008, 2024).
 \end{frame}
 
@@ -410,15 +410,14 @@ dev.off()
     \textbf{Transition models for count data} \\
     \smallskip
     Modeling the probability $P(\dot)$ of observation $y_i$ transitioning\\
-    into higher counts $r$ (Berger \& Tutz 2021).
+    into higher counts $r$ dependent on covariates $\mathbf{x}$ (Berger \& Tutz 2021).
 $$
-    P(y_i > r | y_i \ge r, {\large \bullet}) \in [0, 1]
+    P(y_i > r | y_i \ge r, \mathbf{x}_i) \in [0, 1].
 $$
-    where ${\large \bullet}$ is a (yet unknown) function.
 
     \pause
     \bigskip
-    Similar models are also known as `continuation ratio models'
+    Similar models are also known as `continuation ratio models'\\
     or `ordered logistic models' in the logit context.
 
 \end{frame}
@@ -454,10 +453,10 @@ $$
     \textbf{Core idea}
     \begin{itemize}
         \item Estimate the probability of transitioning between intervals (counts)
-        \item No need for prior knowledge about the response distribution
-        \item Account for excesses in any count(s) (e.g., excess of zeros)
-        \item Be highly flexible in both it's parameters and the response distribution
-        \item Allow to retrieve quantiles, mean, median, mode, \dots
+        \item No need for prior assumptions about the response distribution
+        \item Account for excesses in any count(s) (e.g., excess zeros)
+        \item Highly flexible in both its parameters and the response distribution
+        \item Allows retrieval of quantiles, mean, median, mode, \dots
     \end{itemize}
 
 \end{frame}
@@ -517,7 +516,7 @@ $$
 \begin{frame}[fragile]{Transition models}
 
 <<transitreg_df_example_prep, echo = FALSE, results = hide>>=
-tmp <- "index orig_response Y  theta theta0 x
+tmp <- "index y Y  theta theta0 x
 1   3  1  0  1 8.861246
 1   3  1  1  0 8.861246
 1   3  1  2  0 8.861246
@@ -528,7 +527,7 @@ tmp <- "index orig_response Y  theta theta0 x
 3   2  0  1  0 1.494579
 "
 df <- read.table(text = tmp, header = TRUE)
-df <- subset(df, select = c(index, orig_response, theta, Y, x))
+df <- subset(df, select = c(index, y, theta, Y, x))
 @
 
 
@@ -649,10 +648,9 @@ $$
 \zeta_1, \zeta_2, \dots, \zeta_m,
 $$
 where each interval $[\zeta_r, \zeta_{r+1})$ corresponds to a discrete count $r$.
-
+Each observation $y_i$ is assigned a pseudo count $\tilde{y}_i$.
 \bigskip
 
-Each observation $y_i$ is assigned a pseudo count $\tilde{y}_i$.
 For a continuous response with CDF $F(y)$, the discretization
 approximates the probability of $y_i$ falling into each interval as
 
@@ -877,7 +875,7 @@ Model in pseudo-code:
 $$
 \begin{array}{ll}
 \tilde{y} \sim& \theta_0 + f(\theta) + f(\text{longitude},\text{latitude}) + f(\theta,\text{longitude},\text{latitude}) + \\
-    & f(\text{day}) + f(\theta,\text{day}) + f(\text{altitude}) + f(\theta,\text{altitude})
+    & f(\text{day}) + f(\theta,\text{day}) + f(\text{altitude}) + f(\theta,\text{altitude}) + f(\text{year})
 \end{array}
 $$
     \end{footnotesize}
