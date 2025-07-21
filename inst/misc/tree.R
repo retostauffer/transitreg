@@ -1,3 +1,14 @@
+## ------------------------------------------------------------------------------
+## Title: Transition Probability Tree (TPT) Script
+## Author: Nikolaus Umlauf
+## Date: 2025-07-21
+##
+## Statement:
+## This script contains the original implementation of transition probability trees
+## as developed by Nikolaus Umlauf (2025) for conditional distribution estimation.
+## Please cite appropriately if using or building on this work.
+## ------------------------------------------------------------------------------
+
 ## Main ref: https://onlinelibrary.wiley.com/doi/abs/10.1002/sim.6729
 
 ## Hazard function from binned y.
@@ -27,7 +38,7 @@ transition_probs <- function(h) {
 find_split <- function(x, y_bin, m) {
   ## Candidate split points: equally spaced quantiles (excluding extremes).
   ux <- quantile(x, probs = c(0.001, 0.999))
-  ux <- seq(ux[1], ux[2], length = 50)
+  ux <- seq(ux[1], ux[2], length = 200)
   n <- length(x)
   out <- numeric(length(ux))
 
@@ -37,7 +48,7 @@ find_split <- function(x, y_bin, m) {
 
     n_l <- sum(j)
     n_r <- n - n_l
-    if(n_l < 30 || n_r < 30) next
+    if(n_l < 30 || n_r < 30) next ## FIXME!
 
     ## Hazard estimation.
     h_left  <- hazard_estimates(y_bin[j], m)
@@ -208,7 +219,7 @@ predict_tree <- function(tree, Xnew, mids, type = c("mean", "quantile"), probs =
   }
 }
 
-n <- 10000
+n <- 1000
 
 ## Simulate 2 covariates.
 d <- data.frame(
@@ -240,4 +251,51 @@ i <- order(d$x1)
 
 matplot(d$x1[i], cbind(mu_hat, q_hat)[i, ],
   type = "l", lty = 1, col = c(2, 4, 4), lwd = 3, add = TRUE)
+
+
+transittree <- function(formula, data, subset, na.action = na.pass,
+   breaks = NULL, ...)
+{
+  call <- match.call()
+  if(missing(data)) 
+    data <- environment(formula)
+  mf <- match.call(expand.dots = FALSE)
+  m <- match(c("formula", "data", "subset", "na.action"), names(mf), 0L)
+  mf <- mf[c(1L, m)]
+  mf$drop.unused.levels <- TRUE
+  mf[[1L]] <- quote(stats::model.frame)
+  mf <- eval(mf, parent.frame())
+  mt <- attr(mf, "terms")
+  Y <- model.response(mf, "any")
+  if(length(dim(Y)) == 1L) {
+    nm <- rownames(Y)
+    dim(Y) <- NULL
+    if(!is.null(nm)) 
+      names(Y) <- nm
+  }
+
+  y_con <- FALSE
+
+  if(is.integer(Y)) {
+    y_bin <- Y
+  } else {
+    if(is.factor(Y)) {
+      y_bin <- as.integer(Y)
+    } else {
+      if(is.null(breaks))
+        breaks <- seq(min(Y), max(Y), length = 50)
+      y_bin <- cut(Y, breaks = breaks, labels = FALSE, include.lowest = TRUE)
+      y_con <- TRUE
+      nbins <- length(breaks) - 1L
+      y_mids <- (breaks[-(nbins + 1L)] + breaks[-1L]) / 2
+    }
+  }
+
+  rval <- list("y" = Y, "model" = mf, "terms" = mt, "breaks" = breaks,
+    "y_bin" = y_bin, "y_mids" = y_mids, "nbins" = nbins)
+
+  return(rval)
+}
+
+b <- transittree(y ~ x1 + x2, data = d)
 
