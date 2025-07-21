@@ -86,7 +86,7 @@
     Modeling the porbability $P(\dot)$ of observation $y_i$ transitioning
     into hither counts $r$.
 $$
-P(y_i > r | y_i \ge r, f(\dot)) \in \[0, 1\]
+P(y_i > r | y_i \ge r, f(\dot)) \in [0, 1]
 $$
     where $f(\dot)$ is a (yet unknown) function.
 
@@ -112,9 +112,9 @@ $$
     \textbf{Continuation ratio model}
     \medskip
     Modeling the porbability $P(\dot)$ of observation $y_i$ transitioning
-    into higher counts $r$ conditional on explanatory variables \mathbf{x}.
+    into higher counts $r$ conditional on explanatory variables $\mathbf{x}$.
 $$
-    P(y_i > r | y_i \ge r, \mathbf{x}_i) \in \[0, 1\]
+    P(y_i > r | y_i \ge r, \mathbf{x}_i) \in [0, 1]
 $$
 
 \end{frame}
@@ -128,7 +128,7 @@ $$
     \medskip
     As proposed by Berger \& Tutz (2021)
 $$
-P(y_i > r | y_i \ge r, f(\dot)) \in \[0, 1\]
+P(y_i > r | y_i \ge r, f(\dot)) \in [0, 1]
 $$
     where $f(\dot)$ is a (yet unknown) function.
 

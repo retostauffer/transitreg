@@ -20,9 +20,9 @@ figure1:
 	Rscript make_figure1.R
 
 clean:
-	-rm *.aux
-	-rm *.log
 	-rm *.tex
-
-
-
+	-rm *.nav
+	-rm *.out
+	-rm *.snm
+	-rm *.toc
+	-rm *.vrb
