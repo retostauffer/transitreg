@@ -7,6 +7,10 @@
 
 \usetheme[nototalframenumber,foot,logo,license,licenseall]{uibk}
 
+\definecolor{steelblue}{HTML}{025493}
+\definecolor{tomato}{HTML}{ff6347}
+\usepackage{multicol}
+
 %% ------------------------------------------------------------------
 %% The official corporate colors of the university are predefined and
 %% can be used for e.g., highlighting something. Simply use
@@ -23,6 +27,7 @@
 %% the commands \pkg, \email, \file, \dataset 
 %% ------------------------------------------------------------------
 
+%% \usepackage{Sweave}
 
 %% information for the title page ('short title' is the pdf-title that is shown in viewer's titlebar)
 \title[Transition Regression for Continuous Data]{Transition Regression for Continuous Data}
@@ -53,15 +58,14 @@
 
 %% ----------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Introduction}
+    \frametitle{Count data models}
 
-    \textbf{Count data regression}\newline
-    \medskip
-    \begin{itemize}
-        \item Estimate the parameters of a specific distribution
-    \end{itemize}
+    \textbf{Classical count data regression} \\
+    \smallskip
+    Estimate the parameters of a specific distribution.
     \pause
 
+    \medskip
     Frequently used models are e.g.,
     \begin{itemize}
         \item Poisson models,
@@ -70,210 +74,390 @@
         \item or hurdle models$^{*}$,
     \end{itemize}
 
-    whereof some are designated to account for an excess of zero observations
-    ($^{*}$).
-
-    TODO(R): Reference Kleiber Zeileis 2008, Hilbe 2014 oder so.
+    \medskip
+    $^{*}$whereof some are designated to account for an excess of zeros\\
+    (Zeileis \& Kleiber 2008, 2024).
 \end{frame}
 
 
+<<marginal_dist_data, echo=FALSE>>=
+suppressPackageStartupMessages(library("colorspace"))
+suppressPackageStartupMessages(library("transitreg"))
+suppressPackageStartupMessages(library("distributions3"))
+
+RDAFILE <- "_slides_marginal_models.rda"
+if (!file.exists(RDAFILE)) {
+    ## Simulating data
+    set.seed(1234)
+    ynb <- rnbinom(5000, size = 4, prob = 0.3)
+    y   <- c(rep(0L, 150), ynb)
+    yzero <- 150 / length(y)
+    bk <- seq.int(0L, max(y))
+
+    ## Poisson model
+    m1 <- glm(y ~ 1, data = data.frame(y = y), family = "poisson")
+    m1_lambda <- predict(m1, newdata = data.frame(x = 0L), type = "response")[[1]]
+    m1_dens   <- dpois(bk, lambda = m1_lambda)
+
+    ## Negbin model
+    suppressPackageStartupMessages(library("countreg"))
+    m2 <- nbreg(y ~ 1, data = data.frame(y = y))
+    m2_params <- as.list(predict(m2, newdata = data.frame(y = 1), type = "parameter"))
+    m2_dens   <- dnbinom(bk, mu = m2_params$mu, size = m2_params$theta)
+
+    ## Zero-inflated
+    m3 <- zeroinfl(y ~ 1 | 1, data = data.frame(y = y), dist = "negbin", link = "logit")
+    m3_params <- predict(m3, newdata = data.frame(y = 1), type = "parameter")
+    m3_params <- setNames(as.list(m3_params), colnames(m3_params))
+    m3_dens   <- dnbinom(bk, mu = m3_params$mu, size = m3_params$theta)
+
+    ## Transitreg
+    mtr <- transitreg(y ~ theta0 + theta + s(theta),
+                      data = data.frame(y = y))
+    mtr_dens <- pdf(mtr[1], x = bk)
+
+    save(y, yzero, bk,
+         m1, m1_lambda, m1_dens,
+         m2, m2_params, m2_dens,
+         m3, m3_params, m3_dens,
+         mtr, mtr_dens,
+         file = RDAFILE)
+} else {
+    tmp <- load(RDAFILE)
+}
+@
+
+%% simple example %% %% ----------------------------------------
+%% simple example %% \begin{frame}[fragile]
+%% simple example %%     \frametitle{Transition regression}
+%% simple example %% 
+%% simple example %%     \textbf{Simple example: marginal distribution}\\
+%% simple example %%     Let us assume a random count variable
+%% simple example %%     $Y \sim \text{NBI}^{\textcolor{uibkorange}{3\%}}_0(\text{size} = 4, \text{prob} = 0.3)$.
+%% simple example %% 
+%% simple example %%     \begin{figure}
+%% simple example %%         \center
+%% simple example %% <<simple_example, echo = FALSE, fig = TRUE, width = 7, height = 3>>=
+%% simple example %% #ggplot() + geom_histogram(aes(x = x), breaks = bk) + theme_minimal()
+%% simple example %% par(mar = c(2.5, 3, 1, 0))
+%% simple example %% h <- hist(y, breaks = bk, main = NULL, xlab = NULL, freq = FALSE)
+%% simple example %% 
+%% simple example %% rect(xleft = h$breaks[1], xright = h$breaks[2],
+%% simple example %%      ybottom = yzero, ytop = h$density[1], col = "#fdbe85")
+%% simple example %% text(h$mids[1], yzero, adj = c(-0.2, 0.35), srt = 90, "excess")
+%% simple example %% @
+%% simple example %%     \end{figure}
+%% simple example %% 
+%% simple example %% \end{frame}
+%% simple example %% 
+%% simple example %% %% %% ----------------------------------------
+%% simple example %% %% \begin{frame}[fragile]
+%% simple example %% %%     \frametitle{Introduction}
+%% simple example %% %% 
+%% simple example %% %% <<marginal_dist_plot, echo=FALSE, fig=TRUE, width=8, height=6>>=
+%% simple example %% %% ## Color definition
+%% simple example %% %% colors <- c(poisson = "black", negbin = "red", zeroinf = "blue", transitreg = "steelblue")
+%% simple example %% %% 
+%% simple example %% %% ## Transitreg
+%% simple example %% %% mtr <- transitreg(x ~ theta0 + theta + s(theta),
+%% simple example %% %%                   data = data.frame(x = x))
+%% simple example %% %% mtr_dens <- pdf(mtr[1], x = bk)
+%% simple example %% %% 
+%% simple example %% %% hist(x, breaks = bk, freq = FALSE, right = FALSE, include.lowest = TRUE,
+%% simple example %% %%      ylim = c(0, 0.13))
+%% simple example %% %% lines(bk + 0.5, m1_dens, col = colors[[1]], lwd = 3)
+%% simple example %% %% lines(bk + 0.5, m2_dens, col = colors[[2]], lwd = 3)
+%% simple example %% %% lines(bk + 0.5, m3_dens, col = colors[[3]], lwd = 3)
+%% simple example %% %% points(0.5, m3_params$pi, pch = 19, col = colors[[3]])
+%% simple example %% %% 
+%% simple example %% %% # Adding transitreg density
+%% simple example %% %% #lines(bk[-1], mtr_dens[-1], type = "s", col = 5, lwd = 3)
+%% simple example %% %% #lines(1 + (head(bk, -1) + tail(bk, -1)) * 0.5, mtr_dens[-1], type = "l", col = 5, lwd = 3)
+%% simple example %% %% #points(0.5, mtr_dens[1], pch = 19, col = 5)
+%% simple example %% %% points(bk + 0.5, mtr_dens, pch = 19, col = colors[[4]])
+%% simple example %% %% 
+%% simple example %% %% legend("topright",
+%% simple example %% %%        legend = c("Poisson", "negbin", "zero-infl negbin", "transitreg"),
+%% simple example %% %%        lwd = 3,
+%% simple example %% %%        lty = c(1, 1, 1, NA),
+%% simple example %% %%        pch = c(NA, NA, NA, 19),
+%% simple example %% %%        col = colors)
+%% simple example %% %% @
+%% simple example %% %% 
+%% simple example %% %% \end{frame}
+%% simple example %% 
+%% simple example %% 
+%% simple example %% %% ----------------------------------------
+%% simple example %% \begin{frame}[fragile]
+%% simple example %%     \frametitle{Introduction}
+%% simple example %% 
+%% simple example %% <<marginal_rootogram_plot, echo = FALSE, include = FALSE>>=
+%% simple example %% library("topmodels")
+%% simple example %% 
+%% simple example %% # Expected marginal plots
+%% simple example %% MFILES <- sprintf("_images/marginal-%d.pdf", 1:4)
+%% simple example %% if (!all(file.exists(MFILES))) {
+%% simple example %%     r1  <- rootogram(m1,  breaks = bk - 0.001, plot = FALSE)
+%% simple example %%     r2  <- rootogram(m2,  breaks = bk - 0.001, plot = FALSE)
+%% simple example %%     r3  <- rootogram(m3,  breaks = bk - 0.001, plot = FALSE)
+%% simple example %%     rtr <- rootogram(mtr, breaks = bk - 0.001, plot = FALSE)
+%% simple example %% 
+%% simple example %%     IGN <- function(x, n) -logLik(x) / n
+%% simple example %%     tmp <- paste(c("Poisson", "negbin", "zero-infl negbin", "transitreg"),
+%% simple example %%                  sprintf("(IGN = %.3f)", sapply(list(m1, m2, m3, mtr), IGN, n = length(y))))
+%% simple example %% 
+%% simple example %%     library("ggplot2")
+%% simple example %%     p1 <- autoplot(r1,  main = tmp[1L], xlab = "x", fill = "gray85", expected_col = "steelblue") +
+%% simple example %%         xlab(NULL) + theme(plot.margin = unit(c(.05, .1, 0, .2), "in"))
+%% simple example %%     p2 <- autoplot(r2,  main = tmp[2L], xlab = "x", fill = "gray85", expected_col = "steelblue") +
+%% simple example %%         xlab(NULL) + theme(plot.margin = unit(c(.05, .1, 0, .2), "in"))
+%% simple example %%     p3 <- autoplot(r3,  main = tmp[3L], xlab = "x", fill = "gray85", expected_col = "steelblue") +
+%% simple example %%         xlab(NULL) + theme(plot.margin = unit(c(.05, .1, 0, .2), "in"))
+%% simple example %%     p4 <- autoplot(rtr, main = tmp[4L], xlab = "x", fill = "gray85", expected_col = 2) +
+%% simple example %%         xlab(NULL) + theme(plot.margin = unit(c(.05, .1, 0, .2), "in"))
+%% simple example %% 
+%% simple example %%     size <- list(w = 3.5, h = 1.5)
+%% simple example %%     ggsave(p1, file = MFILES[1L], width = size$w, height = size$h)
+%% simple example %%     ggsave(p2, file = MFILES[2L], width = size$w, height = size$h)
+%% simple example %%     ggsave(p3, file = MFILES[3L], width = size$w, height = size$h)
+%% simple example %%     ggsave(p4, file = MFILES[4L], width = size$w, height = size$h)
+%% simple example %% }
+%% simple example %% @
+%% simple example %% 
+%% simple example %%     \vspace{-1cm}
+%% simple example %%     \begin{figure}[width = \textwidth]
+%% simple example %%         \centering
+%% simple example %%         \begin{tabular}{cc}
+%% simple example %%         \visible<1->{\includegraphics[width=0.49\textwidth]{_images/marginal-1.pdf}} &
+%% simple example %%         \visible<2->{\includegraphics[width=0.49\textwidth]{_images/marginal-2.pdf}} \\
+%% simple example %%         \visible<3->{\includegraphics[width=0.49\textwidth]{_images/marginal-3.pdf}} &
+%% simple example %%         \visible<4->{\includegraphics[width=0.49\textwidth]{_images/marginal-4.pdf}} \\
+%% simple example %%         \end{tabular}
+%% simple example %%     \end{figure}
+%% simple example %% 
+%% simple example %%     \begin{footnotesize}
+%% simple example %%     Ignorance (IGN): $-\text{logLik}(\text{model}) / n$; the lower, the better.
+%% simple example %%     \end{footnotesize}
+%% simple example %% 
+%% simple example %% \end{frame}
+
+
+
+
+
+%% =====================================================
+\begin{frame}[fragile]
+    \frametitle{Count data models}
+
+
+<<estimate_gamlss2_models, echo = FALSE, results = hide>>=
+set.seed(12345)
+sizefn <- function(x) sin((x + .3) / 1.8) * 1.5 + 5
+probfn <- function(x) (-sin((x + 1.5) / 1.8)) * 0.2 + 0.5
+## Drawing data
+N <- 5000
+Nzero <- 0.15 # fraction
+x <- runif(N, 0, 10)
+d <- data.frame(x = x, y = sapply(x, function(y) rnbinom(1L, size = sizefn(y), prob = probfn(y))))
+## Adding excess of zeros
+d <- rbind(d, data.frame(x = runif(length(x) * Nzero, 0, 10), y = 0L))
+d <- subset(d, y < 25)
+
+
+#######################
+suppressPackageStartupMessages(library("gamlss2"))
+
+RDAGAMLSS2 <- "_slides_gamlss2_models.rda"
+if (!file.exists(RDAGAMLSS2)) {
+    q_x  <- seq(0, 10, by = 0.02)
+
+    b_PO <- gamlss2(y ~ s(x) | s(x), data = d, family = PO, verbose = F)
+    p_PO <- quantile(b_PO, prob = c(0.1, 0.5, 0.9), newdata = data.frame(x = q_x))
+    i_PO <- -as.numeric(logLik(b_PO)) / nrow(d)
+
+    b_NB <- gamlss2(y ~ s(x) | s(x), data = d, family = NBI)
+    p_NB <- quantile(b_NB, prob = c(0.1, 0.5, 0.9), newdata = data.frame(x = q_x))
+    i_NB <- -as.numeric(logLik(b_NB)) / nrow(d)
+
+    b_ZA <- gamlss2(y ~ s(x) | s(x) | s(x), data = d, family = ZANBI)
+    p_ZA <- quantile(b_ZA, prob = c(0.1, 0.5, 0.9), newdata = data.frame(x = q_x))
+    i_ZA <- -as.numeric(logLik(b_ZA)) / nrow(d)
+
+    b_TR <- transitreg(y ~ theta0 + te(theta, x, k = 15), data = d)
+    p_TR <- predict(b_TR, type = "quantile", prob = c(0.1, 0.5, 0.9), newdata = data.frame(x = q_x)) - 0.5 # That -0.5 is a quick fix as I (falsly) still interpolate even if we have count data response
+    i_TR <- -as.numeric(logLik(b_TR)) / nrow(d)
+
+    save(q_x,
+         b_PO, p_PO, i_PO,
+         b_NB, p_NB, i_NB,
+         b_ZA, p_ZA, i_ZA,
+         b_TR, p_TR, i_TR,
+         file = RDAGAMLSS2)
+} else {
+    load(RDAGAMLSS2)
+}
+
+
+# Visualization
+colors <- c("steelblue", 2)
+
+grDevices::pdf(file = file.path("_images", "conditional-empty.pdf"), width = 6, height = 4)
+    par(mar = c(3.4, 3.3, .5, .5))
+    plot(y ~ x, data = d, col = adjust_transparency(1, 0.1), xlab = NA, ylab = NA, cex = 0.6)
+    mtext(side = 1, line = 2, "x")
+    mtext(side = 2, line = 2.5, "y")
+dev.off()
+
+grDevices::pdf(file = file.path("_images", "conditional-PO.pdf"), width = 6, height = 4)
+    par(mar = c(3.4, 3.3, .5, .5))
+    plot(y ~ x, data = d, col = adjust_transparency(1, 0.1), xlab = NA, ylab = NA, cex = 0.6)
+    lines(q_x, p_PO[, 1], col = colors[1L], lwd = 3, type = "s")
+    lines(q_x, p_PO[, 2], col = colors[2L], lwd = 3, type = "s")
+    lines(q_x, p_PO[, 3], col = colors[1L], lwd = 3, type = "s")
+    text(x = 0, y = p_PO[1, ], labels = colnames(p_PO), cex = 0.71,
+         srt = 90, adj = c(0.5, -0.7), col = c(colors[1], colors[2], colors[1]))
+    mtext(side = 1, line = 2, "x")
+    mtext(side = 2, line = 2.5, "y")
+    text(10, max(d$y), sprintf("IGN = %.3f", i_PO), adj = c(1, 1))
+dev.off()
+
+grDevices::pdf(file = file.path("_images", "conditional-NB.pdf"), width = 6, height = 4)
+    par(mar = c(3.4, 3.3, .5, .5))
+    plot(y ~ x, data = d, col = adjust_transparency(1, 0.1), xlab = NA, ylab = NA, cex = 0.6)
+    lines(q_x, p_NB[, 1], col = colors[1L], lwd = 3, type = "s")
+    lines(q_x, p_NB[, 2], col = colors[2L], lwd = 3, type = "s")
+    lines(q_x, p_NB[, 3], col = colors[1L], lwd = 3, type = "s")
+    text(x = 0, y = p_NB[1, ], labels = colnames(p_NB), cex = 0.71,
+         srt = 90, adj = c(0.5, -0.7), col = c(colors[1], colors[2], colors[1]))
+    mtext(side = 1, line = 2, "x")
+    mtext(side = 2, line = 2.5, "y")
+    text(10, max(d$y), sprintf("IGN = %.3f", i_NB), adj = c(1, 1))
+dev.off()
+
+grDevices::pdf(file = file.path("_images", "conditional-ZA.pdf"), width = 6, height = 4)
+    par(mar = c(3.4, 3.3, .5, .5))
+    plot(y ~ x, data = d, col = adjust_transparency(1, 0.1), xlab = NA, ylab = NA, cex = 0.6)
+    lines(q_x, p_ZA[, 1], col = colors[1L], lwd = 3, type = "s")
+    lines(q_x, p_ZA[, 2], col = colors[2L], lwd = 3, type = "s")
+    lines(q_x, p_ZA[, 3], col = colors[1L], lwd = 3, type = "s")
+    text(x = 0, y = p_ZA[1, ], labels = colnames(p_ZA), cex = 0.71,
+         srt = 90, adj = c(0.5, -0.7), col = c(colors[1], colors[2], colors[1]))
+    mtext(side = 1, line = 2, "x")
+    mtext(side = 2, line = 2.5, "y")
+    text(10, max(d$y), sprintf("IGN = %.3f", i_ZA), adj = c(1, 1))
+dev.off()
+
+grDevices::pdf(file = file.path("_images", "conditional-TR.pdf"), width = 6, height = 4)
+    par(mar = c(3.4, 3.3, .5, .5))
+    plot(y ~ x, data = d, col = adjust_transparency(1, 0.1), xlab = NA, ylab = NA, cex = 0.6)
+    # Reference: ZANBI
+    lines(q_x, p_ZA[, 1], col = "gray75", lwd = 3, type = "s")
+    lines(q_x, p_ZA[, 2], col = "gray75", lwd = 3, type = "s")
+    lines(q_x, p_ZA[, 3], col = "gray75", lwd = 3, type = "s")
+    # Transitreg
+    lines(q_x, p_TR[, 1], col = colors[1L], lwd = 3, type = "s")
+    lines(q_x, p_TR[, 2], col = colors[2L], lwd = 3, type = "s")
+    lines(q_x, p_TR[, 3], col = colors[1L], lwd = 3, type = "s")
+    text(x = 0, y = p_TR[1, ], labels = colnames(p_TR), cex = 0.71,
+         srt = 90, adj = c(0.5, -0.7), col = c(colors[1], colors[2], colors[1]))
+    mtext(side = 1, line = 2, "x")
+    mtext(side = 2, line = 2.5, "y")
+    text(10, max(d$y), sprintf("IGN = %.3f", i_TR), adj = c(1, 1))
+dev.off()
+@
+
+
+
+    \only<1>{
+        Simulated example: $y \sim \text{NBI}(\mu = f(x), \sigma = f(x))$ plus
+        $15\%$ extra $0$s.
+        \begin{center}
+            \includegraphics[width=0.65\textwidth]{_images/conditional-empty.pdf}
+        \end{center}
+    }
+    \only<2>{
+        Estimated model: ~~~ $y \sim \text{PO}(\log(\mu) = f(x))$.\\[1ex]
+        \begin{center}
+            \includegraphics[width=0.65\textwidth]{_images/conditional-PO.pdf}
+        \end{center}
+    }
+    \only<3>{
+        Estimated model: ~~~ $y \sim \text{NBI}(\log(\mu) = f(x), \log(\sigma) = f(x))$.\\[1ex]
+        \begin{center}
+            \includegraphics[width=0.65\textwidth]{_images/conditional-NB.pdf}
+        \end{center}
+    }
+    \only<4>{
+        Estimated model: ~~~ $y \sim \text{ZANBI}(\log(\mu) = f(x), \log(\sigma) = f(x), \text{logit}(\nu) = f(x))$.\\[1ex]
+        \begin{center}
+            \includegraphics[width=0.65\textwidth]{_images/conditional-ZA.pdf}
+        \end{center}
+    }
+    %%%\only<5>{
+    %%%    Transitreg model: ~~~ $y \sim \theta_0 + \text{te}(\theta, x, k = 10)$.\\[1ex]
+
+    %%%    \begin{center}
+    %%%        \includegraphics[width=0.65\textwidth]{_images/conditional-TR.pdf}
+    %%%    \end{center}
+    %%%}
+
+\end{frame}
+
 %% ----------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Introduction}
+    \frametitle{Transition regression}
 
-    \textbf{Transition models for count data}
-    \medskip
-    Modeling the porbability $P(\dot)$ of observation $y_i$ transitioning
-    into hither counts $r$.
+    \textbf{Transition models for count data} \\
+    \smallskip
+    Modeling the probability $P(\dot)$ of observation $y_i$ transitioning\\
+    into higher counts $r$ dependent on covariates $\mathbf{x}$ (Berger \& Tutz 2021).
 $$
-P(y_i > r | y_i \ge r, f(\dot)) \in [0, 1]
+    P(y_i > r | y_i \ge r, \mathbf{x}_i) \in [0, 1].
 $$
-    where $f(\dot)$ is a (yet unknown) function.
 
-    \medskip
-    Such models are also known as `continuation ratio models'
+    \pause
+    \bigskip
+    Similar models are also known as `continuation ratio models'\\
     or `ordered logistic models' in the logit context.
 
 \end{frame}
 
 
-%% ----------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Introduction}
+%% %% ----------------------------------------
+%% \begin{frame}[fragile]
+%%     \frametitle{Introduction}
+%% 
+%% %% https://search.r-project.org/CRAN/refmans/VGAM/html/cratio.html
+%% %% Ordinal Regression with Continuation Ratios
+%% %% VGAM::cratio
+%% %%
+%% %% Logit-link to move from m = 1 to m = 2,
+%% %% Logit-link to move from m = 2 to m = 3
+%% %% ---> two incercepts, same slope to ensure mononotinic increase
+%% 
+%%     \textbf{Continuation ratio model}\\
+%%     \medskip
+%%     Modeling the porbability $P(\dot)$ of observation $y_i$ transitioning
+%%     into higher counts $r$ conditional on explanatory variables $\mathbf{x}$.
+%% $$
+%%     P(y_i > r | y_i \ge r, \mathbf{x}_i) \in [0, 1]
+%% $$
+%% 
+%% \end{frame}
 
-%% https://search.r-project.org/CRAN/refmans/VGAM/html/cratio.html
-%% Ordinal Regression with Continuation Ratios
-%% VGAM::cratio
-%%
-%% Logit-link to move from m = 1 to m = 2,
-%% Logit-link to move from m = 2 to m = 3
-%% ---> two incercepts, same slope to ensure mononotinic increase
-
-    \textbf{Continuation ratio model}
-    \medskip
-    Modeling the porbability $P(\dot)$ of observation $y_i$ transitioning
-    into higher counts $r$ conditional on explanatory variables $\mathbf{x}$.
-$$
-    P(y_i > r | y_i \ge r, \mathbf{x}_i) \in [0, 1]
-$$
-
-\end{frame}
-
-
-%% ----------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Introduction}
-
-    \textbf{Transition regression models for count data}
-    \medskip
-    As proposed by Berger \& Tutz (2021)
-$$
-P(y_i > r | y_i \ge r, f(\dot)) \in [0, 1]
-$$
-    where $f(\dot)$ is a (yet unknown) function.
-
-    \medskip
-    Such models are also known as `continuation ratio models'.
-
-\end{frame}
 
 %% ----------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Introduction}
+    \frametitle{Transition regression}
 
-    \textbf{Transition regression}\newline
-    \medskip
+    \textbf{Core idea}
     \begin{itemize}
-        \item
         \item Estimate the probability of transitioning between intervals (counts)
+        \item No need for prior assumptions about the response distribution
+        \item Account for excesses in any count(s) (e.g., excess zeros)
+        \item Highly flexible in both its parameters and the response distribution
+        \item Allows retrieval of quantiles, mean, median, mode, \dots
     \end{itemize}
-
-    \pause
-    \begin{itemize}
-        \item High flexibility as no distribution assumption is required
-        \item TODO(R): Check 
-        \item See Berger and Tutz (2021)
-    \end{itemize}
-
-\end{frame}
-
-%% ----------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Introduction}
-
-    \textbf{Transition regression}\newline
-    \medskip
-    \begin{itemize}
-        \item High flexibility as no distribution assumption is required
-        \item See Berger and Tutz (2021)
-    \end{itemize}
-
-\end{frame}
-
-\begin{frame}[fragile]
-    \frametitle{Introduction}
-
-<<marginal_dist_plot, echo=FALSE, fig=TRUE, width=8, height=6>>=
-suppressPackageStartupMessages(library("colorspace"))
-suppressPackageStartupMessages(library("transitreg"))
-suppressPackageStartupMessages(library("distributions3"))
-
-## Simulating data
-set.seed(1234)
-x  <- c(rep(0L, 150), rnbinom(5000, size = 4, prob = 0.3))
-bk <- seq.int(0L, max(x))
-
-## Color definition
-colors <- c(poisson    = "black",
-            negbin     = "red",
-            zeroinf    = "blue",
-            transitreg = "steelblue")
-
-## Poisson model
-m1 <- glm(x ~ 1, data = data.frame(x = x), family = "poisson")
-m1_lambda <- predict(m1, newdata = data.frame(x = 0L), type = "response")[[1]]
-m1_dens   <- dpois(bk, lambda = m1_lambda)
-
-## Negbin model
-suppressPackageStartupMessages(library("countreg"))
-m2 <- nbreg(x ~ 1, data = data.frame(x = x))
-m2_params <- as.list(predict(m2, newdata = data.frame(x = 1), type = "parameter"))
-m2_dens   <- dnbinom(bk, mu = m2_params$mu, size = m2_params$theta)
-
-## Zero-inflated
-m3 <- zeroinfl(x ~ 1 | 1, data = data.frame(x = x), dist = "negbin", link = "logit")
-m3_params <- predict(m3, newdata = data.frame(x = 1), type = "parameter")
-m3_params <- setNames(as.list(m3_params), colnames(m3_params))
-m3_dens   <- dnbinom(bk, mu = m3_params$mu, size = m3_params$theta)
-
-## Transitreg
-mtr <- transitreg(x ~ theta0 + theta + s(theta),
-                  data = data.frame(x = x))
-mtr_dens <- pdf(mtr[1], x = bk)
-
-hist(x, breaks = bk, freq = FALSE, right = FALSE, include.lowest = TRUE,
-     ylim = c(0, 0.13))
-lines(bk + 0.5, m1_dens, col = colors[[1]], lwd = 3)
-lines(bk + 0.5, m2_dens, col = colors[[2]], lwd = 3)
-lines(bk + 0.5, m3_dens, col = colors[[3]], lwd = 3)
-points(0.5, m3_params$pi, pch = 19, col = colors[[3]])
-
-# Adding transitreg density
-#lines(bk[-1], mtr_dens[-1], type = "s", col = 5, lwd = 3)
-#lines(1 + (head(bk, -1) + tail(bk, -1)) * 0.5, mtr_dens[-1], type = "l", col = 5, lwd = 3)
-#points(0.5, mtr_dens[1], pch = 19, col = 5)
-points(bk + 0.5, mtr_dens, pch = 19, col = colors[[4]])
-
-legend("topright",
-       legend = c("Poisson", "negbin", "zero-infl negbin", "transitreg"),
-       lwd = 3,
-       lty = c(1, 1, 1, NA),
-       pch = c(NA, NA, NA, 19),
-       col = colors)
-@
-
-\end{frame}
-
-
-%% ----------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Introduction}
-
-<<marginal_rootogram_plot, echo=FALSE, fig=TRUE, width=8, height=5>>=
-library("topmodels")
-r1  <- rootogram(m1,  breaks = bk - 0.001, plot = FALSE)
-r2  <- rootogram(m2,  breaks = bk - 0.001, plot = FALSE)
-r3  <- rootogram(m3,  breaks = bk - 0.001, plot = FALSE)
-rtr <- rootogram(mtr, breaks = bk - 0.001, plot = FALSE)
-tmp <- paste(c("Poisson", "negbin", "zero-infl negbin", "transitreg"),
-             sprintf("(logLik = %.2f)", sapply(list(m1, m2, m3, mtr), logLik)))
-plot(c(r1, r2, r3, rtr), col = adjust_transparency(colors, 0.5),
-     main = tmp)
-@
-
-\end{frame}
-
-
-%% second slide
-\begin{frame}[fragile]
-    \frametitle{Methodology}
-
-<<convert_cdf_to_pdf, echo=FALSE, fig=TRUE, width=8, height=5.5>>=
-cdf <- ppois(0:8, lambda = 1)
-b <- barplot(cdf, ylim = c(0, 1))
-tp <- transitreg::convert_tp(cdf, from = "cdf", to = "tp")
-lines(b[, 1], tp, type = "b", pch = 19, col = "tomato", lwd = 2)
-text(b[, 1], cdf, sprintf("%.2f", cdf), srt = 90, adj = c(1.3, 0.5))
-
-text(b[1, 1], tp[1], sprintf("1 - %.2f = %.2f", cdf[1], tp[1]),
-     srt = 90, adj = c(-0.1, 0.5), col = "tomato", font = 2)
-for (i in 2:length(b)) {
-    tmp <- tp[i] * (1 - cdf[i])
-    text(b[i, 1], tp[i], sprintf("%.2f (1 - %.2f) = %.2f", tp[i - 1], cdf[i], tp[i]),
-         srt = 90, adj = c(-0.1, 0.5), col = "tomato", font = 2)
-
-}
-@
 
 \end{frame}
 
@@ -284,179 +468,463 @@ for (i in 2:length(b)) {
 
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Methodology}
+    \frametitle{Transition regression}
 
 The transition probability $P(\cdot)$ for count data is defined as
 $$
 P(y_i > r | y_i \ge r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha})),~~r = 0, 1, 2, \dots 
 $$
-where $F(\cdot)$ is a cumulative distribution function (e.g., logistic
+where $F(\cdot)$ is a CDF (e.g., logistic
 or probit) and $r$ represents the counts, with an additive predictor
 $$
 \eta_{ir}(\boldsymbol{\alpha}) = \theta_r + \sum_{j = 1}^k f_j(\mathbf{x}_i, r; \beta).
 $$
 The parameters $\boldsymbol{\alpha} = (\theta^\top, \beta^\top)$ include count-specific
-intercepts and (possibly) smooth functions $f_j(\cdot)$.
+intercepts $\theta_r$ and (possibly) smooth functions $f_j(\cdot)$.
 For i.i.d.\ observations, let $\pi_{ir}$ denote the probability that the count response equals $r$,
 i.e., $P(y_i=r | \mathbf{x}_i)$. These probabilities are computed recursively as
 $$
 \pi_{ir} = (1 - F(\eta_{ir}(\boldsymbol{\alpha}))) \prod_{s=0}^{r-1} F(\eta_{is}(\boldsymbol{\alpha})).
 $$
-
-\end{frame}
-
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Methodology}
-
-Parameter estimation considers the underlying Markov chain $Y_{i0}, Y_{i1}, \dots$,
-where $Y_{ir} = \mathbf{1}(y_i = r)$. The log-likelihood simplifies to
-$$
-\ell(\boldsymbol{\alpha}) = \sum_{i=1}^n \sum_{s=0}^{y_i} \Big[Y_{is} \log(1 - F(\eta_{ir})) + (1 - Y_{is}) \log(F(\eta_{ir}))\Big].
-$$
-
-$(Y_{i0}, \dots, Y_{iy_i})^\top = (0, \dots, 0, 1)$ are created, along with a new
-covariate $\theta_i = (0, 1, 2, \dots, y_i)^\top$ to capture
-count-specific effects $f_j(\mathbf{x}_i, \theta_i)$, or simple count-specific
-intercepts. All other covariates are duplicated accordingly.
-
 \end{frame}
 
 
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Extension for continuous response}
-
-    To model any univariate continuous response $y_i \in \mathcal{R}$ with
-    cumulative distribution function (CDF) $F(y)$, we
-    employ a discretization technique inspired by histogram binning.
-
-    The response $y$ is
-    partitioned into $m-1$ intervals using a set of monotonically increasing
-    boundaries $\zeta_j$ with $j = [1, \dots, m]$, where each interval $[\zeta_\ell,
-    \zeta_{\ell+1})$ for $\ell = [1, ..., m-1]$ corresponds to a discrete pseudo-count $r$.
-\end{frame}
-
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Extension for continuous response}
-    Each observation $y_i$ is assigned to its discrete representation $\tilde{y}_i$
-    based on the interval it falls into.
-    The probability of falling into the $\ell$-th bin
-    is approximated by $P(\zeta_\ell \leq y_i < \zeta_{\ell+1}) =
-    F(\zeta_{\ell+1}) - F(\zeta_\ell)$. These probabilities are encoded as transformed counts
-    $\tilde{y}_i$, so that the transition model uses  $P(\tilde{y}_i = r) =
-    P(\zeta_r \leq y_i < \zeta_{r+1})$ to approximate the discrete likelihood.
-\end{frame}
-
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Extension for continuous response}
-
-    The transition model estimates the probability of transitions between counts
-    $P(\tilde{y}_i > r \mid \tilde{y}_i \geq r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha}))$
-    and recursively computes (cf. Berger and Tutz 2021, Eqn.~8)
-    $$..
-    P(\tilde{y}_i = r, \mathbf{x}_i) = P(\tilde{y}_i = r \mid \tilde{y}_i \geq r, \mathbf{x}_i) \prod_{s=0}^{r-1} P(\tilde{y}_i > s \mid \tilde{y}_i \geq s, \mathbf{x}_i).
+%% -------------------------------------------
+\begin{frame}{Transition models}
+    Parameter estimation considers the underlying Markov chain
+    $Y_{i0}$, $Y_{i1}$, $\dots$, where
     $$
-    For any value $y_i \in [\zeta_\ell, \zeta_{\ell+1})$, the CDF can be approximated by
-    $$
-    \hat{F}(y_i) = \sum_{r=0}^{\ell-1} P(\tilde{y}_i = r) + \frac{y_i - \zeta_\ell}{\zeta_{\ell+1} - \zeta_\ell} P(\tilde{y}_i = \ell),
-    $$
-    where the first term sums the probabilities for bins below the $\ell$-th bin,
-    while the second term performs linear interpolation within the bin that $y_i$ falls into.
-    The stepwise CDF approximation converges uniformly to the true CDF $F(y)$
-    as the number of bins increases ($m \rightarrow \infty$).
-\end{frame}
-
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Extension for continuous response}
-
-    The corresponding probability density function (PDF) can be approximated as
-    $$
-    \hat{f}(y_i) = \frac{P(\tilde{y}_i = \ell)}{\zeta_{\ell+1}-\zeta_\ell},~~y_i \in [\zeta_\ell + \zeta_{\ell + 1}).
+    Y_{ir} = 1 - I(y_i = r) ~~ \in ~~ \{0, 1\}.
     $$
 
+    Simplifies to binary model log-likelihood
+    $$
+    \ell(\boldsymbol{\alpha}) = \sum_{i=1}^n \sum_{s=0}^{y_i} \Big[Y_{is} \log(F(\eta_{ir})) + (1 - Y_{is}) \log(1 - F(\eta_{ir}))\Big].
+    $$
+
+    $(Y_{i0}, \dots, Y_{iy_i})^\top = (1, \dots, 1, 0)$ are created, along with a new
+    covariate $\theta_i = (0, 1, 2, \dots, y_i)^\top$ to capture
+    count-specific effects $f_j(\mathbf{x}_i, \theta_i)$, or simple count-specific
+    intercepts.
+
+    \medskip
+    All other covariates are duplicated accordingly.
 \end{frame}
 
 
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Extension for continuous response}
-    In addition to the CDF, the transition model allows for the computation of other key
-    characteristics such as the mean, mode, skewness, and kurtosis by weighting the
-    bin midpoints with their corresponding probabilities.
+%% -------------------------------------------
+\begin{frame}[fragile]{Transition models}
 
-\end{frame}
+<<transitreg_df_example_prep, echo = FALSE, results = hide>>=
+tmp <- "index y Y  theta theta0 x
+1   3  1  0  1 8.861246
+1   3  1  1  0 8.861246
+1   3  1  2  0 8.861246
+1   3  0  3  0 8.861246
+2   2  1  0  1 7.609823
+2   2  0  1  0 7.609823
+3   2  1  0  1 1.494579
+3   2  0  1  0 1.494579
+"
+df <- read.table(text = tmp, header = TRUE)
+df <- subset(df, select = c(index, y, theta, Y, x))
+@
 
 
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Application I}
-<<shannon_code_example, eval=FALSE>>=
-# Installing package via R-universe
-install.packages("transitreg",
-     repos = "https://retostauffer.r-universe.dev")
-library("transitreg")
-# Load and prepare data set
-data("Shannon")
-Shannon$day <- as.integer(format(Shannon$date, "%j"))
-# Specifying model formula
-f <- sqrt(rain) ~ theta0 + ti(theta, k = 20) +
-     ti(theta, day, bs = c("cr", "cc"), k = c(20, 20))
-# Estimating the transition model
-m <- transitreg(f, data = Shannon,
-     breaks = seq(0, 12, by = 0.3), censored = "left")
+The data set to model the transition probabilities therefore looks
+as follows:
+
+\medskip
+<<echo = TRUE>>=
+print(df)
+@
+
+\pause
+\bigskip
+After the inflation, any standard binary regression method can be used (e.g.,):
+
+<<eval = FALSE>>=
+b <- glm(Y ~ as.factor(theta) + x, data = df, family = binomial)
 @
 \end{frame}
 
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Application I}
 
-    \includegraphics[width=\textwidth]{stauffer-figure1}
 
-\end{frame}
+%% -------------------------------------------
+\begin{frame}{Transition models}
 
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Application II}
+    %Transitreg model: ~~~ $y \sim \theta_0 + f(\theta, x)$.\\[1ex]
+    Transitreg model: ~~~ \texttt{transitreg(y \textasciitilde{} theta0 + te(theta, x, k = 15), ...)}\\
 
-    To demonstrate the applicability of transition models for continuous data on
-    large datasets, a spatio-temporal climatology is estimated using all available
-    data from $1977$ to $2024$, from $557$ different weather stations across Ireland,
-    resulting in a total number of $3.9$ million individual observations.
+    \visible<2->{
+        \begin{center}
+            \includegraphics[width=0.65\textwidth]{_images/conditional-TR.pdf}
+        \end{center}
+    }
 
 \end{frame}
 
+
+
+
+
+
+%%  %% ------------------------------------------------------------------
+%%  \begin{frame}[fragile]
+%%      \frametitle{Extension for continuous response}
+%%  
+%%  
+%%      \textbf{Data}
+%%      \begin{itemize}
+%%          \item Precipitation amount at Shannon airport (Ireland)
+%%          \item Recorded in $\text{mm}\,\text{day}^{-1}$
+%%          \item $30$\,k records between 1945 and 2025
+%%      \end{itemize}
+%%  
+%%      \bigskip
+%%      \textbf{Motivation}
+%%      \begin{itemize}
+%%          \item Strong excess of zeros ($\sim35\%$)
+%%          \item Censored response with unknown distribution
+%%          \item Sometimes classified (e.g., $(0-1]$ =
+%%              light rain, $(1-3]$ = moderate, \dots)
+%%      \end{itemize}
+%%  
+%%  \end{frame}
+
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Application II}
+    \frametitle{Extension for continuous response}
 
-Left-censored transition model ($m = 90$) includes an offset for the
-censoring point (zeros; $\theta_0$), a spatial effect, a cyclic seasonal
-effect, an altitude effect, and interactions of these effects with $\theta$,
-resulting in the following model specification:
+    \vspace{-1em}
+
+<<shannon_rain_motivation, echo = FALSE, results = hide>>=
+grDevices::pdf(file = file.path("_images", "shannon-rain.pdf"), width = 3.5, height = 3)
+    par(mar = c(3.5, 3.5, 2, 0.5))
+    data("Shannon")
+    bk <- seq(0, 7.5, by = 0.25)
+    hist(sqrt(Shannon$rain), freq = FALSE,
+         breaks = bk,
+         col = "lightblue",
+         main = "Shannon airport rainfall",
+         xlab = NA, ylab = NA)
+    mtext(side = 2, line = 2.5, "density")
+    mtext(side = 1, line = 2.2, "sqrt(daily rainfall sum)")
+dev.off()
+
+grDevices::pdf(file = file.path("_images", "shannon-pseudo.pdf"), width = 3.5, height = 3)
+    par(mar = c(3.5, 3.5, 2, 0.5))
+    tab <- table(cut(sqrt(Shannon$rain), breaks = bk, right = FALSE, include.lowest = TRUE))
+    tab <- tab / sum(tab)
+    b <- barplot(tab, xaxt = "n",
+                 main = "Pseudo-counts")
+    axis(side = 1, at = b[, 1], labels = seq.int(0L, length(bk) - 2), lwd = 0)
+
+dev.off()
+@
+
+    \textbf{Idea:} Define intervals and generate pseudo-counts.
+
+    \begin{multicols}{2}
+        \visible<2->{\includegraphics[width = 0.48\textwidth]{_images/shannon-rain}}
+    \columnbreak
+        \visible<3->{\includegraphics[width = 0.48\textwidth]{_images/shannon-pseudo}}
+    \end{multicols}
+
+    %%\vspace{-0.5em}
+    %%\visible<2->{
+    %%    For this example: $31$\,pseudo-counts using \texttt{seq(0, 75, by = 0.25)}.
+    %%}
+
+\end{frame}
+
+
+%% ----------------------------------------------
+\begin{frame}[fragile]{Extension for continuous responses}
+
+Inspired by histogram binning, the response $y_i \in \mathbb{R}$, $i = 1, \ldots, n$
+is divided into $m - 1$ (potentially non-uniformly spaced) intervals using
+$$
+\zeta_1, \zeta_2, \dots, \zeta_m,
+$$
+where each interval $[\zeta_r, \zeta_{r+1})$ corresponds to a discrete count $r$.
+Each observation $y_i$ is assigned a pseudo count $\tilde{y}_i$.
+\bigskip
+
+For a continuous response with CDF $F(y)$, the discretization
+approximates the probability of $y_i$ falling into each interval as
+
+$$
+P(\zeta_r \leq y_i < \zeta_{r+1}) = F(\zeta_{r+1}) - F(\zeta_r).
+$$
+\end{frame}
+
+
+%% ----------------------------------------------
+\begin{frame}[fragile]{Extension for continuous responses}
+    Probabilities are encoded as transformed counts $\tilde{y}_i$,
+    so the transition model uses
+    $$
+    P(\tilde{y}_i = r) = P(\zeta_r \leq y_i < \zeta_{r+1})$$
+    to approximate the discrete likelihood.
+
+    \medskip
+
+    The model estimates the probability of transitions between counts
+    $$
+    P(\tilde{y}_i > r \mid \tilde{y}_i \geq r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha}))
+    $$
+    and recursively computes
+    $$
+    P(\tilde{y}_i = r, \mathbf{x}_i) = P(\tilde{y}_i = r \mid \tilde{y}_i \geq r, \mathbf{x}_i) \prod_{s=0}^{r-1} P(\tilde{y}_i > s \mid \tilde{y}_i \geq s, \mathbf{x}_i).
+    $$
+\end{frame}
+
+
+\begin{frame}[fragile]{Extension for continuous responses}
+\begin{itemize}
+\item Let $r$ denote the unique index such that $y_i \in [\zeta_r, \zeta_{r+1})$.
+
+\item For any value $y_i \in [\zeta_r, \zeta_{r+1})$, the CDF can be approximated by
+  $$
+  \hat{F}(y_i) = \sum_{s=0}^{r-1} P(\tilde{y}_i = s) + \frac{y_i - \zeta_r}{\zeta_{r+1} - \zeta_r} P(\tilde{y}_i = r).
+  $$
+
+\item The PDF can be approximated as
+$$
+\hat{f}(y_i) = \frac{P(\tilde{y}_i = r)}{\zeta_{r+1}-\zeta_r}.
+$$
+\item The mean and variance are approximated using midpoints $c_r = \frac{\zeta_r + \zeta_{r+1}}{2}$
+  $$
+  E[Y] = \sum_{r} c_r \, P(\tilde{y} = r), \quad
+  \text{Var}(Y) = \sum_{r} c_r^2 \, P(\tilde{y} = r) - \left( \sum_{r} c_r \, P(\tilde{y} = r) \right)^2.
+  $$
+\end{itemize}
+\end{frame}
+
+%% %% ------------------------------------------------------------------
+%% \begin{frame}[fragile]
+%%     \frametitle{Extension for continuous response}
+%% 
+%%     To model any univariate continuous response $y_i \in \mathcal{R}$ with
+%%     cumulative distribution function (CDF) $F(y)$, we
+%%     employ a discretization technique inspired by histogram binning.
+%%     \medskip
+%% 
+%%     The response $y$ is
+%%     partitioned into $m-1$ intervals using a set of monotonically increasing
+%%     boundaries $\zeta_j$ with $j = [1, \dots, m]$, where each interval $[\zeta_\ell,
+%%     \zeta_{\ell+1})$ for $\ell = [1, ..., m-1]$ corresponds to a discrete pseudo-count $r$.
+%% \end{frame}
+%% 
+%% %% ------------------------------------------------------------------
+%% \begin{frame}[fragile]
+%%     \frametitle{Extension for continuous response}
+%%     Each observation $y_i$ is assigned to its discrete representation $\tilde{y}_i$
+%%     based on the interval it falls into.
+%%     \medskip
+%% 
+%%     The probability of falling into the $\ell$-th bin
+%%     is approximated by $P(\zeta_\ell \leq y_i < \zeta_{\ell+1}) =
+%%     F(\zeta_{\ell+1}) - F(\zeta_\ell)$. These probabilities are encoded as transformed counts
+%%     $\tilde{y}_i$, so that the transition model uses  $P(\tilde{y}_i = r) =
+%%     P(\zeta_r \leq y_i < \zeta_{r+1})$ to approximate the discrete likelihood.
+%% \end{frame}
+%% 
+%% %% ------------------------------------------------------------------
+%% \begin{frame}[fragile]
+%%     \frametitle{Extension for continuous response}
+%% 
+%%     The transition model estimates the probability of transitions between counts
+%%     $P(\tilde{y}_i > r \mid \tilde{y}_i \geq r, \mathbf{x}_i) = F(\eta_{ir}(\boldsymbol{\alpha}))$
+%%     and recursively computes (cf. Berger and Tutz 2021, Eqn.~8)
+%%     $$..
+%%     P(\tilde{y}_i = r, \mathbf{x}_i) = P(\tilde{y}_i = r \mid \tilde{y}_i \geq r, \mathbf{x}_i) \prod_{s=0}^{r-1} P(\tilde{y}_i > s \mid \tilde{y}_i \geq s, \mathbf{x}_i).
+%%     $$
+%%     For any value $y_i \in [\zeta_\ell, \zeta_{\ell+1})$, the CDF can be approximated by
+%%     $$
+%%     \hat{F}(y_i) = \sum_{r=0}^{\ell-1} P(\tilde{y}_i = r) + \frac{y_i - \zeta_\ell}{\zeta_{\ell+1} - \zeta_\ell} P(\tilde{y}_i = \ell),
+%%     $$
+%%     where the first term sums the probabilities for bins below the $\ell$-th bin,
+%%     while the second term performs linear interpolation within the bin that $y_i$ falls into.
+%%     The stepwise CDF approximation converges uniformly to the true CDF $F(y)$
+%%     as the number of bins increases ($m \rightarrow \infty$).
+%% \end{frame}
+%% 
+%% %% ------------------------------------------------------------------
+%% \begin{frame}[fragile]
+%%     \frametitle{Extension for continuous response}
+%% 
+%%     The corresponding probability density function (PDF) can be approximated as
+%%     $$
+%%     \hat{f}(y_i) = \frac{P(\tilde{y}_i = \ell)}{\zeta_{\ell+1}-\zeta_\ell},~~y_i \in [\zeta_\ell + \zeta_{\ell + 1}).
+%%     $$
+%% 
+%% \end{frame}
+
+
+%%%  %% ------------------------------------------------------------------
+%%%  \begin{frame}[fragile]
+%%%      \frametitle{Extension for continuous response}
+%%%      In addition to the CDF, the transition model allows for the computation of other key
+%%%      characteristics such as the mean, mode, skewness, and kurtosis by weighting the
+%%%      bin midpoints with their corresponding probabilities.
+%%%  
+%%%  \end{frame}
+%%%  
+%%%  
+%%%  %% ------------------------------------------------------------------
+%%%  \begin{frame}[fragile]
+%%%      \frametitle{Application}
+%%%  \vspace{-1em}
+%%%  \begin{verbatim}
+%%%  # Installing package via R-universe
+%%%  install.packages("transitreg",
+%%%                   repos = "https://retostauffer.r-universe.dev")
+%%%  
+%%%  # Load and prepare data set
+%%%  library("transitreg")
+%%%  data("Shannon")
+%%%  Shannon$day <- as.integer(format(Shannon$date, "%j"))
+%%%  # Specifying model formula
+%%%  f <- sqrt(rain) ~ theta0 + ti(theta, k = 20) +
+%%%       ti(theta, day, bs = c("cr", "cc"), k = c(20, 20))
+%%%  # Estimating the transition model
+%%%  m <- transitreg(f, data = Shannon,
+%%%       breaks = seq(0, 12, by = 0.3), censored = "left")
+%%%  @
+%%%  \end{verbatim}
+%%%  \end{frame}
+%%%  
+%%%  %% ------------------------------------------------------------------
+%%%  \begin{frame}[fragile]
+%%%      \frametitle{Application}
+%%%  
+%%%      \includegraphics[width=\textwidth]{stauffer-figure1}
+%%%  
+%%%  \end{frame}
+%%%  
+%%%  %% ------------------------------------------------------------------
+%%%  \begin{frame}[fragile]
+%%%      \frametitle{ApplicationI}
+%%%  
+%%%      To demonstrate the applicability of transition models for continuous data on
+%%%      large datasets, a spatio-temporal climatology is estimated using all available
+%%%      data from $1977$ to $2024$, from $557$ different weather stations across Ireland,
+%%%      resulting in a total number of $3.9$ million individual observations.
+%%%  
+%%%  \end{frame}
+%%%  
+%%%  %% ------------------------------------------------------------------
+%%%  \begin{frame}[fragile]
+%%%      \frametitle{ApplicationI}
+%%%  
+%%%  Left-censored transition model ($m = 90$) includes an offset for the
+%%%  censoring point (zeros; $\theta_0$), a spatial effect, a cyclic seasonal
+%%%  effect, an altitude effect, and interactions of these effects with $\theta$,
+%%%  resulting in the following model specification:
+%%%  $$
+%%%  \begin{array}{ll}
+%%%  \tilde{y} \sim& \theta_0 + f(\theta) + f(\text{longitude},\text{latitude}) + f(\theta,\text{longitude},\text{latitude}) + \\
+%%%      & f(\text{day}) + f(\theta,\text{day}) + f(\text{altitude}) + f(\theta,\text{altitude})
+%%%  \end{array}
+%%%  $$
+%%%  
+%%%  \end{frame}
+
+%% ------------------------------------------------------------------
+\begin{frame}[fragile]
+    \frametitle{Will there be rain?}
+    \pause
+
+    \textbf{Rainfall Ireland}
+    \begin{itemize}
+        \item Daily rainfall amounts from Met~\'Eireann
+        \item All available data 1977--2024 from 557 stations
+        \item $\sim$3.9\,million individual observations
+    \end{itemize}
+
+    \medskip
+    \textbf{Goal:} Estimating spatio-temporal rainfall climatology.
+
+    \medskip
+    \textbf{Covariates:} Day of the year and geographical location.
+
+    \medskip
+    \textbf{Model:} Estimate square-root transformed daily precipitation
+    amount using $m=90$ pseudo-bins with left-censoring (censored at $0$).
+
+%%%%%%$$
+%%%%%%\begin{array}{ll}
+%%%%%%\tilde{y} \sim& \theta_0 + f(\theta) + f(\text{longitude},\text{latitude}) + f(\theta,\text{longitude},\text{latitude}) + \\
+%%%%%%    & f(\text{day}) + f(\theta,\text{day}) + f(\text{altitude}) + f(\theta,\text{altitude})
+%%%%%%\end{array}
+%%%%%%$$
+
+\end{frame}
+
+
+
+%% ------------------------------------------------------------------
+\begin{frame}[fragile]
+    \frametitle{Will there be rain?}
+
+\vspace{-0.5em}
+Model in pseudo-code:
+    \begin{footnotesize}
 $$
 \begin{array}{ll}
 \tilde{y} \sim& \theta_0 + f(\theta) + f(\text{longitude},\text{latitude}) + f(\theta,\text{longitude},\text{latitude}) + \\
-    & f(\text{day}) + f(\theta,\text{day}) + f(\text{altitude}) + f(\theta,\text{altitude})
+    & f(\text{day}) + f(\theta,\text{day}) + f(\text{altitude}) + f(\theta,\text{altitude}) + f(\text{year})
 \end{array}
 $$
+    \end{footnotesize}
+\pause
+Model in \pkg{R}:
+<<eval = FALSE>>=
+## Package available via https://retostauffer.r-universe.dev
+library("transitreg")
+@
+\smallskip
+<<eval = FALSE>>=
+## Model formula
+f <- sqrt(rain) ~ theta0 + ti(theta, k = 12) +
+         ti(lon, lat) + ti(theta, lon, lat, k = c(8, 8, 8)) +
+         ti(day, bs = "cc") + ti(theta, day, bs = c("cr", "cc"), k = c(8, 10)) +
+         ti(alt, bs = "cr", k = 8) + ti(theta, alt, k = c(8, 8)) +
+         ti(year, k = 8)
+@
+\smallskip
+<<eval = FALSE>>=
+## Breaks for pseudo-binning (non-uniformly distributed)
+bk  <- c(0, seq(0.2, 10, by = 0.2), seq(10.25, 20, by = 0.25))
+@
+\smallskip
+<<eval = FALSE>>=
+## Estimating model
+mod <- transitreg(f, data = data, breaks = bk, censored = "left")
+@
+
+%%\begin{footnotesize}
+%%\begin{verbatim}
+%%library("transitreg")
+%%
+%%f <- sqrt(rain) ~ theta0 + ti(theta, k = 12) +
+%%               ti(lon, lat) + ti(theta, lon, lat, k = c(8, 8, 8)) +
+%%               ti(day, bs = "cc") + ti(theta, day, bs = c("cr", "cc"), k = c(8, 10)) +
+%%               ti(alt, bs = "cr", k = 8) + ti(theta, alt, k = c(8, 8)) +
+%%               ti(year, k = 8)
+%%
+%%bk  <- c(0, seq(0.2, 10, by = 0.2), seq(10.25, 20, by = 0.25))
+%%mod <- transitreg(f, data = data, breaks = bk, censored = "left")
+%%\end{verbatim}
+%%    \end{footnotesize}
 
 \end{frame}
 
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Application II}
-
-
-\end{frame}
-
-%% ------------------------------------------------------------------
-\begin{frame}[fragile]
-    \frametitle{Application II}
+    \frametitle{Will there be rain?}
 
     \includegraphics[width=\textwidth]{stauffer-figure2}
 
@@ -465,12 +933,21 @@ $$
 
 %% ------------------------------------------------------------------
 \begin{frame}[fragile]
-    \frametitle{Application II}
+    \frametitle{Will there be rain?}
 
-Based on this spatio-temporal transition model, the estimated average daily
-probability of rain in Limerick during the conference week (July 14--18) is $68.7\%$,
-with a $44.2\%$ chance of receiving more than $1\,\mathrm{mm}$ per day with an expected
-daily amount of precipitation of $1.44\,\mathrm{mm}$.
+    \vspace{-1em}
+    \begin{center}
+        \includegraphics[width = 1\textwidth]{shannon-estim}
+    \end{center}
+
+\pause
+    Climatological estimates for Shannon airport for today (July 17\textit{th}):
+\smallskip
+\begin{itemize}
+    \item $69.7\%$ probability of getting rain,
+    \item $46.0\%$ chance of more than $1\,\text{mm}$ ($0.4\%$ for $>31\,\text{mm}$),
+    \item expected daily amount: $1.61\,\text{mm}$ (mode: $2.25\,\text{mm}$).
+\end{itemize}
 
 \end{frame}
 
@@ -478,12 +955,23 @@ daily amount of precipitation of $1.44\,\mathrm{mm}$.
 \begin{frame}[fragile]
     \frametitle{Summary}
 
+
+    \textbf{Summary}
     \begin{itemize}
-        \item Extension of transition models to continuous response
-        \item Allows to account for excess of zeros or other values
-        \item Allows for censoring
-        \item Mean, Mode, \dots
-        \item It's the best
+        \item Extended transition models to continuous responses
+        \item Performs en-par with, e.g., ZANBI, without distributional assumptions
+        \item Allows to retrieve mean, median, mode, variance, quantiles, \dots
+        \item Proven to work well with large data sets
+    \end{itemize}
+
+    \bigskip
+    \textbf{Software} \\
+    \smallskip
+    Beta-release available -- feel free to test and contribute:
+    \begin{itemize}
+        \item On GitHub: \url{https://github.com/retostauffer/transitreg}
+        \item Install via: \url{https://retostauffer.r-universe.dev}
+        \item Executable toy-example in the proceeding
     \end{itemize}
 
 \end{frame}
@@ -493,21 +981,81 @@ daily amount of precipitation of $1.44\,\mathrm{mm}$.
 \subtitle{}
 \section{Thanks}
 
+%% From Proceedings
+%% \item[Stauffer, R., Mayr, GJ., Messner, JW., Umlauf, N., and Zeileis A.] (2017)\newline
+%%      Spatio-Temporal Precipitation Climatology Over Complex Terrain Using a
+%%      Censored Additive Regression Model.
+%%      {\it Int. J. Climatol.}, {\bf 37}(7), 3264--3275,
+%%      doi:\texttt{10.1002/joc.4913}
+%% \item[Walsh, S.] (2012)
+%%      A Summary of Climate Averages for Ireland, 1981-2010.
+%%      {\it Met\,{\'E}ireann, Climatol. Note}, {\bf 14}, 1--16, \newline
+%%      \texttt{https://www.met.ie/climate-ireland/SummaryClimAvgs.pdf}
+%% \item[Wood, SN., Goude, Y., and Shaw, S.] (2014)
+%%      Generalized Additive Models for Large Data Sets.
+%%      {\it J. R. Stat. Soc. C Appl. Stat.}, {\bf 64}(1), 139--155,
+%%      doi:\texttt{10.1111/rssc.12068}
+%%  \item[Wood, SN., Li, Z., Shaddick, G., and Augustin, NH.] (2017)
+%%      Generalized Additive Models for Gigadata: Modeling the U.K. Black Smoke Network Daily Data.
+%%      {\it J. Am. Stat. Assoc.}, {\bf 112}(519), 1199--1210,\newline
+%%      doi:\texttt{10.1080/01621459.2016.1195744}
 
-%% appendix of 'extra' slides
-\appendix
+\begin{frame}[fragile, allowframebreaks]{References}
+    \begin{footnotesize}
 
-\begin{frame}
-\frametitle{Appendix 1}
-    This slide does not increase the total number of slides and can hold additional information
-    that you may be asked about after the end of the presentation.
+    Umlauf N, Stauffer R (2025).
+        \dquote{transitreg: Flexible Transition Models for Probabilistic Learning.}
+        \emph{R}~package version \verb|0.2-0|.
+        \url{https://retostauffer.r-universe.dev/transitreg},
+        \url{https://github.com/retostauffer/transitreg}
+
+    \smallskip
+    %% Original inspiration
+    Berger M, Tutz G (2021).
+        \dquote{Transition Models for Count Data: a Flexible Alternative to Fixed Distribution Models.},
+        \emph{Statistical Methods \& Applications}, \textbf{30}, 1259--1283.
+        \doi{10.1007/s10260-021-00558-6}
+
+
+    \bigskip
+    %% Rootograms
+    Kleiber C, Zeileis A (2016).
+        \dquote{Visualizing Count Data Regressions Using Rootograms.}
+        \emph{The American Statistician}, \textbf{70}(3), 296--303.
+        \doi{10.1080/00031305.2016.1173590}
+    \smallskip
+
+    %% Countreg
+    Zeileis A, Kleiber C, Jackman S (2008).
+        \dquote{Regression Models for Count Data in \emph{R}.}
+        \emph{Journal of Statistical Software}, \textbf{27}(8), 1--25.
+        \doi{10.18637/jss.v027.i08}
+    \smallskip
+
+    %% Countreg software
+    Zeileis A, Kleiber C (2024).
+        \dquote{countreg: Count Data Regression.}
+        \emph{R}~package version \verb|0.3-0|.
+        \url{https://R-Forge.R-project.org/projects/countreg/}
+
+
+    \end{footnotesize}
 \end{frame}
 
-\begin{frame}
-\frametitle{Appendix 2}
-    This slide does not increase the total number of slides and can hold additional information
-    that you may be asked about after the end of the presentation.
-\end{frame}
+%%%% appendix of 'extra' slides
+%%\appendix
+%%
+%%\begin{frame}
+%%\frametitle{Appendix 1}
+%%    This slide does not increase the total number of slides and can hold additional information
+%%    that you may be asked about after the end of the presentation.
+%%\end{frame}
+%%
+%%\begin{frame}
+%%\frametitle{Appendix 2}
+%%    This slide does not increase the total number of slides and can hold additional information
+%%    that you may be asked about after the end of the presentation.
+%%\end{frame}
 
 \end{document}
 

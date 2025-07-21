@@ -6,5 +6,7 @@
 /*.tex
 /__*.rds
 /__*.rda
+/_*.rda
+/_images/*
 
 
