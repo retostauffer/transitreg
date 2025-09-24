@@ -2,11 +2,14 @@ rm(list = ls())
 graphics.off()
 
 set.seed(1328)
-n <- 1000
-x <- sort(runif(n, -3, 3))
-y <- sin(x) + rnorm(n, sd = 0.3)
 
-# plot(x, y, ylim = c(-2.5, 2.5))
+# n <- 1000
+# x <- sort(runif(n, -3, 3))
+# y <- sin(x) + rnorm(n, sd = 0.3)
+
+n <- 1000
+x <- sort(round(runif(n, -6, 6), 2))
+y <- 10 + sin(x) + c(0, -6)[(x > 0) * 1 + 1] + rnorm(n, sd = exp(-2 + 2 * cos(x)))
 
 breaks <- seq(min(y), max(y), length = 50)
 
@@ -14,17 +17,30 @@ y_bin <- cut(y, breaks = breaks, labels = FALSE, include.lowest = TRUE)
 nbins <- length(breaks) - 1L
 y_mids <- (breaks[-(nbins + 1L)] + breaks[-1L]) / 2
 
+x11()
+par(mfrow = c(1, 2))
+plot(x, y, ylim = c(min(y)-1, max(y)+1))
+sapply(breaks, function(b) abline(h = b, col = 'lightgrey'))
+hist(y, breaks = breaks)
+
+
 nbatches <- 100
 batch_ids <- lapply(1:nbatches, function(i) sample(1:n, size = floor(0.63 * n)))
 # batch_ids <- lapply(1:nbatches, function(i) sample(1:n, size = floor(0.2 * n)))
-# batch_ids <- replicate(100, 1:n, simplify = FALSE)
+# batch_ids <- lapply(1:nbatches, function(i) sample(1:n, size = floor(0.05 * n)))
+# batch_ids <- replicate(1:nbatches, 1:n, simplify = FALSE)
 # nbatches <- length(batch_ids)
 
-prior_left <- rep(1/nbins, nbins)
-prior_right <- rep(1/nbins, nbins)
+# prior_left <- rep(1/nbins, nbins)
+# prior_right <- rep(1/nbins, nbins)
+prior <- rep(1/nbins, nbins)
 # alpha <- 1
-alpha <- .1
+alpha <- 0.1
 
+# x11()
+# par(mfrow = c(1, 2))
+# plot(1:nbins, prior_left, type = 'l')
+# plot(1:nbins, prior_right, type = 'l')
 
 weighted_js_distance <- function(pL, pR, piL = 0.5, base = 2) {
   piR <- 1 - piL
@@ -35,6 +51,7 @@ weighted_js_distance <- function(pL, pR, piL = 0.5, base = 2) {
   sqrt(jsd / log(base))
 }
 
+split_vals <- list()
 best_split_val <- NULL
 best_score <- -Inf
 
@@ -47,6 +64,7 @@ log_loss <- function(P, y, eps = 1e-12) {
   mean(-log(pmax(p_obs, eps)))
 }
 
+x11()
 for(i in 1:nbatches) {
   
   ##############################################################################
@@ -75,8 +93,16 @@ for(i in 1:nbatches) {
     pmf_left  <- pmf_left  / sum(pmf_left)
     pmf_right <- pmf_right / sum(pmf_right)
     
-    pmf_left <- alpha * pmf_left + (1 - alpha) * prior_left
-    pmf_right <- alpha * pmf_right + (1 - alpha) * prior_right
+    # if(FALSE) {
+    #   prior_left <- rep(1/nbins, nbins)
+    #   prior_right <- rep(1/nbins, nbins)
+    # }
+    
+    # pmf_left <- alpha * pmf_left + (1 - alpha) * 1/prior
+    # pmf_right <- alpha * pmf_right + (1 - alpha) * 1/prior
+    
+    pmf_left <- pmf_left * prior
+    pmf_right <- pmf_right * prior
     
     piL <- n_left / (n_left + n_right)
     wdis <- weighted_js_distance(pmf_left, pmf_right, piL = piL)
@@ -91,8 +117,19 @@ for(i in 1:nbatches) {
     }
   }
   
-  prior_left <- best_pmf_left
-  prior_right <- best_pmf_right
+  matplot(best_pmf_left, 1:nbins, type = 's', col = 2)
+  matplot(best_pmf_right, 1:nbins, type = 's', col = 3, add = TRUE)
+  text(x = par("usr")[2], y = par("usr")[4], adj = c(1.01, 1.5),
+       labels = paste0('Batch = ', i))
+  
+  # Sys.sleep(1)
+  
+  # prior_left <- best_pmf_left
+  # prior_right <- best_pmf_right
+  prior <- best_pmf_left + best_pmf_right
+  prior <- prior / sum(prior)
+  
+  split_vals[[i]] <- best_split_val
   
   m_left <- mean(y[x <= best_split_val])
   m_right <- mean(y[x > best_split_val])
@@ -103,13 +140,21 @@ for(i in 1:nbatches) {
   
 }
 
-par(mfrow = c(1, 2))
-plot(x, y, ylim = c(-2.5, 2.5))
+x11()
+par(mfrow = c(1, 3))
+
+plot(x, y, ylim = c(min(y)-1, max(y)+1))
 sapply(breaks, function(b) abline(h = b, col = 'lightgrey'))
 lapply(fits, function(f) lines(f ~ x, lwd = 0.5, col = 2))
 lines(fit ~ x, lwd = 4, col = 4)
-matplot(pmf_left, 1:nbins, type = 's', col = 2)
-matplot(pmf_right, 1:nbins, type = 's', col = 3, add = TRUE)
+text(x = par("usr")[1], y = par("usr")[4], adj = c(-0.01, 1.5),
+     labels = paste0('Split value: ', round(best_split_val, 4)))
+
+matplot(best_pmf_left, 1:nbins, type = 's', col = 2)
+matplot(best_pmf_right, 1:nbins, type = 's', col = 3, add = TRUE)
+
+plot(1:nbatches, split_vals, type = 'l')
+
 # plot(1:nbatches, err, type = 'l')
 
 
