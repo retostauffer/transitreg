@@ -283,8 +283,9 @@ transitreg <- function(formula, data, subset, na.action,
                         theta_vars = theta_vars,
                         scaler     = scale.x,
                         verbose    = verbose, ...)
+
   ## Response (as bins)
-  y    <- num2bin(mf[[1L]], breaks = breaks, censored = censored)
+  y    <- num2bin(response_bins(mf[[1L]]), breaks = breaks, censored = censored)
   ymax <- max(y, na.rm = TRUE)
 
   ## Testing theta_vars. Will fail if:
@@ -377,7 +378,7 @@ transitreg <- function(formula, data, subset, na.action,
   args <- list(uidx     = ui,
                idx      = tmf$index,
                tp       = tp,
-               y        = y,
+               y        = response_bins(y),
                breaks   = as.numeric(breaks),
                censored = censored,
                discrete = rep(is.null(rval$breaks), length(ui)),
@@ -500,6 +501,7 @@ transitreg_predict <- function(object, newdata = NULL,
   ##    up to 'y[i]'.
   ##  - If elementwise = FALSE: We must evaluate each distribution up to
   ##    max(y).
+  print("HERE IN transitreg.R LINE 504")
   if (type %in% c("quantile", "mode", "tp", "mean")) {
     mf[[1L]] <- max(get_mids(object))
   } else {
@@ -513,11 +515,13 @@ transitreg_predict <- function(object, newdata = NULL,
         mf[[1L]] <- max(y)
     }
   }
+  print('kabooom? one row only containing missing values ... reto <<- mf')
+  reto <<- mf
 
   ## Get rows (row index) where we have missing data
   obs_na <- unname(apply(mf, MARGIN = 1, function(x) sum(is.na(x))) > 0)
   if (all(obs_na)) {
-    stop("all observations (rows) contain missing data, prediction not possible")
+    stop("all observations (rows) contain missing values, prediction not possible")
     # TODO(R): Create tests for this
   }
 
@@ -1028,6 +1032,8 @@ predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
                theta_vars   = object$theta_vars,
                factor       = object$factor,
                ncores       = ncores)
+  warning("saving reto <<- ")
+  reto <<- args
 
   return(do.call(transitreg_predict, args))
 }

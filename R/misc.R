@@ -5,6 +5,16 @@ grep2 <- function(pattern, x, ...) {
   unique(i)
 }
 
+## Helper function; mainly used in `transitreg_tmf` where
+## we often require the integer of the bin the observations
+## fall into. If `x` is an object of class `survival` or `Surv` (TODO: Keep both?)
+## we return the first column of the object (the 'event' column). Else
+## the object is returned as is.
+response_bins <- function(x) {
+    if (inherits(x, c("survival", "Surv"))) return(x[, 1L])
+    return(x)
+}
+
 #' @importFrom stats formula
 #' @importFrom Formula as.Formula
 response_name <- function(formula) {
