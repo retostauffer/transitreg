@@ -5,6 +5,7 @@
 \alias{as.character.survival}
 \alias{print.survival}
 \alias{format.survival}
+\alias{[.survival}
 \title{Creating Survival Object}
 \usage{
 survival(time, event)
@@ -14,6 +15,8 @@ survival(time, event)
 \method{print}{survival}(x, quote = FALSE, ...)
 
 \method{format}{survival}(x, ...)
+
+\method{[}{survival}(x, i, ...)
 }
 \arguments{
 \item{time}{the time to event, the varaible the binning is taking place on.}

@@ -408,8 +408,8 @@ transitreg <- function(formula, data, subset, na.action,
 
 # Helper function for predictions on a transitreg model object.
 transitreg_predict <- function(object, newdata = NULL,
-        type = c("pdf", "cdf", "quantile", "mode", "mean", "tp"), y = NULL, prob = NULL,
-        elementwise = NULL, maxcounts = 1e+03,
+        type = c("pdf", "cdf", "quantile", "mode", "mean", "tp", "survival"),
+        y = NULL, prob = NULL, elementwise = NULL, maxcounts = 1e+03,
         verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
         factor = FALSE, ncores = NULL) {
 
@@ -456,8 +456,17 @@ transitreg_predict <- function(object, newdata = NULL,
         stop("'newdata' does not provide all required covariates, ",
              "missing: ", paste(tmp[!tmp %in% names(newdata)], collapse = ", "))
     mf <- newdata[names(newdata) %in% tmp]
-    ## Appending response
-    tmp <- names(model.frame(object))[1]
+
+    ## Getting response name. If the response is survival
+    ## we extract the first name of the survival object, i.e.,
+    ## the 'time' variable.
+    tmp <- model.frame(object)[, 1L, drop = FALSE]
+    if (inherits(tmp[[1]], c("Surv", "survival"))) {
+        tmp <- colnames(tmp[[1]])[1L]
+    } else {
+        tmp <- colnames(tmp)
+    }
+
     ## Try if we can evaluate the response within 'newdata',
     ## else we assume 'y' was set and contains the new response.
     tmp_resp <- tryCatch(eval(parse(text = tmp), envir = list2env(x = newdata, parent = baseenv())),
@@ -481,7 +490,7 @@ transitreg_predict <- function(object, newdata = NULL,
           ## Extending prob and sorting if !elementwise
           if (elementwise & length(prob) == 1L)
               prob <- rep(prob, length.out = nrow(mf))
-      } else if (type %in% c("cdf", "pdf")) {
+      } else if (type %in% c("cdf", "pdf", "survival")) {
           elementwise <- is.null(y) || length(y) == 1L || length(y) == nrow(mf)
       } else if (type == "mode" || type == "mean") {
           elementwise <- TRUE # for 'mode', 'mean' elementwise is always TRUE
@@ -501,7 +510,6 @@ transitreg_predict <- function(object, newdata = NULL,
   ##    up to 'y[i]'.
   ##  - If elementwise = FALSE: We must evaluate each distribution up to
   ##    max(y).
-  print("HERE IN transitreg.R LINE 504")
   if (type %in% c("quantile", "mode", "tp", "mean")) {
     mf[[1L]] <- max(get_mids(object))
   } else {
@@ -515,8 +523,6 @@ transitreg_predict <- function(object, newdata = NULL,
         mf[[1L]] <- max(y)
     }
   }
-  print('kabooom? one row only containing missing values ... reto <<- mf')
-  reto <<- mf
 
   ## Get rows (row index) where we have missing data
   obs_na <- unname(apply(mf, MARGIN = 1, function(x) sum(is.na(x))) > 0)
@@ -538,7 +544,8 @@ transitreg_predict <- function(object, newdata = NULL,
   ## tmf_rc is the 'tmf data.frame row count' we expect.
 
   tmf_rc <- integer(nrow(mf))
-  tmf_rc[!obs_na] <- num2bin(mf[!obs_na, 1L], get_breaks(object), object$censored)
+  tmf_rc[!obs_na] <- num2bin(response_bins(mf[!obs_na, 1L]),
+                             get_breaks(object), object$censored)
   tmf_rc <- cumsum(tmf_rc) # Cumulative sum
 
   tmf_maxrows <- 1e7
@@ -549,6 +556,8 @@ transitreg_predict <- function(object, newdata = NULL,
   for (block in seq_len(max(blockindex))) {
     idx <- which(blockindex == block)
     if (all(obs_na[idx])) next
+
+    xx <- mf[blockindex == block & !obs_na, , drop = FALSE]
 
     ## Creating 'transition model frame' for the prediction of the
     ## transition probabilities using the object$model (binary response model).
@@ -589,10 +598,10 @@ transitreg_predict <- function(object, newdata = NULL,
       ## Sorting 'prob'. This is important for the .C routine!
       probC <- if (!elementwise) sort(unique(prob)) else prob[!obs_na]
       yC   <- NA_integer_ ## Dummy value required for .C call
-  } else if (type %in% c("cdf", "pdf")) {
+  } else if (type %in% c("cdf", "pdf", "survival")) {
       ## Sorting 'y'. This is important for the .C routine!
       if (elementwise) {
-          yC <- num2bin(mf[!obs_na, 1L], breaks = breaks, censored = object$censored)
+          yC <- num2bin(response_bins(mf[!obs_na, 1L]), breaks = breaks, censored = object$censored)
       } else {
           yC <- num2bin(sort(unique(y)), breaks = breaks, censored = object$censored)
       }
@@ -617,6 +626,9 @@ transitreg_predict <- function(object, newdata = NULL,
                ncores      = ncores,            # int; Number of cores to be used (OpenMP)
                elementwise = elementwise,       # Elementwise (one prob or y per ui)
                discrete    = discrete)          # Discrete distribution?
+
+  ## For the C call: Change type to 'cdf'
+  if (type == "survival") args$type <- "cdf"
 
   # Calling C
   args <- check_args_for_treg_predict(args)
@@ -646,7 +658,9 @@ transitreg_predict <- function(object, newdata = NULL,
     x[!obs_na] <- res
   }
 
-  return(x)
+  ## If type == "survival" our result 'x' currently contains the CDF,
+  ## convert (1 - x), else return the result as is.
+  return(if (type == "survival") 1.0 - x else x)
 }
 
 
@@ -945,6 +959,7 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 #'
 #' * `"pdf"`: The predicted probability density function (PDF).
 #' * `"cdf"`: The cumulative distribution function (CDF).
+#' * `"survival"`: Survival function (1 - CDF).
 #' * `"mode"`: The expected value of the response (maximum probability).
 #' * `"mean"`: Expectation (weighted mean).
 #' * `"quantile"`: The quantile of the response specified by `prob`.
@@ -1005,8 +1020,8 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 #' @exportS3Method predict transitreg
 #' @author Niki
 predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
-        type = c("pdf", "cdf", "quantile", "mode", "mean", "tp"), ncores = NULL,
-        elementwise = NULL, verbose = FALSE, ...) {
+        type = c("pdf", "cdf", "quantile", "mode", "mean", "tp", "survival"),
+        ncores = NULL, elementwise = NULL, verbose = FALSE, ...) {
 
   type <- tolower(type)
   type <- match.arg(type)
@@ -1032,8 +1047,6 @@ predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
                theta_vars   = object$theta_vars,
                factor       = object$factor,
                ncores       = ncores)
-  warning("saving reto <<- ")
-  reto <<- args
 
   return(do.call(transitreg_predict, args))
 }

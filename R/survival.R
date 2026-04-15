@@ -46,3 +46,22 @@ print.survival <- function(x, quote = FALSE, ...) {
 format.survival <- function(x, ...) {
     format(as.character(x))
 }
+
+#' @exportS3Method `[` survival
+#' @rdname survival
+`[.survival` <- function(x, i, ...) {
+    cls <- class(x)
+    if (!missing(i)) {
+        x <- unclass(x)[i, , drop = FALSE]
+        class(x) <- cls
+    } else {
+        x <- NextMethod("[")
+    }
+    return(x)
+}
+
+
+
+
+
+

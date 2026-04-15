@@ -1,4 +1,8 @@
 
+## Version 0.2-1
+
+* Adding support to model time-to-event survival models.
+
 ## Version 0.2-0
 
 * Updated package version to `0.2-0` to reflect the current development status

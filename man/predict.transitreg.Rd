@@ -9,7 +9,7 @@
   newdata = NULL,
   y = NULL,
   prob = NULL,
-  type = c("pdf", "cdf", "quantile", "mode", "mean", "tp"),
+  type = c("pdf", "cdf", "quantile", "mode", "mean", "tp", "survival"),
   ncores = NULL,
   elementwise = NULL,
   verbose = FALSE,
@@ -70,6 +70,7 @@ The argument \code{type} controls the return, the following types are allowed:
 \itemize{
 \item \code{"pdf"}: The predicted probability density function (PDF).
 \item \code{"cdf"}: The cumulative distribution function (CDF).
+\item \code{"survival"}: Survival function (1 - CDF).
 \item \code{"mode"}: The expected value of the response (maximum probability).
 \item \code{"mean"}: Expectation (weighted mean).
 \item \code{"quantile"}: The quantile of the response specified by \code{prob}.
