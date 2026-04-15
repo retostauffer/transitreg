@@ -10,7 +10,7 @@ grep2 <- function(pattern, x, ...) {
 ## fall into. If `x` is an object of class `survival` or `Surv` (TODO: Keep both?)
 ## we return the first column of the object (the 'event' column). Else
 ## the object is returned as is.
-response_bins <- function(x) {
+resp_vector <- function(x) {
     if (inherits(x, c("survival", "Surv"))) return(x[, 1L])
     return(x)
 }

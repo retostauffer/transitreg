@@ -285,7 +285,7 @@ transitreg <- function(formula, data, subset, na.action,
                         verbose    = verbose, ...)
 
   ## Response (as bins)
-  y    <- num2bin(response_bins(mf[[1L]]), breaks = breaks, censored = censored)
+  y    <- num2bin(resp_vector(mf[[1L]]), breaks = breaks, censored = censored)
   ymax <- max(y, na.rm = TRUE)
 
   ## Testing theta_vars. Will fail if:
@@ -378,7 +378,7 @@ transitreg <- function(formula, data, subset, na.action,
   args <- list(uidx     = ui,
                idx      = tmf$index,
                tp       = tp,
-               y        = response_bins(y),
+               y        = resp_vector(y),
                breaks   = as.numeric(breaks),
                censored = censored,
                discrete = rep(is.null(rval$breaks), length(ui)),
@@ -544,7 +544,7 @@ transitreg_predict <- function(object, newdata = NULL,
   ## tmf_rc is the 'tmf data.frame row count' we expect.
 
   tmf_rc <- integer(nrow(mf))
-  tmf_rc[!obs_na] <- num2bin(response_bins(mf[!obs_na, 1L]),
+  tmf_rc[!obs_na] <- num2bin(resp_vector(mf[!obs_na, 1L]),
                              get_breaks(object), object$censored)
   tmf_rc <- cumsum(tmf_rc) # Cumulative sum
 
@@ -601,7 +601,7 @@ transitreg_predict <- function(object, newdata = NULL,
   } else if (type %in% c("cdf", "pdf", "survival")) {
       ## Sorting 'y'. This is important for the .C routine!
       if (elementwise) {
-          yC <- num2bin(response_bins(mf[!obs_na, 1L]), breaks = breaks, censored = object$censored)
+          yC <- num2bin(resp_vector(mf[!obs_na, 1L]), breaks = breaks, censored = object$censored)
       } else {
           yC <- num2bin(sort(unique(y)), breaks = breaks, censored = object$censored)
       }

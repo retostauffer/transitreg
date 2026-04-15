@@ -145,7 +145,7 @@ transitreg_tmf <- function(data, response, breaks,
   # -----------------------------------------------------------------
 
   ## Discretize numeric response into counts.
-  yc <- num2bin(response_bins(data[[response]]), breaks = breaks, censored = censored, verbose = verbose)
+  yc <- num2bin(resp_vector(data[[response]]), breaks = breaks, censored = censored, verbose = verbose)
   if (survival) data[[response]][, 1] <- yc else data[[response]] <- yc
 
   ## (Censored) mid points
@@ -198,21 +198,21 @@ transitreg_tmf <- function(data, response, breaks,
       stop("NA values in response data!")
 
   ## data[[response]] must all be bin indices, so integers >= -1
-  check <- all(response_bins(data[[response]]) > -(1 + sqrt(.Machine$double.eps)) |
-               abs(response_bins(data[[response]]) %% 1) > sqrt(.Machine$double.eps))
+  check <- all(resp_vector(data[[response]]) > -(1 + sqrt(.Machine$double.eps)) |
+               abs(resp_vector(data[[response]]) %% 1) > sqrt(.Machine$double.eps))
   if (!check) stop("The response must be bin indices, so integers in the range of {-1L, Inf}.")
 
   if (survival) {
-      data[[response]][, 1L] <- as.integer(response_bins(data[[response]]))
+      data[[response]][, 1L] <- as.integer(resp_vector(data[[response]]))
   } else {
-      data[[response]]       <- as.integer(response_bins(data[[response]]))
+      data[[response]]       <- as.integer(resp_vector(data[[response]]))
   }
 
   ## Setting up the new data.frame with (pseudo-)bins
 
   ## Define length of vectors in list Sum of response pseudo indices +
   ## nrow(data), the latter to account for the additional "0" bin.
-  nout <- sum(response_bins(data[[response]])) + nrow(data)
+  nout <- sum(resp_vector(data[[response]])) + nrow(data)
 
   ## ------ building transitreg data -------
 
@@ -225,7 +225,7 @@ transitreg_tmf <- function(data, response, breaks,
 
   ## Building index vector; each observation 1:nrow(data) gets its unique index
   result <- list()
-  result$index <- rep(seq_len(nrow(data)), times = response_bins(data[[response]]) + 1L)
+  result$index <- rep(seq_len(nrow(data)), times = resp_vector(data[[response]]) + 1L)
 
   ## Creating Y; always 1 except for the last entry per index.
   fn_get_Y <- function(nout, resp, survival) {
@@ -249,7 +249,7 @@ transitreg_tmf <- function(data, response, breaks,
     resettozero <- c(0L, which(diff(idx) > 0))
     return(seq_len(nout) - rep(resettozero, resp + 1L) - 1L)
   }
-  result$theta <- fn_get_theta(nout, response_bins(data[[response]]), result$index)
+  result$theta <- fn_get_theta(nout, resp_vector(data[[response]]), result$index)
 
   ## Adding theta_vars if needed.
   ## For 'theta99' in 'theta_vars' a new variable 'theta99' is generated which
@@ -268,13 +268,13 @@ transitreg_tmf <- function(data, response, breaks,
   ## Appending the remaining data from 'data'.
   for (n in names(data)) {
       if (n == response && survival) {
-        result[[n]] <- rep(data[[n]][, 1L], response_bins(data[[response]]) + 1L)
+        result[[n]] <- rep(data[[n]][, 1L], resp_vector(data[[response]]) + 1L)
       ## If data[[n]] is a simple vector
       } else if (!is.matrix(data[[n]])) {
-        result[[n]] <- rep(data[[n]], response_bins(data[[response]]) + 1L)
+        result[[n]] <- rep(data[[n]], resp_vector(data[[response]]) + 1L)
       ## Else create matrix
       } else {
-        result[[n]] <- matrix(rep(data[[n]], rep(response_bins(data[[response]]) + 1L, ncol(data[[n]]))),
+        result[[n]] <- matrix(rep(data[[n]], rep(resp_vector(data[[response]]) + 1L, ncol(data[[n]]))),
                               ncol     = ncol(data[[n]]),
                               dimnames = list(NULL, colnames(data[[n]])))
       }
