@@ -39,6 +39,7 @@ find_split <- function(x, y_bin, m) {
   ## Candidate split points: equally spaced quantiles (excluding extremes).
   ux <- quantile(x, probs = c(0.001, 0.999))
   ux <- seq(ux[1], ux[2], length = 200)
+  #ux <- sort(x)
   n <- length(x)
   out <- numeric(length(ux))
 
@@ -292,10 +293,64 @@ transittree <- function(formula, data, subset, na.action = na.pass,
   }
 
   rval <- list("y" = Y, "model" = mf, "terms" = mt, "breaks" = breaks,
-    "y_bin" = y_bin, "y_mids" = y_mids, "nbins" = nbins)
+    "y_con" = y_con, "y_bin" = y_bin, "y_mids" = y_mids, "nbins" = nbins)
 
   return(rval)
 }
 
 b <- transittree(y ~ x1 + x2, data = d)
+
+## Tests.
+set.seed(123)
+
+n <- 10000
+x <- runif(n, -5, 5)
+y <- 10 + ifelse(x > 2, 1, 1) + rnorm(n, sd = ifelse(x > 2, 0.15, 0.1))
+
+m <- 400
+breaks <- seq(min(y), max(y), length.out = m + 1)
+y_bin <- cut(y, breaks = breaks, labels = FALSE, include.lowest = TRUE)
+
+# --- helpers for smoothed histograms ---
+smooth_probs <- function(counts, alpha = 1) {
+  (counts + alpha) / (sum(counts) + alpha * length(counts))
+}
+
+# Generalized (prior-weighted) JS divergence:
+# JSD_{pi} = pi_L * KL(pL || m) + pi_R * KL(pR || m), where m = pi_L pL + pi_R pR
+# Return distance = sqrt(JSD_{pi} / log(base)) in [0,1] for base=2.
+weighted_js_distance <- function(pL, pR, piL, base = 2) {
+  piR <- 1 - piL
+  m   <- piL * pL + piR * pR
+  KL  <- function(a, b) sum(ifelse(a > 0, a * (log(a / b)), 0))
+  jsd <- piL * KL(pL, m) + piR * KL(pR, m)
+  sqrt(jsd / log(base))
+}
+
+max_dist <- function(x, y_bin, m, min_group = 10, alpha = 0.5) {
+  ux <- seq(min(x), max(x), length.out = 100)
+  dmi <- rep((NA_real_), length(ux))  # MI-based (weighted JS) distance
+
+  for(j in seq_along(ux)) {
+    i  <- x > ux[j]
+    nR <- sum(i); nL <- sum(!i)
+    if (min(nR, nL) < min_group) next   # skip tiny splits
+
+    cR <- tabulate(y_bin[i],  nbins = m)
+    cL <- tabulate(y_bin[!i], nbins = m)
+
+    pR <- smooth_probs(cR, alpha = alpha)
+    pL <- smooth_probs(cL, alpha = alpha)
+
+    piL <- nL / (nL + nR)  # empirical priors
+    dmi[j] <- weighted_js_distance(pL, pR, piL, base = 2)  # in [0,1]
+  }
+
+  plot(dmi ~ ux, type = "l", xlab = "u", ylab = "Weighted JS distance (MI)")
+  wh <- which.max(dmi)
+  abline(v = ux[wh], col = 2, lty = 2, lwd = 2)
+  ux[wh]
+}
+
+max_dist(x, y_bin, m)
 
