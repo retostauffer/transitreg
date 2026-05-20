@@ -272,6 +272,30 @@ transitreg <- function(formula, data, subset, na.action,
   rval$breaks   <- breaks
   rval$bins     <- bins
 
+  ## TODO(R) =================================================
+  ## We should avoid making out-of-range survival predictions,
+  ## this was my attempt to calculate the range for each unique
+  ## combination of covariates which works fine and would work
+  ## to be used with the training data (just merge mf to
+  ## survival_range -> no match? Set to NA as we have never
+  ## seen this observation. The problem is that this will not
+  ## work for newdata! Not yet have an idea how this could
+  ## be done efficiently in a generalized way.
+  ##
+  ## ## Survival? Calculate observed range, required to set predictions
+  ## ## out of range to NA to not extrapolate survival rates
+  ## if (inherits(mf[[1]], c("survival", "Surv"))) {
+  ##   # replacing response with 'time' (y)
+  ##   tmp <- model.frame(mf) # covariates
+  ##   tmp[[1]] <- resp_vector(mf[[1]]); names(tmp)[1] <- "y"
+  ##   # Unique covariate combinations
+  ##   tmpf <- as.formula(sprintf("y ~ %s", paste(names(tmp)[-1], collapse = " + ")))
+  ##   rval$survival_range <- aggregate(tmpf, data = tmp,
+  ##                      FUN = function(x) c(min = min(x), max = max(x)))
+  ##   rm(tmp, tmpf)
+  ## }
+  ## TODO(R) =================================================
+
   ## Get count data breaks if needed
   if (is.null(breaks)) breaks <- seq.int(0, bins)
 
@@ -283,8 +307,9 @@ transitreg <- function(formula, data, subset, na.action,
                         theta_vars = theta_vars,
                         scaler     = scale.x,
                         verbose    = verbose, ...)
+
   ## Response (as bins)
-  y    <- num2bin(mf[[1L]], breaks = breaks, censored = censored)
+  y    <- num2bin(resp_vector(mf[[1L]]), breaks = breaks, censored = censored)
   ymax <- max(y, na.rm = TRUE)
 
   ## Testing theta_vars. Will fail if:
@@ -377,7 +402,7 @@ transitreg <- function(formula, data, subset, na.action,
   args <- list(uidx     = ui,
                idx      = tmf$index,
                tp       = tp,
-               y        = y,
+               y        = resp_vector(y),
                breaks   = as.numeric(breaks),
                censored = censored,
                discrete = rep(is.null(rval$breaks), length(ui)),
@@ -407,8 +432,8 @@ transitreg <- function(formula, data, subset, na.action,
 
 # Helper function for predictions on a transitreg model object.
 transitreg_predict <- function(object, newdata = NULL,
-        type = c("pdf", "cdf", "quantile", "mode", "mean", "tp"), y = NULL, prob = NULL,
-        elementwise = NULL, maxcounts = 1e+03,
+        type = c("pdf", "cdf", "quantile", "mode", "mean", "tp", "survival"),
+        y = NULL, prob = NULL, elementwise = NULL, maxcounts = 1e+03,
         verbose = FALSE, theta_scaler = NULL, theta_vars = NULL,
         factor = FALSE, ncores = NULL) {
 
@@ -450,19 +475,10 @@ transitreg_predict <- function(object, newdata = NULL,
   if (is.null(newdata)) {
     mf <- model.frame(object)
   } else {
-    tmp <- names(model.frame(object))[-1]
-    if (!all(tmp %in% names(newdata)))
-        stop("'newdata' does not provide all required covariates, ",
-             "missing: ", paste(tmp[!tmp %in% names(newdata)], collapse = ", "))
-    mf <- newdata[names(newdata) %in% tmp]
-    ## Appending response
-    tmp <- names(model.frame(object))[1]
-    ## Try if we can evaluate the response within 'newdata',
-    ## else we assume 'y' was set and contains the new response.
-    tmp_resp <- tryCatch(eval(parse(text = tmp), envir = list2env(x = newdata, parent = baseenv())),
-                         error = function(e) return(FALSE))
-    mf <- cbind(data.frame(y = if (isFALSE(tmp_resp)) NA_real_ else tmp_resp), mf)
-    rm(tmp)
+    ## Check that newdata contains all covariates needed, and that the
+    ## class and levels in `newdata` match the training data to avoid
+    ## issues in the C code.
+    mf <- check_and_prepare_newdata(newdata, object)
   }
 
   ## Guessing 'elementwise' if is NULL
@@ -480,7 +496,7 @@ transitreg_predict <- function(object, newdata = NULL,
           ## Extending prob and sorting if !elementwise
           if (elementwise & length(prob) == 1L)
               prob <- rep(prob, length.out = nrow(mf))
-      } else if (type %in% c("cdf", "pdf")) {
+      } else if (type %in% c("cdf", "pdf", "survival")) {
           elementwise <- is.null(y) || length(y) == 1L || length(y) == nrow(mf)
       } else if (type == "mode" || type == "mean") {
           elementwise <- TRUE # for 'mode', 'mean' elementwise is always TRUE
@@ -517,7 +533,7 @@ transitreg_predict <- function(object, newdata = NULL,
   ## Get rows (row index) where we have missing data
   obs_na <- unname(apply(mf, MARGIN = 1, function(x) sum(is.na(x))) > 0)
   if (all(obs_na)) {
-    stop("all observations (rows) contain missing data, prediction not possible")
+    stop("all observations (rows) contain missing values, prediction not possible")
     # TODO(R): Create tests for this
   }
 
@@ -534,7 +550,8 @@ transitreg_predict <- function(object, newdata = NULL,
   ## tmf_rc is the 'tmf data.frame row count' we expect.
 
   tmf_rc <- integer(nrow(mf))
-  tmf_rc[!obs_na] <- num2bin(mf[!obs_na, 1L], get_breaks(object), object$censored)
+  tmf_rc[!obs_na] <- num2bin(resp_vector(mf[!obs_na, 1L]),
+                             get_breaks(object), object$censored)
   tmf_rc <- cumsum(tmf_rc) # Cumulative sum
 
   tmf_maxrows <- 1e7
@@ -545,6 +562,8 @@ transitreg_predict <- function(object, newdata = NULL,
   for (block in seq_len(max(blockindex))) {
     idx <- which(blockindex == block)
     if (all(obs_na[idx])) next
+
+    xx <- mf[blockindex == block & !obs_na, , drop = FALSE]
 
     ## Creating 'transition model frame' for the prediction of the
     ## transition probabilities using the object$model (binary response model).
@@ -585,10 +604,10 @@ transitreg_predict <- function(object, newdata = NULL,
       ## Sorting 'prob'. This is important for the .C routine!
       probC <- if (!elementwise) sort(unique(prob)) else prob[!obs_na]
       yC   <- NA_integer_ ## Dummy value required for .C call
-  } else if (type %in% c("cdf", "pdf")) {
+  } else if (type %in% c("cdf", "pdf", "survival")) {
       ## Sorting 'y'. This is important for the .C routine!
       if (elementwise) {
-          yC <- num2bin(mf[!obs_na, 1L], breaks = breaks, censored = object$censored)
+          yC <- num2bin(resp_vector(mf[!obs_na, 1L]), breaks = breaks, censored = object$censored)
       } else {
           yC <- num2bin(sort(unique(y)), breaks = breaks, censored = object$censored)
       }
@@ -613,6 +632,9 @@ transitreg_predict <- function(object, newdata = NULL,
                ncores      = ncores,            # int; Number of cores to be used (OpenMP)
                elementwise = elementwise,       # Elementwise (one prob or y per ui)
                discrete    = discrete)          # Discrete distribution?
+
+  ## For the C call: Change type to 'cdf'
+  if (type == "survival") args$type <- "cdf"
 
   # Calling C
   args <- check_args_for_treg_predict(args)
@@ -642,7 +664,9 @@ transitreg_predict <- function(object, newdata = NULL,
     x[!obs_na] <- res
   }
 
-  return(x)
+  ## If type == "survival" our result 'x' currently contains the CDF,
+  ## convert (1 - x), else return the result as is.
+  return(if (type == "survival") 1.0 - x else x)
 }
 
 
@@ -941,6 +965,7 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 #'
 #' * `"pdf"`: The predicted probability density function (PDF).
 #' * `"cdf"`: The cumulative distribution function (CDF).
+#' * `"survival"`: Survival function (1 - CDF).
 #' * `"mode"`: The expected value of the response (maximum probability).
 #' * `"mean"`: Expectation (weighted mean).
 #' * `"quantile"`: The quantile of the response specified by `prob`.
@@ -1001,8 +1026,8 @@ newresponse.transitreg <- function(object, newdata = NULL, ...) {
 #' @exportS3Method predict transitreg
 #' @author Niki
 predict.transitreg <- function(object, newdata = NULL, y = NULL, prob = NULL,
-        type = c("pdf", "cdf", "quantile", "mode", "mean", "tp"), ncores = NULL,
-        elementwise = NULL, verbose = FALSE, ...) {
+        type = c("pdf", "cdf", "quantile", "mode", "mean", "tp", "survival"),
+        ncores = NULL, elementwise = NULL, verbose = FALSE, ...) {
 
   type <- tolower(type)
   type <- match.arg(type)
@@ -1055,3 +1080,75 @@ logLik.transitreg <- function(object, newdata = NULL, ...) {
 }
 
 
+
+
+#' Check and Prepare Newdata
+#'
+#' If `newdata` are provided when calling the predict method, this function
+#' is used to (i) reduce `newdata` to the covariates originally used to
+#' estimate the model, and if factor checks all levels are known (i.e.,
+#' all levels have been seen in the training data).
+#' TODO(R): This ensures we do not forward missing values to C which (currently)
+#' would result in a segfault as NA handling is not properly implemented -- though
+#' it already checks for it and throws errors).
+#'
+#' @param newdata data.frame with the `newdata` for the prediction.
+#' @param mf the model frame of the model (i.e., training data).
+#'
+#' @return Returns a modified version of `newdata` (a subset) or throws
+#' errors if covariates are missing, or a class/level mismatch is found.
+#'
+#' @author Reto
+check_and_prepare_newdata <- function(newdata, object) {
+
+    mf <- model.frame(object)
+    names_nd <- names(newdata)
+    names_mf <- names(mf)[-1L]
+
+    # Missing variables?
+    if (!all(names_mf %in% names_nd))
+        stop("'newdata' does not provide all required covariates, ",
+             "missing: ", paste(names_mf[!names_nd %in% names_mf], collapse = ", "))
+
+    ## ----------------------------------------------------
+    # Checking type and levels (if factor)
+    cols_to_check <- names_nd[names_nd %in% names_mf]
+    for (n in cols_to_check) {
+        # The class must be the same (TODO(R): Numeric/integer must now be exact; fix?))
+        if (!inherits(newdata[[n]], class(mf[[n]]))) {
+            stop("variable \"", n, "\" must be of class ",
+                 paste(class(mf[[n]]), collapse = ", "),
+                 " as in the original data")
+        }
+        # If the variable is/was factor, make sure newdata only contains
+        # levels which are also found in the original data.
+        if (class(mf[[n]]) == "factor") {
+            tmp <- levels(newdata[[n]])
+            if (!all(tmp %in% mf[[n]])) {
+                tmp <- tmp[!tmp %in% levels(mf[[n]])]
+                stop("variable \"", n, "\" contains unexpected levels: ",
+                     paste(tmp, collapse = ", "))
+            }
+        }
+    }
+
+    ## ----------------------------------------------------
+    ## Getting response name. If the response is survival
+    ## we extract the first name of the survival object, i.e.,
+    ## the 'time' variable.
+    tmp <- mf[, 1L, drop = FALSE]
+    if (inherits(tmp[[1]], c("Surv", "survival"))) {
+        tmp <- colnames(tmp[[1]])[1L]
+    } else {
+        tmp <- colnames(tmp)
+    }
+
+    ## Try if we can evaluate the response within 'newdata',
+    ## else we assume 'y' was set and contains the new response.
+    tmp_resp <- tryCatch(eval(parse(text = tmp), envir = list2env(x = newdata, parent = baseenv())),
+                         error = function(e) return(FALSE))
+    newdata <- cbind(data.frame(y = if (isFALSE(tmp_resp)) NA_real_ else tmp_resp), newdata)
+
+    # Return newdata with the required variables
+    return(newdata)
+}

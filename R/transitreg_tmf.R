@@ -137,19 +137,21 @@ transitreg_tmf <- function(data, response, breaks,
   censored <- match.arg(censored)
   breaks <- sort(breaks) # Just to be sure
 
+  ## TODO(R): Keep both?
+  survival <- inherits(data[[response]], c("survival", "Surv"))
+
   # -----------------------------------------------------------------
   # Converting response from original scale to (pseudo-)index
   # -----------------------------------------------------------------
 
   ## Discretize numeric response into counts.
-  yc <- num2bin(data[[response]], breaks = breaks, censored = censored, verbose = verbose)
-  data[[response]] <- yc
+  yc <- num2bin(resp_vector(data[[response]]), breaks = breaks, censored = censored, verbose = verbose)
+  if (survival) data[[response]][, 1] <- yc else data[[response]] <- yc
 
   ## (Censored) mid points
   ym <- (breaks[-1] + breaks[-length(breaks)]) / 2
   if (censored == "left"  || censored == "both") ym <- c(min(breaks), ym)
   if (censored == "right" || censored == "both") ym <- c(ym, max(breaks))
-
 
   # -----------------------------------------------------------------
   # Preparing the rest
@@ -196,17 +198,21 @@ transitreg_tmf <- function(data, response, breaks,
       stop("NA values in response data!")
 
   ## data[[response]] must all be bin indices, so integers >= -1
-  check <- all(data[[response]] > -(1 + sqrt(.Machine$double.eps)) |
-               abs(data[[response]] %% 1) > sqrt(.Machine$double.eps))
-  if (!check)
-    stop("The response must be bin indices, so integers in the range of {-1L, Inf}.")
-  data[[response]] <- as.integer(data[[response]])
+  check <- all(resp_vector(data[[response]]) > -(1 + sqrt(.Machine$double.eps)) |
+               abs(resp_vector(data[[response]]) %% 1) > sqrt(.Machine$double.eps))
+  if (!check) stop("The response must be bin indices, so integers in the range of {-1L, Inf}.")
+
+  if (survival) {
+      data[[response]][, 1L] <- as.integer(resp_vector(data[[response]]))
+  } else {
+      data[[response]]       <- as.integer(resp_vector(data[[response]]))
+  }
 
   ## Setting up the new data.frame with (pseudo-)bins
 
   ## Define length of vectors in list Sum of response pseudo indices +
   ## nrow(data), the latter to account for the additional "0" bin.
-  nout <- sum(data[[response]]) + nrow(data)
+  nout <- sum(resp_vector(data[[response]])) + nrow(data)
 
   ## ------ building transitreg data -------
 
@@ -219,13 +225,23 @@ transitreg_tmf <- function(data, response, breaks,
 
   ## Building index vector; each observation 1:nrow(data) gets its unique index
   result <- list()
-  result$index <- rep(seq_len(nrow(data)), times = data[[response]] + 1L)
+  result$index <- rep(seq_len(nrow(data)), times = resp_vector(data[[response]]) + 1L)
 
   ## Creating Y; always 1 except for the last entry per index.
-  fn_get_Y <- function(nout, resp) {
-    res <- rep(1L, nout); res[cumsum(resp + 1)] <- 0L; return(res)
+  fn_get_Y <- function(nout, resp, survival) {
+    res <- rep(1L, nout)
+    idx <- if (survival) cumsum(resp[, 1L] + 1L) else cumsum(resp + 1L)
+    # If not survival modeling: Setting the last element of each index (observation) to 0L.
+    # When we have a survival response, we set the last element to abs(resp[, 2L] - 1L);
+    # inverting 0's and 1's.
+    if (!survival) {
+        res[idx] <- 0L
+    } else {
+        res[idx] <- abs(resp[, 2L] - 1L)
+    }
+    return(res)
   }
-  result$Y <- fn_get_Y(nout, data[[response]])
+  result$Y <- fn_get_Y(nout, data[[response]], survival)
 
   ## Creating theta; a sequence from zero to the response_value for each index.
   ## The following Two lines create this sequence of sequences.
@@ -233,7 +249,7 @@ transitreg_tmf <- function(data, response, breaks,
     resettozero <- c(0L, which(diff(idx) > 0))
     return(seq_len(nout) - rep(resettozero, resp + 1L) - 1L)
   }
-  result$theta <- fn_get_theta(nout, data[[response]], result$index)
+  result$theta <- fn_get_theta(nout, resp_vector(data[[response]]), result$index)
 
   ## Adding theta_vars if needed.
   ## For 'theta99' in 'theta_vars' a new variable 'theta99' is generated which
@@ -251,13 +267,15 @@ transitreg_tmf <- function(data, response, breaks,
 
   ## Appending the remaining data from 'data'.
   for (n in names(data)) {
+      if (n == response && survival) {
+        result[[n]] <- rep(data[[n]][, 1L], resp_vector(data[[response]]) + 1L)
       ## If data[[n]] is a simple vector
-      if (!is.matrix(data[[n]])) {
-        result[[n]] <- rep(data[[n]], data[[response]] + 1)
+      } else if (!is.matrix(data[[n]])) {
+        result[[n]] <- rep(data[[n]], resp_vector(data[[response]]) + 1L)
       ## Else create matrix
       } else {
-        result[[n]] <- matrix(rep(data[[n]], rep(data[[response]] + 1, ncol(data[[n]]))),
-                              ncol = ncol(data[[n]]),
+        result[[n]] <- matrix(rep(data[[n]], rep(resp_vector(data[[response]]) + 1L, ncol(data[[n]]))),
+                              ncol     = ncol(data[[n]]),
                               dimnames = list(NULL, colnames(data[[n]])))
       }
   }

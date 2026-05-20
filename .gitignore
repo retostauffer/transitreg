@@ -6,6 +6,10 @@
 /lib
 /_coverage.html
 
+# Testing files
+/test_*.R
+/Rplots.pdf
+
 # Ignore some file types in the 'inst' folder by default
 /inst/*.R
 /inst/*.pdf
