@@ -451,28 +451,10 @@ transitreg_predict <- function(object, newdata = NULL,
   if (is.null(newdata)) {
     mf <- model.frame(object)
   } else {
-    tmp <- names(model.frame(object))[-1]
-    if (!all(tmp %in% names(newdata)))
-        stop("'newdata' does not provide all required covariates, ",
-             "missing: ", paste(tmp[!tmp %in% names(newdata)], collapse = ", "))
-    mf <- newdata[names(newdata) %in% tmp]
-
-    ## Getting response name. If the response is survival
-    ## we extract the first name of the survival object, i.e.,
-    ## the 'time' variable.
-    tmp <- model.frame(object)[, 1L, drop = FALSE]
-    if (inherits(tmp[[1]], c("Surv", "survival"))) {
-        tmp <- colnames(tmp[[1]])[1L]
-    } else {
-        tmp <- colnames(tmp)
-    }
-
-    ## Try if we can evaluate the response within 'newdata',
-    ## else we assume 'y' was set and contains the new response.
-    tmp_resp <- tryCatch(eval(parse(text = tmp), envir = list2env(x = newdata, parent = baseenv())),
-                         error = function(e) return(FALSE))
-    mf <- cbind(data.frame(y = if (isFALSE(tmp_resp)) NA_real_ else tmp_resp), mf)
-    rm(tmp)
+    ## Check that newdata contains all covariates needed, and that the
+    ## class and levels in `newdata` match the training data to avoid
+    ## issues in the C code.
+    mf <- check_and_prepare_newdata(newdata, object)
   }
 
   ## Guessing 'elementwise' if is NULL
@@ -1074,3 +1056,75 @@ logLik.transitreg <- function(object, newdata = NULL, ...) {
 }
 
 
+
+
+#' Check and Prepare Newdata
+#'
+#' If `newdata` are provided when calling the predict method, this function
+#' is used to (i) reduce `newdata` to the covariates originally used to
+#' estimate the model, and if factor checks all levels are known (i.e.,
+#' all levels have been seen in the training data).
+#' TODO(R): This ensures we do not forward missing values to C which (currently)
+#' would result in a segfault as NA handling is not properly implemented -- though
+#' it already checks for it and throws errors).
+#'
+#' @param newdata data.frame with the `newdata` for the prediction.
+#' @param mf the model frame of the model (i.e., training data).
+#'
+#' @return Returns a modified version of `newdata` (a subset) or throws
+#' errors if covariates are missing, or a class/level mismatch is found.
+#'
+#' @author Reto
+check_and_prepare_newdata <- function(newdata, object) {
+
+    mf <- model.frame(object)
+    names_nd <- names(newdata)
+    names_mf <- names(mf)[-1L]
+
+    # Missing variables?
+    if (!all(names_mf %in% names_nd))
+        stop("'newdata' does not provide all required covariates, ",
+             "missing: ", paste(names_mf[!names_nd %in% names_mf], collapse = ", "))
+
+    ## ----------------------------------------------------
+    # Checking type and levels (if factor)
+    cols_to_check <- names_nd[names_nd %in% names_mf]
+    for (n in cols_to_check) {
+        # The class must be the same (TODO(R): Numeric/integer must now be exact; fix?))
+        if (!inherits(newdata[[n]], class(mf[[n]]))) {
+            stop("variable \"", n, "\" must be of class ",
+                 paste(class(mf[[n]]), collapse = ", "),
+                 " as in the original data")
+        }
+        # If the variable is/was factor, make sure newdata only contains
+        # levels which are also found in the original data.
+        if (class(mf[[n]]) == "factor") {
+            tmp <- levels(newdata[[n]])
+            if (!all(tmp %in% mf[[n]])) {
+                tmp <- tmp[!tmp %in% levels(mf[[n]])]
+                stop("variable \"", n, "\" contains unexpected levels: ",
+                     paste(tmp, collapse = ", "))
+            }
+        }
+    }
+
+    ## ----------------------------------------------------
+    ## Getting response name. If the response is survival
+    ## we extract the first name of the survival object, i.e.,
+    ## the 'time' variable.
+    tmp <- mf[, 1L, drop = FALSE]
+    if (inherits(tmp[[1]], c("Surv", "survival"))) {
+        tmp <- colnames(tmp[[1]])[1L]
+    } else {
+        tmp <- colnames(tmp)
+    }
+
+    ## Try if we can evaluate the response within 'newdata',
+    ## else we assume 'y' was set and contains the new response.
+    tmp_resp <- tryCatch(eval(parse(text = tmp), envir = list2env(x = newdata, parent = baseenv())),
+                         error = function(e) return(FALSE))
+    newdata <- cbind(data.frame(y = if (isFALSE(tmp_resp)) NA_real_ else tmp_resp), newdata)
+
+    # Return newdata with the required variables
+    return(newdata)
+}
