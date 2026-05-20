@@ -272,6 +272,30 @@ transitreg <- function(formula, data, subset, na.action,
   rval$breaks   <- breaks
   rval$bins     <- bins
 
+  ## TODO(R) =================================================
+  ## We should avoid making out-of-range survival predictions,
+  ## this was my attempt to calculate the range for each unique
+  ## combination of covariates which works fine and would work
+  ## to be used with the training data (just merge mf to
+  ## survival_range -> no match? Set to NA as we have never
+  ## seen this observation. The problem is that this will not
+  ## work for newdata! Not yet have an idea how this could
+  ## be done efficiently in a generalized way.
+  ##
+  ## ## Survival? Calculate observed range, required to set predictions
+  ## ## out of range to NA to not extrapolate survival rates
+  ## if (inherits(mf[[1]], c("survival", "Surv"))) {
+  ##   # replacing response with 'time' (y)
+  ##   tmp <- model.frame(mf) # covariates
+  ##   tmp[[1]] <- resp_vector(mf[[1]]); names(tmp)[1] <- "y"
+  ##   # Unique covariate combinations
+  ##   tmpf <- as.formula(sprintf("y ~ %s", paste(names(tmp)[-1], collapse = " + ")))
+  ##   rval$survival_range <- aggregate(tmpf, data = tmp,
+  ##                      FUN = function(x) c(min = min(x), max = max(x)))
+  ##   rm(tmp, tmpf)
+  ## }
+  ## TODO(R) =================================================
+
   ## Get count data breaks if needed
   if (is.null(breaks)) breaks <- seq.int(0, bins)
 
