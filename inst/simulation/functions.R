@@ -23,8 +23,9 @@ calc_crps_skill_scores <- function(x, offset = -1) {
         res[[n]] <- res[[n]] / res$transitreg
     }
     res <- subset(res, select = -transitreg)
+    reto <<- res
     # Convert wide to long again
-    data.frame(model = rep(names(res), each = nrow(res) * 2),
+    data.frame(model = rep(names(res), each = nrow(res)),
                crpss = unname(do.call(c, res)) + offset)
 }
 plot_crps <- function(x) {
@@ -39,6 +40,7 @@ plot_crpss <- function(x, offset = -1) {
     # Elementwise CRPSS + mean(CRPSS) labelled at the top
     boxplot(crpss ~ model, data = x); abline(h = 1 + offset, col = "tomato")
     tmp <- aggregate(crpss ~ model, data = x, mean)
+    points(tmp$crpss, pch = 19, col = 2, cex = 2)
     axis(side = 3, at = seq_len(nrow(tmp)), format(tmp$crps))
     invisible(tmp)
 }

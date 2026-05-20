@@ -17,16 +17,14 @@ source("functions.R")
 
 # -------------------------------------------------------------------
 # -------------------------------------------------------------------
-simulate_data_poisson <- function(lambda, n = 1000) {
-    data.frame(y = rpois(n, lambda))
+simulate_data_negbin <- function(size, prob, n = 1000) {
+    data.frame(y = rnbinom(n, size, prob))
 }
 
-data   <- simulate_data_poisson(5.5, 1000)
-glm    <- glm(y ~ 1, data = data, family = "poisson")
-gam1   <- gamlss2(y ~ 1, data = data, family = PO, trace = TRUE)
-gam2   <- gamlss2(y ~ 1, data = data, family = NBI, trace = TRUE)
+data   <- simulate_data_negbin(5, 0.1, 1000)
+gam    <- gamlss2(y ~ 1, data = data, family = NBI, trace = TRUE)
 tra    <- transitreg(y ~ s(theta), data = data)
-models <- list(glm = glm, gamlss_PO = gam1, gamlss2_NBI = gam2, transitreg = tra)
+models <- list(gamlss_NBI = gam, transitreg = tra)
 
 # Calculating CRPS
 crps <- get_crps(models, data$y)
@@ -45,8 +43,5 @@ autoplot(do.call(c, w), single_graph = TRUE, col = seq_along(w), legend = TRUE)
 
 
 ## Comparing 'quantiles'?
-
-
-
 
 
