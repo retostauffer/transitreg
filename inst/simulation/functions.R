@@ -4,7 +4,7 @@
 get_crps <- function(models, y) {
     res <- lapply(models, function(m) crps(prodist(m), y))
     data.frame(model = rep(names(models), each = length(y)), crps = do.call(c, res)) |>
-        structure(row.names = seq_len(length(y) * 3))
+        structure(row.names = seq_len(length(y) * length(models)))
 }
 
 ## Calculating skill scores against 'transitreg'
@@ -28,18 +28,24 @@ calc_crps_skill_scores <- function(x, offset = -1) {
     data.frame(model = rep(names(res), each = nrow(res)),
                crpss = unname(do.call(c, res)) + offset)
 }
-plot_crps <- function(x) {
+plot_crps <- function(x, plot = TRUE) {
+    # Calculating average
+    tmp <- aggregate(crps ~ model, data = x, mean)
+    if (!plot) return(tmp)
+
     # Elementwise CRPS + mean(CRPS) labelled at the top
     boxplot(crps ~ model, data = x)
-    tmp <- aggregate(crps ~ model, data = x, mean)
     axis(side = 3, at = seq_len(nrow(tmp)), format(tmp$crps))
     invisible(tmp)
 }
-plot_crpss <- function(x, offset = -1) {
+plot_crpss <- function(x, offset = -1, plot = TRUE) {
+    # Calculating CRPS skill scores and model average
     x <- calc_crps_skill_scores(x, offset)
+    tmp <- aggregate(crpss ~ model, data = x, mean)
+    if (!plot) return(tmp)
+
     # Elementwise CRPSS + mean(CRPSS) labelled at the top
     boxplot(crpss ~ model, data = x); abline(h = 1 + offset, col = "tomato")
-    tmp <- aggregate(crpss ~ model, data = x, mean)
     points(tmp$crpss, pch = 19, col = 2, cex = 2)
     axis(side = 3, at = seq_len(nrow(tmp)), format(tmp$crps))
     invisible(tmp)
