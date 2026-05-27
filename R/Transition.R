@@ -802,9 +802,12 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plo
         }
         if (tp) title <- paste(title, "plus transition probabilities")
     }
-    if ("xlab" %in% names(userargs)) { xlab <- userargs$xlab; userargs$xlab <- NULL }  else xlab <- "x"
-    if ("ylab" %in% names(userargs)) { ylab <- userargs$ylab; userargs$ylab <- NULL }  else ylab <- "P(X = x)"
-    if ("col" %in% names(userargs))  { col  <- userargs$col;  userargs$col  <- NULL }  else col  <- 1
+    if ("xlab" %in% names(userargs)) { xlab <- userargs$xlab; userargs$xlab <- NULL } else xlab <- "x"
+    if ("ylab" %in% names(userargs)) { ylab <- userargs$ylab; userargs$ylab <- NULL } else ylab <- "P(X = x)"
+    if ("col" %in% names(userargs))  { col  <- userargs$col;  userargs$col  <- NULL } else col  <- 1
+
+    # Adding default x limits if the user has not specified custom limits on the `...` argument.
+    if ("xlim" %in% names(userargs)) { xlim <- userargs$xlim; userargs$xlim <- NULL } else xlim = range(breaks),
 
     # Take first 1:n distributions only
     if (length(x) > n & !all) x <- x[seq_len(n)]
@@ -834,8 +837,8 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plo
                        pch = 19, cex = 0.75,
                        xlab = xlab,
                        ylab = ylab,
+                       xlim = xlim,
                        col  = col,
-                       xlim = range(breaks),
                        ylim = if (tp) c(0, pmax(1, max(rval$y))) else ylim,
                        main = title), userargs))
 
