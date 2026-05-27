@@ -807,7 +807,7 @@ plot.Transition <- function(x, cdf = FALSE, tp = FALSE, all = FALSE, n = 8L, plo
     if ("col" %in% names(userargs))  { col  <- userargs$col;  userargs$col  <- NULL } else col  <- 1
 
     # Adding default x limits if the user has not specified custom limits on the `...` argument.
-    if ("xlim" %in% names(userargs)) { xlim <- userargs$xlim; userargs$xlim <- NULL } else xlim = range(breaks),
+    if ("xlim" %in% names(userargs)) { xlim <- userargs$xlim; userargs$xlim <- NULL } else xlim = range(breaks)
 
     # Take first 1:n distributions only
     if (length(x) > n & !all) x <- x[seq_len(n)]
